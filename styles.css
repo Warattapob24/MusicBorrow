@@ -1,0 +1,10 @@
+/* styles.css - เพิ่มเติมหรือปรับแต่งได้ตามต้องการ */
+body {
+  background: #f8fafc;
+}
+h1, h2, h3 {
+  color: #2d3a4b;
+}
+button {
+  font-weight: bold;
+}

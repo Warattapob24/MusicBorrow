@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Wars: Pitch Command</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #0c0a1a; color: #e0e0e0; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale; touch-action: manipulation;
+        }
+        .game-container {
+            width: 100%; max-width: 800px; padding: 1rem;
+            background: rgba(18, 16, 41, 0.8); border-radius: 20px;
+            border: 1px solid rgba(136, 71, 255, 0.5);
+            box-shadow: 0 0 30px rgba(136, 71, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        .staff-container {
+            position: relative;
+            width: 100%;
+            height: 200px; /* <--- ปรับความสูงเป็น 200px */
+            margin: 2rem 0; /* <--- ปรับระยะห่างเป็น 2rem */
+        }
+        .staff-line { position: absolute; width: 100%; height: 2px; background-color: rgba(255, 255, 255, 0.7); left: 0; }
+        .clef { position: absolute; height: 140%; width: auto; top: 50%; transform: translateY(-50%); left: 10px; fill: #f0f0f0; stroke: #f0f0f0; }
+        .note-wrapper { position: absolute; left: 50%; transform: translateX(-50%); transition: all 0.2s ease-out; }
+        .note-wrapper.correct { transform: translateX(-50%) scale(1.5) rotate(15deg); opacity: 0; }
+        .note-head { 
+            position: relative; 
+            width: 30px; 
+            height: 24px; 
+            background-color: #00f2ff; 
+            border-radius: 50%; 
+            transform: rotate(-15deg); 
+            box-shadow: 0 0 15px #00f2ff, 0 0 25px #00f2ff; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        .note-accidental { font-size: 24px; font-weight: bold; color: #0c0a1a; transform: rotate(15deg); }
+        .note-stem { position: absolute; width: 3px; background-color: #00f2ff; }
+        .note-head.up .note-stem { height: 70px; bottom: 12px; left: 2px; }
+        .note-head.down .note-stem { height: 70px; top: 12px; right: 2px; }
+        .ledger-line { 
+            position: absolute; 
+            width: 45px; 
+            height: 2px; 
+            background-color: rgba(255, 255, 255, 0.7); 
+            left: 50%; 
+            transform: translateX(-50%);
+            top: 11px; /* เพิ่มค่านี้เพื่อให้เส้นอยู่กลางหัวโน้ต */
+        }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 50; }
+        .modal-content { background: #121029; padding: 2rem; border-radius: 15px; border: 1px solid #8847ff; box-shadow: 0 0 30px rgba(136, 71, 255, 0.5); text-align: center; width: 90%; max-width: 500px; }
+        .accidental-selector button { background-color: #374151; color: #D1D5DB; border: 2px solid transparent; transition: all 0.2s; }
+        .accidental-selector button.active { background-color: #4f46e5; color: white; border-color: #818cf8; }
+        .study-mode-toggle .dot { transition: transform 0.2s ease-in-out; }
+        .study-mode-toggle input:checked ~ .dot { transform: translateX(100%); }
+        .study-mode-toggle input:checked ~ div:first-of-type { background-color: #22c55e; }
+        #keyboard-container { height: 160px; transition: opacity 0.3s; }
+        .key { border: 2px solid #0c0a1a; border-top: none; border-radius: 0 0 8px 8px; cursor: pointer; transition: all 0.1s ease-out; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-weight: 600; }
+        .key.unclickable { cursor: default; }
+        .key.white { background-color: #d1d5db; color: #1f2937; height: 100%; width: 14.28%; }
+        .key.black { background-color: #1f2937; color: #e0e0e0; height: 65%; width: 10%; position: absolute; z-index: 10; }
+        .key:active { transform: scale(0.98) translateY(2px); box-shadow: 0 2px 3px rgba(0,0,0,0.2); }
+        .key.correct { background: #22c55e; border-color: #16a34a; color: white; }
+        .key.incorrect { background: #ef4444; border-color: #dc2626; color: white; animation: shake 0.4s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .key[data-note="C#"] { left: 9.28%; } .key[data-note="D#"] { left: 23.57%; } .key[data-note="F#"] { left: 52.14%; }
+        .key[data-note="G#"] { left: 66.42%; } .key[data-note="A#"] { left: 80.71%; }
+        /* สไตล์สำหรับครอบ SVG */
+        /* ทำให้ SVG ยืดเต็มพื้นที่ container */
+        .note-svg-container svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* คลาสสำหรับกลับหัวโน้ต */
+        .note-svg-container.stem-down {
+            transform: rotate(180deg);
+        }
+
+        /* ปรับตำแหน่งเครื่องหมายแปลงเสียงใหม่ */
+        .note-accidental {
+            position: absolute;
+            left: -25px; /* จัดให้อยู่ด้านซ้ายของโน้ต */
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 32px;
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+
+        /* ปรับตำแหน่งเส้น Ledger Line ใหม่ให้อยู่กลางหัวโน้ต */
+        .ledger-line {
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+#close-game-btn {
+    background-color: #7f1d1d; /* สีแดงเข้ม */
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 10px;
+    transition: background-color 0.2s;
+}
+
+#close-game-btn:hover {
+    background-color: #991b1b; /* สีแดงเข้มขึ้นเมื่อ hover */
+}
+    </style>
+</head>
+<body>
+    <main id="game-ui" class="game-container">
+        <header class="flex justify-between items-center mb-2">
+            <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-white tracking-wider">⚔️ Staff Wars</h1>
+                <p id="user-info" class="text-sm text-slate-300"></p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-xl font-bold">Level: <span id="level">1</span></div>
+                <div class="text-xl font-bold">คะแนน: <span id="score">0</span></div>
+                <div class="text-xl font-bold">เวลา: <span id="timer">60</span></div>
+                <button id="mute-btn" class="p-2 rounded-full bg-slate-700 hover:bg-slate-600">🔊</button>
+                <button id="close-game-btn" class="p-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-xl">X</button>
+            </div>
+        </header>
+
+        <div id="staff-container" class="staff-container"></div>
+        
+        <div id="feedback-panel" class="text-center min-h-[200px] pt-4">
+            <div id="sound-feedback-container">
+                 <p id="feedback-text" class="text-xl font-bold h-8 mb-2 text-cyan-400"></p>
+                 <div id="tuner-ui">
+                     <div class="relative w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+                         <div class="absolute w-0.5 h-full bg-white/50 left-1/2 -translate-x-1/2"></div>
+                         <div id="tuner-indicator" class="absolute top-0 w-2 h-full bg-amber-400 rounded-full" style="left: 50%; transform: translateX(-50%);"></div>
+                     </div>
+                     <div class="flex justify-between text-xs px-1 text-slate-400"><span>ต่ำไป</span><span>ตรงกลาง</span><span>สูงไป</span></div>
+                 </div>
+            </div>
+            <div id="keyboard-wrapper" class="hidden">
+                <div id="keyboard-container" class="relative w-full mb-2 flex"></div>
+                <label class="study-mode-toggle flex justify-end items-center gap-2 cursor-pointer pr-1">
+                    <span class="text-sm font-bold text-slate-300">แสดงชื่อโน้ต</span>
+                    <div class="relative">
+                        <input type="checkbox" id="in-game-show-labels-toggle" class="sr-only peer">
+                        <div class="block bg-slate-600 w-10 h-6 rounded-full peer-checked:bg-cyan-500"></div>
+                        <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition peer-checked:translate-x-full"></div>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal-overlay" class="modal-overlay">
+        <div id="modal-content" class="modal-content">
+            <div id="start-screen">
+                <h2 class="text-4xl font-bold mb-4">Pitch Command</h2>
+                <p class="text-lg text-slate-300 mb-6">ตั้งค่าสมรภูมิแล้วเริ่มรบ!</p>
+                <div class="space-y-3 mb-6">
+                    <select id="clef-select" class="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                        <option value="g">กุญแจซอล (Treble)</option>
+                        <option value="f">กุญแจฟา (Bass)</option>
+                        <option value="c-alto">กุญแจอัลโต (Alto)</option>
+                        <option value="c-tenor">กุญแจเทเนอร์ (Tenor)</option>
+                    </select>
+                    <select id="mode-select" class="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                        <option value="sound">โหมดเสียง 🎤</option>
+                        <option value="keyboard">โหมดคีย์บอร์ด 🎹</option>
+                    </select>
+                    <select id="transposition-select" class="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                        <option value="0">เครื่อง C (เสียงตรง)</option>
+                        <option value="-2">เครื่อง B♭ (เช่น ทรัมเป็ต)</option>
+                        <option value="-9">เครื่อง E♭ (เช่น แซกโซโฟน)</option>
+                    </select>
+                     <div id="keyboard-options-modal">
+                         <div class="bg-slate-800 p-3 rounded-lg text-left">
+                             <label class="text-white font-bold mb-2 block">เครื่องหมายแปลงเสียง</label>
+<div id="accidental-selector" class="accidental-selector grid grid-cols-2 gap-2">
+    <button data-value="naturals" class="p-2 rounded-md font-semibold text-xl">♮</button>
+    <button data-value="accidentals" class="p-2 rounded-md font-semibold text-xl">♯/♭</button>
+</div>
+                         </div>
+                     </div>
+                </div>
+                <button id="start-btn" class="w-full bg-cyan-500 text-slate-900 font-bold py-3 px-6 rounded-lg text-xl hover:bg-cyan-400">เริ่มเกม</button>
+            </div>
+             <div id="game-over-screen" class="hidden text-center">
+                 <h2 class="text-4xl font-bold mb-2">หมดเวลา!</h2>
+                 <p class="text-lg text-slate-300 mb-4">คะแนนสุดท้ายของคุณคือ</p>
+                 <p id="final-score" class="text-6xl font-bold text-cyan-400 mb-6">0</p>
+                 <button id="restart-btn" class="w-full bg-cyan-500 text-slate-900 font-bold py-3 px-6 rounded-lg">เล่นอีกครั้ง</button>
+                 <button id="close-game-btn" style="background-color: #7f1d1d; margin-top: 10px;">ออก</button>
+             </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import Supabase to communicate with the backend
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+        const SUPABASE_URL = 'https://qsbvitqxwgtmopjjuxin.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzYnZpdHF4d2d0bW9wamp1eGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTExODMxNDksImV4cCI6MjA2Njc1OTE0OX0.7q2MR7ePBrZKMh08MlZDbeXbFWcoH3dZNgdzWGHOugY';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let currentUserData = null;
+        let gameStartTime = null;
+
+        // Listen for the initial data from the main app
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'INIT_GAME') {
+                currentUserData = event.data.user;
+                // Initialize the game with user data
+                document.getElementById('user-info').textContent = `ผู้เล่น: ${currentUserData.nickname || currentUserData.first_name} | คะแนนสูงสุด: ${currentUserData.staff_wars_highscore}`;
+                document.getElementById('level').textContent = currentUserData.staff_wars_level;
+            }
+        });
+
+        const PitchCommandGame = {
+
+            els: {},
+            state: {},
+            audio: {},
+            keyPressHandler: null,
+
+            config: {
+                INITIAL_TIME: 60,
+                NOTE_NAMES: ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"],
+                A4_MIDI: 69, A4_FREQ: 440,
+                ENHARMONIC_MAP: { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' },
+            NOTES: {
+                g: {'C4':{y:160, l:true}, 'D4':{y:150}, 'E4':{y:140}, 'F4':{y:130}, 'G4':{y:120}, 'A4':{y:110}, 'B4':{y:100}, 'C5':{y:90}, 'D5':{y:80}, 'E5':{y:70}, 'F5':{y:60}, 'G5':{y:50}, 'A5':{y:40, l:true}},
+                f: {'E2':{y:160, l:true}, 'F2':{y:150}, 'G2':{y:140}, 'A2':{y:130}, 'B2':{y:120}, 'C3':{y:110}, 'D3':{y:100}, 'E3':{y:90}, 'F3':{y:80}, 'G3':{y:70}, 'A3':{y:60}, 'B3':{y:50}, 'C4':{y:40, l:true}},
+                'c-alto': {'D3':{y:160, l:true}, 'E3':{y:150}, 'F3':{y:140}, 'G3':{y:130}, 'A3':{y:120}, 'B3':{y:110}, 'C4':{y:100}, 'D4':{y:90}, 'E4':{y:80}, 'F4':{y:70}, 'G4':{y:60}, 'A4':{y:50}, 'B4':{y:40, l:true}},
+                'c-tenor': {'B2':{y:160, l:true}, 'C3':{y:150}, 'D3':{y:140}, 'E3':{y:130}, 'F3':{y:120}, 'G3':{y:110}, 'A3':{y:100}, 'B3':{y:90}, 'C4':{y:80}, 'D4':{y:70}, 'E4':{y:60}, 'F4':{y:50}, 'G4':{y:40, l:true}}
+            },
+                CLEF_DATA: {
+                    g: { path: `<path d="M104.549 111.639c-2.589.845-4.7286 2.271-6.419 4.279-1.6906 2.007-2.7207 4.2-3.0905 6.577-.3698 2.377-.066 4.728.9113 7.052.9773 2.325 2.8131 4.2 5.5072 5.627.634 0 1.03.264 1.189.792.158.528-.08.792-.713.792-2.589-.528-4.8606-1.611-6.8152-3.248-3.6452-3.012-5.6526-6.894-6.0224-11.649-.2113-2.377.0132-4.675.6736-6.894.6603-2.219 1.5716-4.253 2.7338-6.102 1.4263-1.954 3.1168-3.645 5.0715-5.071.1056-.106.4094-.343.9112-.713.5019-.37.9905-.713 1.466-1.03.4755-.317 1.1885-.819 2.1395-1.506L99.1601 86.44c-2.5886 2.166-5.1507 4.556-7.6864 7.171-2.5358 2.615-4.8338 5.376-6.8941 8.281-2.0602 2.906-3.7111 5.983-4.9526 9.232-1.2414 3.249-1.8621 6.669-1.8621 10.262 0 3.328.6999 6.458 2.0999 9.39 1.3999 2.932 3.2621 5.481 5.5865 7.646 2.3244 2.166 5.0054 3.87 8.043 5.112 3.0376 1.241 6.1148 1.862 9.2317 1.862.106 0 .594-.053 1.466-.159.872-.105 1.796-.237 2.773-.396.978-.158 1.876-.33 2.695-.515.818-.185 1.228-.383 1.228-.594l-.476-2.219c-2.06-10.407-4.015-20.365-5.863-29.874zm2.773-.317 6.498 31.459c3.751-1.427 6.286-3.87 7.607-7.33 1.321-3.46 1.624-6.973.911-10.539-.713-3.566-2.39-6.723-5.032-9.47-2.641-2.747-5.969-4.12-9.984-4.12zm-8.3204-42.394c1.6374-.846 3.1564-2.113 4.5564-3.804 1.4-1.69 2.694-3.5 3.883-5.428 1.188-1.928 2.219-3.896 3.09-5.904.872-2.007 1.572-3.829 2.1-5.467.581-1.743.977-3.698 1.189-5.864.211-2.166-.132-3.988-1.03-5.468-.634-1.32-1.466-2.086-2.496-2.298-1.031-.211-2.061-.132-3.091.238-1.03.37-2.007.964-2.932 1.783-.924.819-1.598 1.545-2.02 2.179-1.163 2.06-2.18 4.358-3.0513 6.894-.8717 2.536-1.466 5.164-1.7829 7.885-.317 2.72-.3566 5.335-.1189 7.845.2377 2.509.8056 4.979 1.7037 7.409zm-2.3772 2.456c-.8981-3.486-1.6905-6.907-2.3773-10.262-.6868-3.354-1.0301-6.801-1.0301-10.341 0-2.588.1849-5.428.5547-8.518.3697-3.09 1.0433-6.102 2.0206-9.034.9773-2.932 2.3244-5.56 4.0413-7.884 1.7174-2.325 4.0014-4.015 6.8544-5.072.264-.105.528-.158.792-.158.37 0 .806.211 1.308.634.502.422 1.03 1.043 1.585 1.862.554.819 1.043 1.664 1.466 2.536.422.871.739 1.466.951 1.783 1.426 2.694 2.469 5.56 3.13 8.597.66 3.038 1.043 6.062 1.149 9.073.211 4.544-.04 9.034-.753 13.472-.713 4.437-2.153 8.769-4.319 12.995-.739 1.268-1.492 2.549-2.258 3.843-.766 1.295-1.677 2.549-2.734 3.764-.211.212-.594.595-1.149 1.149l-1.704 1.704c-.581.581-1.096 1.123-1.545 1.624-.449.502-.673.806-.673.912l3.248 15.848c.021.104 1.625 0 1.625 0 3.1.039 6.382.541 9.232 1.664 2.747 1.268 5.111 3.011 7.092 5.23 1.981 2.219 3.565 4.715 4.754 7.488 1.189 2.774 1.783 5.587 1.783 8.44 0 2.852-.423 5.758-1.268 8.716-2.166 5.6-5.626 9.747-10.38 12.441-.529.317-1.282.674-2.259 1.07-.977.396-1.36 1.017-1.149 1.862 1.268 5.756 2.126 9.716 2.576 11.886.449 2.17.779 4.97.99 8.4.211 3.28-.357 6.23-1.704 8.87-1.347 2.65-3.156 4.8-5.428 6.46-2.271 1.67-4.345 2.64-6.22 2.94-1.876.29-3.157.43-3.843.43-2.3776 0-4.702-.45-6.9736-1.35-2.7999-1.05-5.1507-2.66-7.0525-4.83-1.9018-2.17-2.8527-4.81-2.8527-7.92 0-1.96.5679-3.97 1.7037-6.03 1.1358-2.06 2.6282-3.54 4.4771-4.43 2.0603-1.06 3.9225-1.35 5.5866-.88 1.664.48 3.0375 1.38 4.1205 2.7 1.0829 1.32 1.8359 2.92 2.2589 4.79.422 1.88.396 3.63-.08 5.27-.475 1.64-1.439 3.03-2.892 4.16-1.4528 1.14-3.4735 1.65-6.062 1.55 1.0565 1.9 2.5357 3.1 4.4375 3.6 1.9018.51 3.8565.54 5.8635.12 2.008-.42 3.896-1.2 5.666-2.34 1.77-1.13 3.157-2.36 4.16-3.68.634-.95 1.11-2.19 1.427-3.72.317-1.54.502-3.13.554-4.8.053-1.66 0-2.96-.158-3.88-.159-.93-.423-2.37-.793-4.32-1.584-6.39-2.588-10.41-3.011-12.05-.211-.523-.779-.695-1.703-.51-.925.185-1.704.357-2.338.51-4.543.59-8.3468.32-11.4108-.787-4.7545-1.268-8.9411-3.527-12.5598-6.776-3.6187-3.248-6.5242-7.184-8.7166-11.807-2.1923-4.622-3.2885-8.135-3.2885-10.539v-4.556c0-4.279.7396-8.294 2.2188-12.045 2.7998-5.864 6.1148-11.252 9.9448-16.165 3.83-4.913 8.2015-9.483 13.1145-13.709z"/>`, viewBox: '0 0 200 200' },
+                    f: { path: `<g transform="translate(-80.598 -338.39)" fill-rule="evenodd"><path d="m94.574 338.62c-8.785 0.21-15.515 6.36-13.334 15.79 0.002 0.01 0.013 0.02 0.016 0.03 0.256 3.25 2.96 5.81 6.276 5.81 3.485 0 6.309-2.82 6.309-6.3 0-3.08-2.191-5.64-5.098-6.2-1.158-0.41-2.896-1.34-2.82-2.84 0.036-0.74 0.903-2.09 2.294-2.77 1.691-0.79 3.434-1.22 5.194-0.86 2.667 0.49 9.489 5.39 10.019 13.88 0.31 6.44-3.31 15.15-6.849 19.27-5.698 6.51-14.851 10.55-13.955 11.27 0.803 0.72 11.61-4.22 17.237-10.42 6.867-7.44 10.267-13.64 9.937-21.17-0.19-7.54-6.03-15.7-15.226-15.49z" stroke-width=".45574"/><path stroke-linejoin="round" d="m116.86 36.473a9.7721 9.1613 0 1 1 -19.546 0 9.7721 9.1613 0 1 1 19.546 0z" transform="matrix(.50978 0 0 .50978 61.959 329.32)" stroke-linecap="round" stroke-width=".894"/><path stroke-linejoin="round" d="m116.86 36.473a9.7721 9.1613 0 1 1 -19.546 0 9.7721 9.1613 0 1 1 19.546 0z" transform="matrix(.50978 0 0 .50978 61.959 342.37)" stroke-linecap="round" stroke-width=".894"/></g>`, viewBox: '0 0 41.161 47.605' },
+                    'c-alto': { path: `<g><path d="M 325.9,546.8 C 325.8,548.7 324.7,550.7 322.8,551.5 C 321.1,552.1 319.1,552.2 317.6,551 C 316.6,550.2 316.2,548.4 317.3,547.5 C 318.3,546.5 320.4,547.4 320.3,548.9 C 320.7,549.9 318.5,550.5 319.7,551.3 C 321,551.6 322.3,550.5 322.6,549.3 C 323.1,547.5 323.1,545.6 322.7,543.8 C 322.4,542.9 321.9,541.5 320.7,541.9 C 319.2,542.2 318.3,543.8 317.9,545.1 C 317.6,543.2 316.4,541.5 315,540.2 C 315,544.1 315,548 315,551.9 L 314.1,551.9 C 314.1,543.9 314.1,535.7 314.1,527.7 L 315,527.7 C 315,531.5 315,535.5 315,539.4 C 316.4,538.1 317.6,536.4 317.8,534.5 C 318.3,535.9 319.3,537.5 321,537.8 C 322.2,537.8 322.5,536.3 322.8,535.4 C 323.1,533.7 323.1,531.8 322.6,530.1 C 322.2,529 320.9,528 319.6,528.3 C 318.6,529 320.6,529.6 320.3,530.6 C 320.5,532 318.8,533 317.6,532.3 C 316.3,531.6 316.4,529.7 317.4,528.8 C 318,528.1 319.3,527.7 320.3,527.7 C 321.2,527.7 321.8,527.7 322.6,528 C 324.6,528.7 325.7,530.7 325.9,532.7 C 326.2,534.9 324.9,537.3 322.8,538.2 C 321.5,538.7 319.9,538.3 318.8,537.3 C 318.7,538.3 318.2,539.2 317.7,539.9 C 318.1,540.6 318.6,541.8 318.8,542.1 C 320.1,540.9 322.5,540.8 323.8,542 C 325.2,543.1 326.1,545 325.9,546.8 z"/><path d="m 312.2,551.9 -2.8,0 0,-24.2 2.8,0 0,24.2 z"/></g>`, viewBox: '309 527 18 25' },
+                    'c-tenor': { path: `<g><path d="M 325.9,546.8 C 325.8,548.7 324.7,550.7 322.8,551.5 C 321.1,552.1 319.1,552.2 317.6,551 C 316.6,550.2 316.2,548.4 317.3,547.5 C 318.3,546.5 320.4,547.4 320.3,548.9 C 320.7,549.9 318.5,550.5 319.7,551.3 C 321,551.6 322.3,550.5 322.6,549.3 C 323.1,547.5 323.1,545.6 322.7,543.8 C 322.4,542.9 321.9,541.5 320.7,541.9 C 319.2,542.2 318.3,543.8 317.9,545.1 C 317.6,543.2 316.4,541.5 315,540.2 C 315,544.1 315,548 315,551.9 L 314.1,551.9 C 314.1,543.9 314.1,535.7 314.1,527.7 L 315,527.7 C 315,531.5 315,535.5 315,539.4 C 316.4,538.1 317.6,536.4 317.8,534.5 C 318.3,535.9 319.3,537.5 321,537.8 C 322.2,537.8 322.5,536.3 322.8,535.4 C 323.1,533.7 323.1,531.8 322.6,530.1 C 322.2,529 320.9,528 319.6,528.3 C 318.6,529 320.6,529.6 320.3,530.6 C 320.5,532 318.8,533 317.6,532.3 C 316.3,531.6 316.4,529.7 317.4,528.8 C 318,528.1 319.3,527.7 320.3,527.7 C 321.2,527.7 321.8,527.7 322.6,528 C 324.6,528.7 325.7,530.7 325.9,532.7 C 326.2,534.9 324.9,537.3 322.8,538.2 C 321.5,538.7 319.9,538.3 318.8,537.3 C 318.7,538.3 318.2,539.2 317.7,539.9 C 318.1,540.6 318.6,541.8 318.8,542.1 C 320.1,540.9 322.5,540.8 323.8,542 C 325.2,543.1 326.1,545 325.9,546.8 z"/><path d="m 312.2,551.9 -2.8,0 0,-24.2 2.8,0 0,24.2 z"/></g>`, viewBox: '309 527 18 25' }
+                }
+            },
+
+            init() {
+                this.cacheDOMElements();
+                this.precalculateFrequencies();
+                this.setupAudio();
+                this.bindEvents();
+                this.resetGame();
+            },
+
+            cacheDOMElements() {
+                const ids = [
+                    'score', 'timer', 'staff-container', 'feedback-panel', 'feedback-text', 'tuner-ui',
+                    'tuner-indicator', 'modal-overlay', 'modal-content', 'start-screen', 'game-over-screen',
+                    'start-btn', 'restart-btn', 'final-score', 'clef-select', 'mode-select', 'mute-btn',
+                    'accidental-selector', 'keyboard-options-modal', 'in-game-show-labels-toggle',
+                    'sound-feedback-container', 'keyboard-wrapper', 'keyboard-container', 'transposition-select'
+                ];
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        const camelCaseId = id.replace(/-([a-z])/g, g => g[1].toUpperCase());
+                        this.els[camelCaseId] = el;
+                    }
+                });
+            },
+
+            setupAudio() {
+                this.audio.bgMusic = new Audio('https://cdn.pixabay.com/audio/2025/05/03/audio_327c570a65.mp3');
+                this.audio.bgMusic.loop = true;
+                this.audio.bgMusic.volume = 0.25;
+                this.audio.correct = new Audio('https://cdn.pixabay.com/audio/2025/06/21/audio_d2e98a6f49.mp3');
+                this.audio.correct.volume = 0.7;
+                this.audio.incorrect = new Audio('https://cdn.pixabay.com/audio/2025/04/14/audio_fa4f3e1533.mp3');
+                this.audio.incorrect.volume = 0.7;
+                this.audio.start = new Audio('https://cdn.pixabay.com/audio/2022/03/10/audio_edf7b16049.mp3');
+                this.audio.start.volume = 0.7;
+                this.audio.end = new Audio('https://cdn.pixabay.com/audio/2025/06/26/audio_0ef82a1331.mp3');
+                this.audio.end.volume = 0.7;
+            },
+
+            playSound(sound) {
+                if (!sound || (this.state.isMuted && sound !== this.audio.start)) return;
+                sound.currentTime = 0;
+                sound.play().catch(() => {});
+            },
+
+            toggleMute() {
+                this.state.isMuted = !this.state.isMuted;
+                this.els.muteBtn.textContent = this.state.isMuted ? '🔇' : '🔊';
+                if (this.audio.bgMusic) this.audio.bgMusic.muted = this.state.isMuted;
+            },
+
+            playPianoNote(noteName) {
+            // สร้าง AudioContext ถ้ายังไม่มี (จำเป็นสำหรับ Web Audio API)
+            if (!this.state.audioContext) {
+                this.state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // จัดการกรณีที่เบราว์เซอร์บล็อกเสียงก่อนผู้ใช้จะคลิก
+            if (this.state.audioContext.state === 'suspended') {
+                this.state.audioContext.resume();
+            }
+
+            const freq = this.config.NOTE_FREQUENCIES[noteName];
+            // ถ้าหาความถี่ไม่เจอ หรือปิดเสียงอยู่ ให้หยุดทำงาน
+            if (!freq || this.state.isMuted) return;
+
+            // 1. สร้างต้นกำเนิดเสียง (Oscillator)
+            const oscillator = this.state.audioContext.createOscillator();
+            // 2. สร้างตัวควบคุมความดัง (GainNode) เพื่อทำให้เสียงไม่แข็งทื่อ
+            const gainNode = this.state.audioContext.createGain();
+
+            // 3. ต่อวงจรเสียง: Oscillator -> Gain -> ลำโพง
+            oscillator.connect(gainNode);
+            gainNode.connect(this.state.audioContext.destination);
+
+            // 4. ตั้งค่าเสียง
+            oscillator.type = 'triangle'; // ใช้คลื่นเสียงทรงสามเหลี่ยม จะได้เสียงคล้ายๆ Electric Piano
+            oscillator.frequency.setValueAtTime(freq, this.state.audioContext.currentTime);
+
+            // 5. สร้างซองเสียง (Envelope) ให้เหมือนการกดคีย์เปียโน (กดแล้วเสียงค่อยๆ หายไป)
+            const now = this.state.audioContext.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01); // Attack: เสียงดังขึ้นอย่างรวดเร็ว
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.5); // Decay: เสียงค่อยๆ เบาลงจนเงียบ
+
+            // 6. เริ่มเล่นและตั้งเวลาหยุด
+            oscillator.start(now);
+            oscillator.stop(now + 0.5);
+        },
+
+            bindEvents() {
+                this.els.startBtn.addEventListener('click', () => this.startGame());
+                this.els.restartBtn.addEventListener('click', () => this.resetGame());
+                this.els.muteBtn.addEventListener('click', () => this.toggleMute());
+                this.els.modeSelect.addEventListener('change', () => this.handleModeChange());
+                this.els.clefSelect.addEventListener('change', (e) => this.handleClefChange(e));
+                this.els.accidentalSelector.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'BUTTON') {
+                        this.setAccidentalPreference(e.target.dataset.value);
+                    }
+                });
+                this.els.inGameShowLabelsToggle.addEventListener('change', () => this.createKeyboard());
+            },
+
+            resetGame() {
+                if (this.state.timerInterval) clearInterval(this.state.timerInterval);
+                if (this.audio.bgMusic) this.audio.bgMusic.pause();
+                
+            this.state = {
+                score: 0,
+                timeLeft: this.config.INITIAL_TIME,
+                currentNoteKey: null,
+                isGameActive: false,
+                isChecking: false,
+                correctPitchStartTime: null, // <--- เพิ่มตัวนี้กลับมา
+                timerInterval: null,
+                audioContext: null,
+                analyser: null,
+                mediaStream: null,
+                pitchLoopId: null,
+                };
+                
+                this.els.gameOverScreen.classList.add('hidden');
+                this.els.startScreen.classList.remove('hidden');
+                this.els.modalOverlay.classList.remove('hidden');
+                
+                this.els.score.textContent = '0';
+                this.els.timer.textContent = this.config.INITIAL_TIME;
+                this.setControlsDisabled(false);
+                this.handleModeChange();
+                this.setAccidentalPreference('accidentals');
+                this.els.staffContainer.innerHTML = '';
+            },
+
+            async startGame() {
+                if (this.state.isGameActive) return;
+                this.playSound(this.audio.start);
+                this.els.startBtn.disabled = true;
+                
+                this.state.currentClef = this.els.clefSelect.value;
+                this.state.currentMode = this.els.modeSelect.value;
+                this.state.transposition = parseInt(this.els.transpositionSelect.value, 10);
+                
+                if (this.state.currentMode === 'sound') {
+                    const micReady = await this.setupPitchDetection();
+                    if (!micReady) {
+                        alert('ไม่สามารถเข้าถึงไมโครโฟนได้ โปรดตรวจสอบการตั้งค่า');
+                        this.resetGame(); // กลับไปหน้าแรก
+                        return;
+                    }
+                }
+                
+                this.state.isGameActive = true;
+                this.els.modalOverlay.classList.add('hidden');
+                this.setControlsDisabled(true);
+                if (!this.state.isMuted) this.playSound(this.audio.bgMusic);
+
+                this.drawStaff();
+                this.generateNewNote();
+                this.state.timerInterval = setInterval(() => this.updateTimer(), 1000);
+                
+                if (this.state.currentMode === 'sound') {
+                    this.getPitch();
+                }
+                this.els.startBtn.disabled = false;
+                gameStartTime = Date.now(); // Record start time                
+            },
+
+            async endGame() {
+                this.state.isGameActive = false;
+                if(this.state.timerInterval) clearInterval(this.state.timerInterval);
+                this.state.timerInterval = null;
+                this.stopPitchDetection();
+                if (this.audio.bgMusic) this.audio.bgMusic.pause();
+                this.playSound(this.audio.end);
+                
+                this.els.finalScore.textContent = this.state.score;
+                this.els.startScreen.classList.add('hidden');
+                this.els.gameOverScreen.classList.remove('hidden');
+                this.els.modalOverlay.classList.remove('hidden');
+
+                if (!currentUserData) return;
+
+                // 1. Calculate and log practice time
+    const gameEndTime = Date.now();
+    const durationInMinutes = (gameEndTime - gameStartTime) / 60000;
+
+    window.parent.postMessage({
+        type: 'GAME_OVER',
+        payload: {
+            gameName: 'staffwars',
+            score: this.state.score,
+            duration: durationInMinutes
+        }
+    }, '*');
+            },
+            
+            updateTimer() {
+                if (!this.state.isGameActive) return;
+                this.state.timeLeft--;
+                this.els.timer.textContent = this.state.timeLeft;
+                if (this.state.timeLeft <= 0) {
+                    this.endGame();
+                }
+            },
+            
+            setControlsDisabled(disabled) {
+                this.els.clefSelect.disabled = disabled;
+                this.els.transpositionSelect.disabled = disabled;
+                this.els.modeSelect.disabled = disabled;
+                this.els.accidentalSelector.querySelectorAll('button').forEach(btn => btn.disabled = disabled);
+            },
+            
+            handleModeChange() {
+                const mode = this.els.modeSelect.value;
+                const isSoundMode = mode === 'sound';
+                this.els.transpositionSelect.style.display = isSoundMode ? 'block' : 'none';
+            },
+            
+            handleClefChange(e) {
+                this.state.currentClef = e.target.value;
+                if (this.state.isGameActive) {
+                    this.drawStaff();
+                    this.generateNewNote();
+                } else {
+                     this.drawStaff();
+                }
+            },
+            
+            drawStaff() {
+                this.els.staffContainer.innerHTML = '';
+                const clefData = this.config.CLEF_DATA[this.state.currentClef];
+                const clefSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                clefSvg.setAttribute('class', 'clef');
+                clefSvg.setAttribute('viewBox', clefData.viewBox);
+                clefSvg.innerHTML = clefData.path;
+
+            if (this.state.currentClef === 'c-alto') clefSvg.style.transform = 'translateY(-50%) translateX(-28%) scale(0.29)';
+            else if (this.state.currentClef === 'c-tenor') clefSvg.style.transform = 'translateY(-57%) translateX(-28%) scale(0.29)';
+            else if (this.state.currentClef === 'f') clefSvg.style.transform = 'translateY(-52.5%) translateX(-28%) scale(0.25)';
+            else if (this.state.currentClef === 'g') clefSvg.style.transform = 'translateY(-50%) translateX(-30%) scale(0.65)';
+                
+                this.els.staffContainer.appendChild(clefSvg);
+            for (let i = 0; i < 5; i++) {
+                const line = document.createElement('div');
+                line.className = 'staff-line';
+                line.style.top = `${60 + i * 20}px`; // ใช้ค่า pixel แบบคงที่
+                this.els.staffContainer.appendChild(line);
+            }
+        },
+
+        generateNewNote() {
+            const currentNotes = this.config.NOTES[this.state.currentClef];
+            let notePool = Object.keys(currentNotes);
+            const preference = this.state.accidentalPreference;
+
+            if (preference === 'naturals') {
+                notePool = notePool.filter(note => !note.includes('#'));
+            }
+            
+            // --- ตรรกะใหม่: เพิ่มโอกาสให้โน้ต #/b ออกบ่อยขึ้น ---
+            if (preference === 'accidentals' || preference === 'all') {
+                const accidentalChance = 0.5; // << 📍 ปรับค่าตรงนี้! (0.5 = 50%)
+
+                if (Math.random() < accidentalChance) {
+                    // ถ้าสุ่มติด 50% นี้ ให้ "บังคับ" สุ่มเฉพาะโน้ต #/b
+                    const sharpsPool = notePool.filter(note => note.includes('#'));
+                    if (sharpsPool.length > 0) {
+                        this.state.currentNoteKey = sharpsPool[Math.floor(Math.random() * sharpsPool.length)];
+                    } else {
+                        // กรณีฉุกเฉิน ถ้าไม่มีโน้ต #/b ให้สุ่มจากทั้งหมดแทน
+                        this.state.currentNoteKey = notePool[Math.floor(Math.random() * notePool.length)];
+                    }
+                } else {
+                    // ถ้าไม่ติด 50% ก็สุ่มจากโน้ตทั้งหมดตามปกติ
+                    this.state.currentNoteKey = notePool[Math.floor(Math.random() * notePool.length)];
+                }
+            } else {
+                // ถ้าเป็นโหมด naturals ก็สุ่มจากโน้ตธรรมดาตามปกติ
+                this.state.currentNoteKey = notePool[Math.floor(Math.random() * notePool.length)];
+            }
+            // --- จบตรรกะใหม่ ---
+
+            this.state.isChecking = false;
+            this.state.correctPitchStartTime = null;
+
+            this.drawNote();
+
+            if (this.state.currentMode === 'keyboard') {
+                this.els.soundFeedbackContainer.classList.add('hidden');
+                this.els.keyboardWrapper.classList.remove('hidden');
+                this.createKeyboard();
+            } else {
+                this.els.soundFeedbackContainer.classList.remove('hidden');
+                this.els.keyboardWrapper.classList.add('hidden');
+                this.updateFeedback('เล่นโน้ตบนหน้าจอ!', 'cyan');
+            }
+        },
+
+        drawNote() {
+            const oldNote = this.els.staffContainer.querySelector('.note-wrapper');
+            if (oldNote) oldNote.remove();
+            if (!this.state.currentNoteKey) return;
+
+            const noteData = this.config.NOTES[this.state.currentClef][this.state.currentNoteKey];
+            if (!noteData) return;
+
+            const noteWrapper = document.createElement('div');
+            noteWrapper.className = 'note-wrapper';
+            noteWrapper.style.top = `${noteData.y - 12}px`; // ใช้ค่า y ตรงๆ
+
+            let noteName = this.state.currentNoteKey.slice(0, -1);
+            const preference = this.state.accidentalPreference;
+            if ((preference === 'accidentals' || preference === 'all') && noteName.includes('#')) {
+                if (Math.random() < 0.5) {
+                    const flatName = this.config.ENHARMONIC_MAP[noteName];
+                    if (flatName) noteName = flatName;
+                }
+            }
+
+            let accidentalHtml = '';
+            if (noteName.includes('#')) {
+                accidentalHtml = `<span class="note-accidental">♯</span>`;
+            } else if (noteName.includes('b')) {
+                accidentalHtml = `<span class="note-accidental">♭</span>`;
+            }
+
+            const isStemUp = noteData.y >= 100; // เปลี่ยนเงื่อนไขการกลับด้านของก้านโน้ต
+            const noteHTML = `<div class="note-head ${isStemUp ? 'up' : 'down'}">${accidentalHtml}<div class="note-stem"></div></div>`;
+            
+            const noteDiv = document.createElement('div');
+            noteDiv.innerHTML = noteHTML;
+
+            if (noteData.l) {
+                const ledgerLine = document.createElement('div');
+                ledgerLine.className = 'ledger-line';
+                noteWrapper.appendChild(ledgerLine);
+            }
+            
+            noteWrapper.appendChild(noteDiv);
+            this.els.staffContainer.appendChild(noteWrapper);
+        },
+
+        handleCorrectAnswer() {
+            this.playSound(this.audio.correct);
+            this.processAnswer(true);
+        },
+            
+            handleIncorrectAnswer(message) {
+                this.playSound(this.audio.incorrect);
+                this.updateFeedback(message, 'red');
+                this.processAnswer(false);
+            },
+
+        processAnswer(isCorrect) {
+            if (!this.state.isGameActive) return;
+            this.state.isChecking = true; // ตั้งสถานะว่ากำลังตรวจสอบคำตอบ (เกมหยุดชั่วคราว)
+
+            if (isCorrect) {
+                this.state.score++;
+                const timeBonus = this.state.currentMode === 'sound' ? 2 : 1;
+                this.state.timeLeft += timeBonus;
+                
+                // อัปเดตคะแนนและเวลาบนหน้าจอ
+                this.els.score.textContent = this.state.score;
+                this.els.timer.textContent = this.state.timeLeft;
+
+                const noteEl = this.els.staffContainer.querySelector('.note-wrapper');
+                if(noteEl) noteEl.classList.add('correct');
+                
+                // หน่วงเวลาเล็กน้อยแล้วสร้างโน้ตตัวต่อไป
+                setTimeout(() => {
+                    if (this.state.isGameActive) this.generateNewNote();
+                }, 600); // เพิ่ม delay เล็กน้อยเพื่อให้เห็น feedback ชัดขึ้น
+            } else {
+                this.state.timeLeft -= 2;
+                if (this.state.timeLeft < 0) this.state.timeLeft = 0;
+                this.els.timer.textContent = this.state.timeLeft;
+                
+                setTimeout(() => {
+                    this.state.isChecking = false; // คืนสถานะให้เกมดำเนินต่อ
+                    if (this.state.isGameActive) this.generateNewNote();
+                }, 1200);
+            }
+        },
+
+            updateFeedback(message, color) {
+                if (this.els.feedbackText) {
+                    this.els.feedbackText.textContent = message;
+                    this.els.feedbackText.className = `text-xl font-bold h-8 mb-2 text-${color}-400`;
+                }
+            },
+
+            createKeyboard() {
+                const container = this.els.keyboardContainer;
+                if (!container) return;
+                container.innerHTML = '';
+                const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+                const showLabels = this.els.inGameShowLabelsToggle.checked;
+
+                notes.forEach(note => {
+                    const key = document.createElement('div');
+                    key.className = 'key white flex items-end justify-center p-2 text-lg';
+                    key.dataset.note = note;
+                    if (showLabels) key.textContent = note;
+                    container.appendChild(key);
+                });
+                
+                for (const sharp in this.config.ENHARMONIC_MAP) {
+                    const key = document.createElement('div');
+                    key.className = 'key black flex items-center justify-center text-sm';
+                    key.dataset.note = sharp;
+                    if (showLabels) {
+                        key.innerHTML = `<div class="text-center leading-tight">${sharp}<br>${this.config.ENHARMONIC_MAP[sharp]}</div>`;
+                    }
+                    container.appendChild(key);
+                }
+
+                if (this.keyPressHandler) {
+                    container.removeEventListener('click', this.keyPressHandler);
+                }
+                this.keyPressHandler = this.handleKeyClick.bind(this);
+                container.addEventListener('click', this.keyPressHandler);
+            },
+            
+            handleKeyClick(e) {
+            if (!this.state.isGameActive || this.state.isChecking) return;
+            const keyElement = e.target.closest('.key');
+            if (!keyElement) return;
+
+            // --- ส่วนที่เพิ่มเข้ามา ---
+            // นำชื่อโน้ตจากปุ่ม (เช่น "C#") มารวมกับ Octave ที่ 4
+            const noteToPlay = keyElement.dataset.note + '4'; 
+            this.playPianoNote(noteToPlay);
+            // --- จบส่วนที่เพิ่มเข้ามา ---
+
+            this.state.isChecking = true;
+            
+            const selectedNote = keyElement.dataset.note;
+            const correctNote = this.state.currentNoteKey.slice(0, -1);
+            
+            const isCorrect = (selectedNote === correctNote || this.config.ENHARMONIC_MAP[selectedNote] === correctNote || this.config.ENHARMONIC_MAP[correctNote] === selectedNote);
+            
+            keyElement.classList.add(isCorrect ? 'correct' : 'incorrect');
+
+            if (isCorrect) {
+                this.handleCorrectAnswer();
+            } else {
+                this.handleIncorrectAnswer('ผิด!');
+            }
+        },
+
+            setAccidentalPreference(value) {
+                this.state.accidentalPreference = value;
+                this.els.accidentalSelector.querySelectorAll('button').forEach(btn => btn.classList.toggle('active', btn.dataset.value === value));
+            },
+
+            async setupPitchDetection() {
+                try {
+                    if (!this.state.audioContext) {
+                        this.state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    if (this.state.audioContext.state === 'suspended') {
+                        await this.state.audioContext.resume();
+                    }
+                    this.state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const source = this.state.audioContext.createMediaStreamSource(this.state.mediaStream);
+                    this.state.analyser = this.state.audioContext.createAnalyser();
+                    this.state.analyser.fftSize = 2048;
+                    source.connect(this.state.analyser);
+                    this.state.dataArray = new Float32Array(this.state.analyser.fftSize);
+                    return true;
+                } catch (err) {
+                    console.error('Error setting up pitch detection:', err);
+                    return false;
+                }
+            },
+            
+            stopPitchDetection() {
+                if (this.state.pitchLoopId) cancelAnimationFrame(this.state.pitchLoopId);
+                if (this.state.mediaStream) this.state.mediaStream.getTracks().forEach(track => track.stop());
+                this.state.pitchLoopId = null;
+                this.state.mediaStream = null;
+            },
+            
+        getPitch() {
+            if (!this.state.isGameActive || !this.state.analyser) return;
+            this.state.analyser.getFloatTimeDomainData(this.state.dataArray);
+            const frequency = this.autoCorrelate(this.state.dataArray, this.state.audioContext.sampleRate);
+
+            if (frequency !== -1 && !this.state.isChecking) {
+                this.checkPitch(frequency);
+            }
+
+            this.state.pitchLoopId = requestAnimationFrame(() => this.getPitch());
+        },
+
+        checkPitch(frequency) {
+            const targetFreq = this.getTargetConcertFrequency();
+            if (!targetFreq || this.state.isChecking) return;
+
+            const heardNoteName = this.concertPitchToWrittenPitch(frequency);
+            if (!heardNoteName) return; 
+
+            const cents = 1200 * Math.log2(frequency / targetFreq);
+            const tunerOffset = Math.max(-50, Math.min(50, cents));
+            if (this.els.tunerIndicator) this.els.tunerIndicator.style.left = `calc(50% + ${tunerOffset}%)`;
+
+            let feedbackMessage = `เสียงที่ได้ยิน: ${heardNoteName}`;
+            let feedbackColor = 'amber';
+
+            if (Math.abs(cents) < 20) {
+                if(this.els.tunerIndicator) this.els.tunerIndicator.classList.add('correct-pitch');
+                feedbackMessage += ' (ยอดเยี่ยม!)';
+                feedbackColor = 'green';
+
+                if (this.state.correctPitchStartTime === null) {
+                    this.state.correctPitchStartTime = Date.now();
+                } else if (Date.now() - this.state.correctPitchStartTime >= 500) {
+                    this.state.isChecking = true; // <--- เพิ่มบรรทัดนี้เพื่อ "เหยียบเบรก" ให้เกม
+                    this.handleCorrectAnswer();
+                }
+            } else {
+                if(this.els.tunerIndicator) this.els.tunerIndicator.classList.remove('correct-pitch');
+                this.state.correctPitchStartTime = null;
+
+                if (cents > 20) {
+                    feedbackMessage += ' (สูงไป 🔼)';
+                } else if (cents < -20) {
+                    feedbackMessage += ' (ต่ำไป 🔽)';
+                }
+            }
+            
+            this.updateFeedback(feedbackMessage, feedbackColor);
+        },
+
+            getTargetConcertFrequency() {
+                const writtenNoteFreq = this.config.NOTE_FREQUENCIES[this.state.currentNoteKey];
+                if (!writtenNoteFreq) return null;
+                const midi = 69 + 12 * Math.log2(writtenNoteFreq / this.config.A4_FREQ);
+                const concertMidi = midi + this.state.transposition;
+                return this.config.A4_FREQ * Math.pow(2, (concertMidi - 69) / 12);
+            },
+
+            autoCorrelate(buf, sampleRate) {
+                const SIZE = buf.length;
+                let rms = 0;
+                for (let i = 0; i < SIZE; i++) {
+                    rms += buf[i] * buf[i];
+                }
+                rms = Math.sqrt(rms / SIZE);
+                if (rms < 0.01) return -1;
+
+                let r1 = 0, r2 = SIZE - 1;
+                const thres = 0.2;
+                for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+                for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+                buf = buf.slice(r1, r2);
+
+                const c = new Array(buf.length).fill(0);
+                for (let i = 0; i < buf.length; i++) {
+                    for (let j = 0; j < buf.length - i; j++) {
+                        c[i] += buf[j] * buf[j+i];
+                    }
+                }
+
+                let d = 0;
+                while (d < c.length -1 && c[d] > c[d+1]) d++;
+                
+                let maxval = -1, maxpos = -1;
+                for (let i = d; i < buf.length; i++) {
+                    if (c[i] > maxval) {
+                        maxval = c[i];
+                        maxpos = i;
+                    }
+                }
+                if (maxpos === -1) return -1;
+                
+                let T0 = maxpos;
+                const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+                if (x1 && x2 && x3) {
+                    const a = (x1 + x3 - 2 * x2) / 2;
+                    const b = (x3 - x1) / 2;
+                    if (a) T0 = T0 - b / (2 * a);
+                }
+                
+                return sampleRate / T0;
+            },
+
+        calculateFrequency(noteKey) {
+            const noteNameOnly = noteKey.slice(0, -1);
+            const octave = parseInt(noteKey.slice(-1), 10);
+            const semitoneIndex = this.config.NOTE_NAMES.indexOf(noteNameOnly);
+            if (semitoneIndex === -1) return null;
+
+            const midiNumber = 12 * (octave + 1) + semitoneIndex;
+            return this.config.A4_FREQ * Math.pow(2, (midiNumber - this.config.A4_MIDI) / 12);
+        },
+
+        precalculateFrequencies() {
+            this.config.NOTE_FREQUENCIES = {}; // เริ่มจากออบเจ็กต์ว่างๆ
+            for (const clef in this.config.NOTES) {
+                for (const noteKey in this.config.NOTES[clef]) {
+                    if (!this.config.NOTE_FREQUENCIES[noteKey]) {
+                        this.config.NOTE_FREQUENCIES[noteKey] = this.calculateFrequency(noteKey);
+                    }
+                }
+            }
+        },
+        concertPitchToWrittenPitch(frequency) {
+            if (frequency <= 0) return null;
+            
+            // 1. แปลงความถี่ที่ได้ยิน (Concert) ไปเป็นเลข MIDI มาตรฐาน
+            const concertMidiNum = Math.round(12 * Math.log2(frequency / this.config.A4_FREQ) + this.config.A4_MIDI);
+            
+            // 2. Transpose กลับ: นำเลข MIDI มาลบกับการตั้งค่า Transposition ของเครื่องดนตรี
+            // (เช่น เครื่อง Bb ตั้งค่าไว้ -2, การลบออก (-(-2)) จะเท่ากับการบวก 2 ทำให้เสียงสูงขึ้น 1 คู่เสียงเต็ม)
+            const writtenMidiNum = concertMidiNum - this.state.transposition; 
+
+            // 3. แปลงเลข MIDI ที่ได้ (Written) กลับไปเป็นชื่อโน้ตและ Octave
+            const noteIndex = writtenMidiNum % 12;
+            const octave = Math.floor(writtenMidiNum / 12) - 1;
+            
+            return this.config.NOTE_NAMES[noteIndex] + octave;
+        }
+    };
+    
+const closeGameBtn = document.getElementById('close-game-btn');
+if (closeGameBtn) {
+    closeGameBtn.addEventListener('click', () => {
+        // ส่งสัญญาณ 'CLOSE_GAME' กลับไปที่แอปหลัก (index.html)
+        if (window.parent) {
+            window.parent.postMessage({ type: 'CLOSE_GAME' }, '*');
+        }
+    });
+}
+    
+    PitchCommandGame.init();
+</script>
+</body>
+</html>

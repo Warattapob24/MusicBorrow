@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - ระบบยืมคืนเครื่องดนตรี</title>
+  <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@1.5.10/css/pico.min.css">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <main class="container">
+    <div id="welcome-message" style="font-weight: bold; margin-bottom: 1rem;"></div>
+    <h1>Dashboard</h1>
+    <section>
+      <h2>เครื่องดนตรีที่พร้อมใช้งาน</h2>
+      <ul id="instrument-list"></ul>
+    </section>
+    <section>
+      <h2>เครื่องดนตรีที่กำลังยืม</h2>
+      <ul id="borrowed-list"></ul>
+    </section>
+    <section>
+      <h2>ประวัติการยืม-คืน</h2>
+      <ul id="history-list"></ul>
+    </section>
+    <section>
+      <h2>เหรียญตราของฉัน</h2>
+      <ul id="badge-list"></ul>
+    </section>
+    <section>
+      <h2>แก้ไขข้อมูลส่วนตัว</h2>
+      <form id="profile-form">
+        <input type="text" id="prefix" placeholder="คำนำหน้า">
+        <input type="text" id="first_name" placeholder="ชื่อจริง">
+        <input type="text" id="last_name" placeholder="นามสกุล">
+        <input type="text" id="student_id" placeholder="รหัสนักเรียน">
+        <input type="text" id="student_group" placeholder="กลุ่ม/ห้อง">
+        <select id="user_role" required>
+          <option value="student">นักเรียนทั่วไป</option>
+          <option value="club">สมาชิกชุมนุม</option>
+          <option value="teacher">ครูอาจารย์</option>
+          <option value="guest">บุคคลทั่วไป</option>
+        </select>
+        <button type="submit">บันทึก</button>
+      </form>
+    </section>
+    <section>
+      <div id="admin-stats"></div>
+      <div id="admin-instruments"></div>
+      <form id="add-instrument-form">
+        <input type="text" id="add-instrument-name" placeholder="ชื่อเครื่องดนตรี" required>
+        <input type="text" id="add-instrument-type" placeholder="ประเภท">
+        <button type="submit">เพิ่มเครื่องดนตรี</button>
+      </form>
+      <div id="admin-users"></div>
+      <form id="add-user-form">
+        <input type="email" id="add-user-email" placeholder="อีเมล" required>
+        <input type="text" id="add-user-prefix" placeholder="คำนำหน้า" required>
+        <input type="text" id="add-user-firstname" placeholder="ชื่อจริง" required>
+        <input type="text" id="add-user-lastname" placeholder="นามสกุล" required>
+        <input type="text" id="add-user-studentid" placeholder="รหัสนักเรียน">
+        <input type="text" id="add-user-studentgroup" placeholder="กลุ่ม/ห้อง">
+        <button type="submit">เพิ่มนักเรียน</button>
+      </form>
+      <h2>ประวัติการยืม-คืนทั้งหมด</h2>
+      <ul id="admin-borrow-logs"></ul>
+      <h2>อนุมัติคำขอยืมกลับบ้าน</h2>
+      <ul id="admin-home-borrow-requests"></ul>
+      <h2>มอบเหรียญตราให้นักเรียน</h2>
+      <div id="admin-badge-users"></div>
+    </section>
+  </main>
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

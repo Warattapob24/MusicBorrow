@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Rhythm Core - Final Version</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Kanit:wght@400;500;700&display=swap');
+        
+        body { font-family: 'Kanit', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+
+        /* --- UI Components --- */
+        .timing-line {
+            background: linear-gradient(to bottom, transparent, #3b82f6 48%, #93c5fd 50%, #3b82f6 52%, transparent);
+            box-shadow: 0 0 25px 5px rgba(59, 130, 246, 0.6);
+        }
+        .drum-button {
+            transition: all 0.1s ease;
+            background: linear-gradient(145deg, #374151, #1f2937);
+            border: 3px solid #4b5563;
+        }
+        .drum-button:active {
+            transform: scale(0.95);
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.4);
+        }
+        .drum-button.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px currentColor;
+            border-color: currentColor;
+        }
+
+        /* --- Note & Track Styles --- */
+        .note {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+            transform: translateY(-50%);
+        }
+        .note-R { color: #3b82f6; }
+        .note-L { color: #f97316; }
+        .note-KICK { color: #fca311; }
+        .note-SNARE { color: #60a5fa; }
+        .note-HIHAT { color: #4cc9f0; }
+
+        .note.hit { animation: note-hit-effect 0.2s ease-out forwards; }
+        @keyframes note-hit-effect {
+            from { transform: translateY(-50%) scale(1); opacity: 1; }
+            to   { transform: translateY(-50%) scale(2); opacity: 0; }
+        }
+        .note.miss { filter: grayscale(1) brightness(0.5); opacity: 0.3 !important; }
+
+        /* --- Feedback Text --- */
+        .feedback-text {
+            position: absolute;
+            font-size: 2.5rem;
+            font-weight: 700;
+            opacity: 0;
+            animation: feedback-anim 0.5s ease-out;
+            text-shadow: 0 0 10px black;
+            z-index: 50;
+        }
+        @keyframes feedback-anim {
+            0% { transform: translateY(0) scale(0.8); opacity: 1; }
+            100% { transform: translateY(-60px) scale(1.3); opacity: 0; }
+        }
+
+        /* --- Modal Styles --- */
+        .modal {
+            background-color: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(8px);
+        }
+        /* เพิ่มต่อท้ายใน <style> */
+        #calibration-visual-cue.animate {
+            transform: scale(0) !important;
+        }
+        /* เพิ่มต่อท้ายใน <style> */
+.h-real-screen {
+    height: 100vh; /* สำหรับบราวเซอร์เก่าที่ไม่รู้จักตัวแปร CSS */
+    height: calc(var(--vh, 1vh) * 100);
+}
+/* --- Final Responsive Freestyle Drum Kit Layout (Custom) --- */
+#freestyle-pads {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    height: 55.5vw; /* (500px / 900px) * 100vw */
+    max-height: 500px;
+    margin: 0 auto;
+}
+.pad-base {
+    position: absolute;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    font-weight: bold;
+    /* ขนาดตัวอักษรจะยืดหดตามหน้าจอ */
+    font-size: 1.55vw; /* (14px / 900px) * 100vw */
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    background: linear-gradient(145deg, #374151, #1f2937);
+    border: 3px solid #4b5563;
+    transition: all 0.05s ease;
+    transform: translate(-50%, -50%); 
+}
+.pad-base:active, .pad-base.active {
+    transform: translate(-50%, -50%) scale(0.95);
+    box-shadow: inset 0 4px 8px rgba(0,0,0,0.6), 0 0 25px currentColor;
+    border-color: currentColor;
+}
+/* สำหรับจอมือถือขนาดเล็กมาก ให้กำหนดขนาดตัวอักษรขั้นต่ำ */
+@media (max-width: 450px) {
+    .pad-base {
+        font-size: 8px;
+    }
+}
+
+/* --- ตำแหน่งและขนาดของกลองแต่ละใบในหน่วย vw --- */
+/* แถวบนสุด (Cymbals) */
+.pad-china    { top: 45%; left: 85%; width: 13.3vw; height: 13.3vw; max-width: 120px; max-height: 120px; color: #f59e0b; }
+.pad-crash    { top: 15%; left: 30%; width: 15.5vw; height: 15.5vw; max-width: 140px; max-height: 140px; color: #facc15; }
+.pad-crash2   { top: 15%; left: 70%; width: 14.4vw; height: 14.4vw; max-width: 130px; max-height: 130px; color: #facc15; }
+.pad-ride     { top: 40%; left: 75%; width: 17.7vw; height: 17.7vw; max-width: 160px; max-height: 160px; color: #fbbf24; }
+.pad-cowbell  { top: 38%; left: 50%; width: 6.6vw;  height: 6.6vw;  max-width: 60px;  max-height: 60px;  color: #e5e7eb; border-radius: 25%; }
+
+/* แถวกลาง (Core & Toms) */
+.pad-hihat    { top: 45%; left: 15%; width: 14.4vw; height: 14.4vw; max-width: 130px; max-height: 130px; color: #93c5fd; }
+.pad-snare    { top: 70%; left: 30%; width: 15.5vw; height: 15.5vw; max-width: 140px; max-height: 140px; color: #60a5fa; }
+.pad-tom1     { top: 40%; left: 40%; width: 11.1vw; height: 11.1vw; max-width: 100px; max-height: 100px; color: #4cc9f0; }
+.pad-tom2     { top: 40%; left: 60%; width: 11.1vw; height: 11.1vw; max-width: 100px; max-height: 100px; color: #4cc9f0; }
+.pad-floortom { top: 70%; left: 68%; width: 13.3vw; height: 13.3vw; max-width: 120px; max-height: 120px; color: #4895ef; }
+
+/* แถวล่าง (Pedals) */
+.pad-pedal-hat  { top: 90%; left: 15%; width: 12.2vw; height: 6.6vw; max-width: 110px; max-height: 60px; border-radius: 15px; color: #a5f3fc; }
+.pad-pedal-kick { top: 90%; left: 48%; width: 22.2vw; height: 7.7vw; max-width: 200px; max-height: 70px; border-radius: 20px; color: #f97316; }
+/* --- คาถาสำหรับปรับแก้ในแนวนอน (ฉบับหลอมรวม) --- */
+@media (orientation: landscape) and (max-height: 550px) {
+
+    /* --- ส่วนควบคุมหลัก --- */
+    #freestyle-screen > h2 {
+        font-size: 5vh;
+        margin-bottom: 2vh;
+    }
+    #freestyle-screen > p {
+        font-size: 2vh;
+        margin-top: 2vh;
+    }
+    #freestyle-screen > .home-btn {
+        font-size: 2.5vh;
+        padding: 1.5vh 3vh;
+        margin-top: 2vh;
+        border-radius: 1.5vh;
+    }
+
+    /* --- ส่วนกลอง (เหมือนเดิม แต่ปรับปรุงเล็กน้อย) --- */
+    #freestyle-pads {
+        height: 70vh; 
+        width: auto;
+        max-height: none;
+    }
+
+    .pad-base {
+        font-size: 2.5vh; 
+        border-width: 2px;
+    }
+    #menu-screen > h1 {
+        font-size: 6vh;
+        margin-bottom: 1vh;
+    }
+    #menu-screen > p {
+        font-size: 2.5vh;
+        margin-bottom: 3vh;
+    }
+    
+    #menu-grid {
+        /* เปลี่ยนเป็นแนวนอน 2 คอลัมน์ และลดช่องว่าง */
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2vh;
+        max-width: 95vw; /* ทำให้ตารางกว้างขึ้น */
+    }
+
+    /* ปรับขนาดของ Card แต่ละใบ */
+    #menu-grid > div {
+        padding: 2vh;
+        border-radius: 1.5vh;
+    }
+    
+    /* ปรับขนาดตัวอักษรข้างใน Card */
+    #menu-grid h3 {
+        font-size: 3.5vh;
+        margin-bottom: 0.5vh;
+    }
+    #menu-grid p {
+        font-size: 1.8vh;
+        line-height: 1.2; /* ลดระยะห่างบรรทัด */
+    }
+
+    #settings-btn {
+        margin-top: 3vh;
+        padding: 1vh 2vh;
+        font-size: 3vh;
+    }
+
+    #exercise-menu-modal .bg-gray-800 {
+        padding: 10vh;
+        /* ทำให้ Modal สูงเกือบเต็มจอเพื่อให้มีพื้นที่ */
+        height: 95vh; 
+        overflow-y: auto; /* ทำให้เลื่อนได้ถ้าเนื้อหาเยอะ */
+    }
+
+    /* --- ส่วนเลือกรูปแบบ --- */
+    #pattern-selection-view #exercise-menu-title {
+        font-size: 5vh;
+        margin-bottom: 2vh;
+    }
+    #exercise-list {
+        margin-bottom: 3vh;
+    }
+    #exercise-list button {
+        padding: 1.5vh;
+        font-size: 4.2vh;
+        border-radius: 1.5vh;
+    }
+    #modal-close-btn {
+        padding: 1.5vh;
+        font-size: 4.2vh;
+    }
+
+    /* --- ส่วนเลือกความเร็ว --- */
+    #tempo-selection-view #selected-pattern-title {
+        font-size: 4vh;
+    }
+    #tempo-selection-view #selected-pattern-desc {
+        font-size: 5vh;
+        margin-bottom: 3vh;
+    }
+    #tempo-selection-view .my-8 {
+        margin-top: 4vh;
+        margin-bottom: 4vh;
+    }
+    #tempo-selection-view label {
+        font-size: 5.5vh;
+    }
+    #tempo-selection-view #bpm-display {
+        font-size: 4vh;
+    }
+    #tempo-selection-view button {
+        padding: 1.8vh;
+        font-size: 5.5vh;
+        border-radius: 1.5vh;
+    }
+
+    #results-screen .bg-gray-800 {
+        padding: 3vh;
+        height: 95vh;
+        overflow-y: auto;
+    }
+    #results-screen h2 {
+        font-size: 5vh;
+        margin-bottom: 2vh;
+    }
+    #results-screen .grid {
+        gap: 2vh;
+        margin-top: 3vh;
+        margin-bottom: 3vh;
+    }
+    #results-screen .bg-gray-700 {
+        padding: 2vh;
+        border-radius: 1.5vh;
+    }
+    #results-screen .text-sm {
+        font-size: 3vh;
+    }
+    #results-screen .text-2xl {
+        font-size: 4vh;
+    }
+    #results-screen button {
+        padding: 1.8vh;
+        font-size: 5.5vh;
+        border-radius: 1.5vh;
+    }
+
+    #calibration-modal .bg-gray-800 {
+        padding: 3vh 4vh;
+        height: 95vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    #calibration-modal h2 {
+        font-size: 5vh;
+    }
+    #calibration-modal p {
+        font-size: 3vh;
+    }
+    #calibration-modal .w-48 { /* targeting visual cue & tap button */
+        width: 25vh;
+        height: 25vh;
+        margin: 0 auto;
+    }
+    #calibration-modal #calibration-progress {
+        font-size: 4.5vh;
+    }
+    #calibration-modal button {
+        font-size: 4.5vh;
+    }
+    #calibration-modal #calibration-close-btn {
+        padding: 1.5vh;
+        border-radius: 1.5vh;
+    }
+}
+    </style>
+</head>
+<body class="bg-gray-900 text-white overflow-hidden select-none">
+
+    <div id="app-container" class="relative w-full h-real-screen">
+
+        <div id="menu-screen" class="absolute inset-0 z-40 flex flex-col items-center justify-center p-4">
+            <h1 class="text-5xl font-bold font-orbitron text-blue-400 mb-2">Rhythm Core</h1>
+            <p class="text-gray-400 mb-8">เรียนรู้จังหวะกลองอย่างเป็นระบบ</p>
+            <div id="menu-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl">
+                </div>
+             <button id="settings-btn" class="mt-8 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg text-sm transition-colors">⚙️ Settings</button>
+             <button id="close-game-btn" class="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">ออก</button>
+        </div>
+
+        <div id="game-screen" class="hidden h-real-screen flex flex-col">
+            <div id="count-in-display" class="absolute inset-0 flex items-center justify-center font-orbitron text-9xl font-bold text-white z-30 pointer-events-none" style="text-shadow: 0 0 20px black;"></div>
+            <div class="bg-gray-800/80 px-4 py-2 flex justify-between items-center border-b border-gray-700 z-10">
+                <div class="flex items-center space-x-6">
+                    <div><span class="text-gray-400 text-sm">Accuracy</span><div id="accuracy-display" class="font-orbitron text-blue-400 text-lg">100%</div></div>
+                    <div><span class="text-gray-400 text-sm">Combo</span><div id="combo-display" class="font-orbitron text-orange-400 font-bold text-lg">x0</div></div>
+                </div>
+                <div id="pattern-name" class="text-center text-lg font-bold"></div>
+                <div class="text-right">
+                    <span class="text-gray-400 text-sm">Score</span><div id="score-display" class="font-orbitron text-white font-bold text-lg">0</div>
+                </div>
+            </div>
+            <div class="flex-1 relative bg-gradient-to-b from-gray-900 to-gray-800 overflow-hidden">
+                <div id="feedback-container" class="absolute inset-0 flex items-center justify-center z-30 pointer-events-none"></div>
+                <div class="absolute inset-y-0 w-full flex flex-col justify-around py-16 opacity-20 pointer-events-none">
+                    <div class="h-px bg-gray-600"></div><div class="h-px bg-gray-600"></div>
+                    <div class="h-px bg-gray-600"></div><div class="h-px bg-gray-600"></div>
+                    <div class="h-px bg-gray-600"></div>
+                </div>
+                <div class="absolute left-[20%] top-0 bottom-0 w-1.5 timing-line z-20"></div>
+                <div id="beat-counter" class="absolute top-4 left-4 font-orbitron text-2xl font-bold text-blue-400 z-10">1</div>
+                <div id="note-track" class="absolute inset-0"></div>
+            </div>
+            <div id="control-area" class="bg-gray-800/80 flex items-center justify-center p-4 border-t border-gray-700 z-10">
+                 </div>
+        </div>
+        
+        <div id="freestyle-screen" class="hidden h-real-screen flex-col items-center justify-center bg-gray-900">
+             <h2 class="text-3xl font-bold font-orbitron mb-8">Freestyle Mode</h2>
+             <div id="freestyle-pads" class="grid grid-cols-3 gap-4">
+                 </div>
+             <p class="mt-8 text-gray-500">ใช้คีย์บอร์ดเพื่อเล่น หรือกดที่ปุ่ม</p>
+             <button class="home-btn mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">กลับเมนูหลัก</button>
+        </div>
+
+<div id="exercise-menu-modal" class="hidden modal fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-lg w-full max-w-md text-center p-6 transform transition-all">
+        
+        <div id="pattern-selection-view">
+            <h2 id="exercise-menu-title" class="text-3xl font-bold mb-6">เลือกแบบฝึกหัด</h2>
+            <div id="exercise-list" class="flex flex-col space-y-3 mb-6">
+                </div>
+            <button id="modal-close-btn" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg">
+                กลับไปเมนูหลัก
+            </button>
+        </div>
+
+        <div id="tempo-selection-view" class="hidden">
+            <h2 id="selected-pattern-title" class="text-3xl font-bold mb-2 text-blue-400">ชื่่อแบบฝึกหัด</h2>
+            <p id="selected-pattern-desc" class="text-gray-400 mb-6">คำอธิบาย</p>
+            
+            <div class="my-8">
+                <label for="bpm-slider" class="block text-lg font-medium text-white mb-2">เลือกความเร็ว (BPM)</label>
+                <div class="flex items-center justify-center space-x-4">
+                    <span class="text-xl font-orbitron w-24 text-right" id="bpm-display">100 BPM</span>
+                    <input id="bpm-slider" type="range" min="40" max="220" value="100" class="w-full h-3 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+
+            <button id="start-practice-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-all text-xl mb-3">
+                เริ่มฝึก!
+            </button>
+            <button id="back-to-patterns-btn" class="w-full text-gray-400 hover:text-white hover:bg-gray-700 py-2 rounded-lg">
+                กลับไปเลือกรูปแบบ
+            </button>
+        </div>
+
+    </div>
+</div>
+        <div id="results-screen" class="hidden modal fixed inset-0 z-40 flex items-center justify-center p-4">
+            <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-lg w-full max-w-md text-center p-8">
+                <h2 id="results-title" class="text-3xl font-bold mb-2">ยอดเยี่ยม!</h2>
+                <div class="grid grid-cols-2 gap-4 my-6">
+                    <div class="bg-gray-700 p-4 rounded-lg"><div class="text-sm text-blue-400">คะแนน</div><div id="results-score" class="text-2xl font-bold font-orbitron">0</div></div>
+                    <div class="bg-gray-700 p-4 rounded-lg"><div class="text-sm text-orange-400">คอมโบสูงสุด</div><div id="results-max-combo" class="text-2xl font-bold font-orbitron">x0</div></div>
+                    <div class="bg-gray-700 p-4 rounded-lg col-span-2">
+                        <div class="text-sm text-gray-400">ความแม่นยำ</div>
+                        <div class="flex items-center space-x-4 mt-2">
+                            <div class="w-full bg-gray-600 rounded-full h-4"><div id="results-accuracy-bar" class="bg-gradient-to-r from-green-400 to-blue-500 h-4 rounded-full" style="width: 0%;"></div></div>
+                            <div id="results-accuracy" class="text-2xl font-bold font-orbitron">0%</div>
+                        </div>
+                    </div>
+                </div>
+        <button id="play-again-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors mb-3">
+            เล่นอีกครั้ง
+        </button>
+                <button class="home-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors">กลับไปที่เมนู</button>
+            </div>
+        </div>
+
+<div id="calibration-modal" class="hidden modal fixed inset-0 z-50 flex flex-col items-center justify-center p-4 text-center">
+    <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-lg w-full max-w-md p-8">
+        <h2 class="text-3xl font-bold mb-4">ปรับจูนจังหวะเสียง</h2>
+        <p class="text-gray-400 mb-6">เมื่อวงกลมสีฟ้าหดตัวจนสุดและมีเสียงดังขึ้น ให้กดปุ่ม 'TAP' ให้ตรงจังหวะที่สุด</p>
+        
+        <div class="relative w-48 h-48 mx-auto my-4 bg-gray-900 rounded-full flex items-center justify-center">
+            <div id="calibration-visual-cue" class="absolute bg-blue-500 rounded-full" style="width: 100%; height: 100%; transform: scale(1); transition: transform 0.5s ease-in-out;"></div>
+        </div>
+        
+        <button id="calibration-tap-btn" class="drum-button w-48 h-48 rounded-full text-2xl font-bold">TAP</button>
+        
+        <div id="calibration-progress" class="mt-6 text-lg">กดปุ่ม TAP เพื่อเริ่ม (0/5)</div>
+        <div id="calibration-result" class="mt-2 text-green-400 font-bold"></div>
+        
+        <button id="calibration-close-btn" class="mt-8 w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg">บันทึกและปิด</button>
+    </div>
+</div>
+
+    </div>
+
+    <script>
+        // วางไว้บนสุดของ <script> ในไฟล์ Rhythm Core
+let currentUserData = null;
+let gameStartTime = 0;
+
+window.addEventListener('message', (event) => {
+    // ใช้ event.data.type ไม่ใช่ event.data.action
+    if (event.data.type === 'INIT_GAME') {
+        console.log("Rhythm Core received user data:", event.data.user);
+        currentUserData = event.data.user;
+    }
+});
+        //<-- SCRIPT FOR ADAPTIVE HEIGHT -->
+function setTrueHeight() {
+    // คำนวณหา 1% ของความสูงที่ใช้งานได้จริง
+    const vh = window.innerHeight * 0.01;
+    // ตั้งค่าตัวแปร --vh ใน CSS
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+// เรียกใช้คาถานี้เมื่อโหลดหน้าเว็บและเมื่อมีการปรับขนาดหน้าต่าง
+window.addEventListener('load', setTrueHeight);
+window.addEventListener('resize', setTrueHeight);
+setTrueHeight(); // เรียกใช้ครั้งแรกทันที
+
+    //<-- 1. GAME DATA & CONFIG -->
+    const CONFIG = {
+        NOTE_SPEED_PX_PER_MS: 0.35, // px per millisecond
+        HIT_WINDOW_MS: 150, // Total window: 150ms (+-75ms from center)
+        PERFECT_WINDOW_MS: 60, // Total window for perfect: 60ms (+-30ms)
+        //COUNT_IN_DURATION_MS: 3000,
+    };
+    
+    const GAME_DATA = {
+        ASSETS: {
+            audio: {
+                'KICK': 'assets/audio/kick.mp3',
+                'SNARE': 'assets/audio/snare.mp3',
+                'HIHAT': 'assets/audio/hihat.mp3',
+                'HIHATOPEN': 'assets/audio/hihatopen.mp3',
+                'COWBELL': 'assets/audio/cowbell.mp3',
+                'TOM1': 'assets/audio/tom1.mp3',
+                'TOM2': 'assets/audio/tom2.mp3',
+                'FLOORTOM': 'assets/audio/floortom.mp3',
+                'CRASH': 'assets/audio/crash.mp3',
+                'CRASH2': 'assets/audio/crash2.mp3',
+                'RIDE': 'assets/audio/ride.mp3',
+                'CHINA': 'assets/audio/china.mp3',
+                'METRONOME': 'assets/audio/metronome.mp3',
+                'SUCCESS': 'assets/audio/success.mp3',
+                'FAILURE': 'assets/audio/failure.mp3',
+            }
+        },
+// ใน const GAME_DATA
+FREESTYLE_KIT: {
+    // ชื่อกลอง: { key: 'ปุ่ม', label: 'ชื่อ', css: 'ชื่อ class', sound: 'เสียงที่จะเล่น' }
+    'CRASH':     { key: 'r', label: 'CRASH',      css: 'pad-crash',      sound: 'CRASH' },
+    'HIHAT_MAIN':{ key: 'f', label: 'HI-HAT',     css: 'pad-hihat',      sound: 'HIHAT' }, // นี่คือ Hi-Hat หลัก
+    'TOM1':      { key: 'h', label: 'HI TOM',     css: 'pad-tom1',       sound: 'TOM1' },
+    'TOM2':      { key: 'j', label: 'MID TOM',    css: 'pad-tom2',       sound: 'TOM2' },
+    'RIDE':      { key: 'l', label: 'RIDE',       css: 'pad-ride',       sound: 'RIDE' },
+    'SNARE':     { key: 'g', label: 'SNARE',      css: 'pad-snare',      sound: 'SNARE' },
+    'FLOORTOM':  { key: 'm', label: 'LOW TOM',    css: 'pad-floortom',   sound: 'FLOORTOM' },
+    'PEDAL_HAT': { key: 'z', label: 'PEDAL',      css: 'pad-pedal-hat',  sound: 'HIHAT' }, // Pedal Hat จะเล่นเสียงปิด
+    'PEDAL_KICK':{ key: ' ', label: 'KICK PEDAL', css: 'pad-pedal-kick', sound: 'KICK' },  // ใช้ Spacebar
+    'CRASH2':    { key: 'o', label: 'CRASH 2',    css: 'pad-crash2',     sound: 'CRASH2' },
+    'CHINA':     { key: ';', label: 'CHINA',      css: 'pad-china',      sound: 'CHINA' },
+    'COWBELL':   { key: 'n', label: 'COWBELL',    css: 'pad-cowbell',    sound: 'COWBELL'},
+},
+    SVG_NOTES: {
+        // อักขระศักดิ์สิทธิ์ฉบับปรับปรุงใหม่!
+        whole: `<g transform="rotate(-20)"><ellipse cx="0" cy="0" rx="10" ry="7" stroke="currentColor" stroke-width="2.5" fill="none"/></g>`,
+        half: `<g transform="translate(0, 5)"><ellipse cx="0" cy="0" rx="9" ry="6" stroke="currentColor" stroke-width="2" fill="none"/><line x1="-8" y1="0" x2="-8" y2="-30" stroke="currentColor" stroke-width="2.5"/></g>`,
+        quarter: `<g><ellipse cx="0" cy="0" rx="9" ry="6" fill="currentColor"/><line x1="8" y1="0" x2="8" y2="-30" stroke="currentColor" stroke-width="2.5"/></g>`,
+        eighth: `<g><ellipse cx="0" cy="0" rx="9" ry="6" fill="currentColor"/><line x1="8" y1="0" x2="8" y2="-30" stroke="currentColor" stroke-width="2.5"/><path d="M8 -30 C 18 -25 12 -15 12 -15" stroke="currentColor" stroke-width="3.5" fill="none"/></g>`,
+        sixteenth: `<g><ellipse cx="0" cy="0" rx="9" ry="6" fill="currentColor"/><line x1="8" y1="0" x2="8" y2="-30" stroke="currentColor" stroke-width="2.5"/><path d="M8 -30 C 18 -25 12 -15 12 -15 M8 -24 C 18 -19 12 -9 12 -9" stroke="currentColor" stroke-width="3.5" fill="none"/></g>`,
+        thirty_second: `<g transform="translate(2,0)"><ellipse cx="0" cy="0" rx="9" ry="6" fill="currentColor"/><line x1="8" y1="0" x2="8" y2="-30" stroke="currentColor" stroke-width="2.5"/><path d="M8 -30 C 18 -25 12 -15 12 -15 M8 -24 C 18 -19 12 -9 12 -9 M8 -18 C 18 -13 12 -3 12 -3" stroke="currentColor" stroke-width="3.5" fill="none"/></g>`,
+        triplet: `<g transform="translate(-1, 0) scale(0.9)"><text x="0" y="-35" font-size="24" font-weight="bold" text-anchor="middle" fill="currentColor">3</text><ellipse cx="0" cy="0" rx="9" ry="6" fill="currentColor"/><line x1="8" y1="0" x2="8" y2="-30" stroke="currentColor" stroke-width="2.5"/></g>`,
+    },
+// ใน const GAME_DATA
+LEVELS: [
+    { 
+        id: 'academy', name: 'Rhythm Academy', description: 'เรียนรู้พื้นฐานการตีสลับมือ L-R', mode: 'sticking',
+        exercises: [            
+            // 'w' สำหรับ Whole Notes (โน้ตตัวกลม)
+            { name: "Whole Notes", pattern: 'wR wL wR wL wR wL wR wL', description: "ฝึกโน้ตตัวกลม" },
+            // 'h' สำหรับ Half Notes (โน้ตตัวขาว)
+            { name: "Half Notes", pattern: 'hR hL hR hL hR hL hR hL', description: "ฝึกโน้ตตัวขาว" },
+            // 'q' สำหรับ Quarter Notes (โน้ตตัวดำ)
+            { name: "Single Strokes (4ths)", pattern: 'qR qL qR qL qR qL qR qL qR qL qR qL qR qL qR qL qR', description: "โน้ตตัวดำพื้นฐาน" },
+            // 'e' สำหรับ Eighth Notes (โน้ตเขบ็ต 1 ชั้น)
+            { name: "Single Strokes (8ths)R", pattern: 'eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR', description: "โน้ตตัวเขบ็ต 1 ชั้น" },            
+            { name: "Single Strokes (8ths)L", pattern: 'eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL eR eL', description: "โน้ตตัวเขบ็ต 1 ชั้น" },
+        ]
+    },
+    {
+        id: 'rudiments', name: 'Rudiment Foundation', description: 'ฝึกรูดิเมนต์พื้นฐาน 5 แบบ', mode: 'sticking',
+        exercises: [
+            // 's' สำหรับ Sixteenth Notes (โน้ตเขบ็ต 2 ชั้น)
+            { name: "Double Stroke Roll", pattern: 'sR sR sL sL sR sR sL sL sR sR sL sL sR sR sL sL qR', description: "การตี ดับ'เบิล สโทรค" },
+            { name: "Single Paradiddle", pattern: 'sR sL sR sR sL sR sL sL sR sL sR sR sL sR sL sL qR', description: "พาราดิดเดิ้ล" },
+            { name: "Double Paradiddle", pattern: 'sR sL sR sL sR sR sL sR sL sR sL sL sR sL sR sL sR sR sL sR sL sR sL sL qR', description: "ดับ'เบิล พาราดิดเดิ้ล" },
+            // Flam Accent มักเล่นเป็น Eighth-note Triplets แต่ในที่นี้จะใช้ 'e' (Eighth) เพื่อความเรียบง่าย
+            { name: "Flam Accent", pattern: 'efR eL eR efL eR eL', description: "การตีเน้นเสียง" },
+        ]
+    },
+    {
+        id: 'groove', name: 'Groove Workshop', description: 'ผสมผสาน Kick, Snare, Hi-hat', mode: 'groove',
+        exercises: [
+            // 'e' สำหรับ Eighth Notes (โน้ตเขบ็ต 1 ชั้น)
+            { name: "Basic Rock Beat", pattern: 'eK eH eS eH eK eH eS eH', description: "จังหวะร็อกพื้นฐาน" },
+            { name: "Funky Syncopation", pattern: 'eK eH eS eH eK eK eS eH', description: "จังหวะขัด" },
+        ]
+    },
+],
+        KEYMAP: {
+            sticking: { 'f': 'L', 'j': 'R' },
+            groove:   { 'f': 'KICK', 'j': 'SNARE', 'k': 'HIHAT' },
+            freestyle:{ 'f': 'KICK', 'j': 'SNARE', 'k': 'HIHAT' }
+        }
+    };
+
+    //<-- 2. DOM & STATE MANAGEMENT -->
+    const dom = {
+        app: document.getElementById('app-container'),
+        menuScreen: document.getElementById('menu-screen'),
+        menuGrid: document.getElementById('menu-grid'),
+        gameScreen: document.getElementById('game-screen'),
+        freestyleScreen: document.getElementById('freestyle-screen'),
+        freestylePads: document.getElementById('freestyle-pads'),
+        resultsScreen: document.getElementById('results-screen'),
+        
+        score: document.getElementById('score-display'),
+        combo: document.getElementById('combo-display'),
+        accuracy: document.getElementById('accuracy-display'),
+        patternName: document.getElementById('pattern-name'),
+        beatCounter: document.getElementById('beat-counter'),
+        noteTrack: document.getElementById('note-track'),
+        feedbackContainer: document.getElementById('feedback-container'),
+        controlArea: document.getElementById('control-area'),
+        
+        resultsTitle: document.getElementById('results-title'),
+        resultsScore: document.getElementById('results-score'),
+        resultsMaxCombo: document.getElementById('results-max-combo'),
+        resultsAccuracy: document.getElementById('results-accuracy'),
+        resultsAccuracyBar: document.getElementById('results-accuracy-bar'),
+
+        countInDisplay: document.getElementById('count-in-display'),
+        exerciseMenuModal: document.getElementById('exercise-menu-modal'),
+        exerciseMenuTitle: document.getElementById('exercise-menu-title'),
+        exerciseList: document.getElementById('exercise-list'),
+        exerciseBackBtn: document.getElementById('exercise-back-btn'),
+
+        calibrationModal: document.getElementById('calibration-modal'),
+        calibrationTapBtn: document.getElementById('calibration-tap-btn'),
+        calibrationVisualCue: document.getElementById('calibration-visual-cue'),
+        calibrationProgress: document.getElementById('calibration-progress'),
+        calibrationResult: document.getElementById('calibration-result'),
+        calibrationCloseBtn: document.getElementById('calibration-close-btn'),
+    };
+    
+    let state = {};
+    let soundBank = {};
+
+    function resetState() {
+        state = {
+            gameState: 'counting', // menu, playing, finished
+            mode: 'sticking', // sticking, groove
+            currentExercise: null,
+            noteQueue: [],
+            gameTime: 0,
+            startTime: 0,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            hits: 0,
+            misses: 0,
+            lastBeat: -1,
+            countInBeat: 0,
+            latencyOffset: state.latencyOffset || 0, // คงค่า latency เดิมไว้ถ้ามี
+            isCalibrating: false,
+            calibrationTaps: [],
+            calibrationTimeout: null,
+            isHiHatPedalDown: false,
+        };
+    }
+
+    //<-- 3. INITIALIZATION & NAVIGATION -->
+    function init() {
+        const savedOffset = localStorage.getItem('rhythmCoreLatencyOffset');
+    if (savedOffset) {
+        state.latencyOffset = parseInt(savedOffset, 10);
+    }
+        buildMenu();
+        buildFreestylePads();
+        loadSounds();
+        attachEventListeners();
+        showScreen('menu');
+    }
+
+    function showScreen(screenName) {
+        console.log(`--- [SYSTEM] กำลังแสดงผลหน้าจอ: ${screenName} ---`); 
+        ['menu', 'game', 'freestyle', 'results'].forEach(s => {
+            dom[`${s}Screen`].classList.add('hidden');
+        });
+        dom[`${screenName}Screen`].classList.remove('hidden');
+    }
+    
+    function buildMenu() {
+        dom.menuGrid.innerHTML = '';
+        GAME_DATA.LEVELS.forEach(level => {
+            const levelCard = document.createElement('div');
+            levelCard.className = "bg-gray-800 p-6 rounded-lg border border-gray-700 cursor-pointer hover:bg-gray-700 hover:border-blue-500 transition-all";
+            levelCard.innerHTML = `<h3 class="text-xl font-bold text-white">${level.name}</h3><p class="text-gray-400">${level.description}</p>`;
+            levelCard.onclick = () => showExerciseMenu(level);
+            dom.menuGrid.appendChild(levelCard);
+        });
+        // Add Freestyle
+        const freestyleCard = document.createElement('div');
+        freestyleCard.className = "bg-gray-800 p-6 rounded-lg border border-gray-700 cursor-pointer hover:bg-gray-700 hover:border-purple-500 transition-all md:col-span-2";
+        freestyleCard.innerHTML = `<h3 class="text-xl font-bold text-white">🎵 Freestyle Mode</h3><p class="text-gray-400">เล่นอย่างอิสระบนชุดกลองเสมือน</p>`;
+        freestyleCard.onclick = () => showScreen('freestyle');
+        dom.menuGrid.appendChild(freestyleCard);
+    }
+    
+// Function to show the exercise menu modal
+// ฟังก์ชันใหม่ที่ใช้แสดงผลและควบคุม Modal ทั้งหมด
+function showExerciseMenu(level) {
+    const patternView = dom.exerciseMenuModal.querySelector('#pattern-selection-view');
+    const tempoView = dom.exerciseMenuModal.querySelector('#tempo-selection-view');
+    
+    // 1. แสดงหน้าเลือกรูปแบบ และซ่อนหน้าเลือกความเร็ว
+    patternView.classList.remove('hidden');
+    tempoView.classList.add('hidden');
+    
+    // 2. ตั้งชื่อหมวดหมู่
+    dom.exerciseMenuTitle.textContent = level.name;
+    dom.exerciseList.innerHTML = '';
+
+    // 3. สร้างปุ่มสำหรับแต่ละ "รูปแบบ"
+    level.exercises.forEach(exercise => {
+        const exerciseButton = document.createElement('button');
+        exerciseButton.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors text-left";
+        exerciseButton.textContent = exercise.name;
+        
+        // --- เมื่อคลิกเลือกรูปแบบ ---
+        exerciseButton.onclick = () => {
+            // ซ่อนหน้าเลือกรูปแบบ และแสดงหน้าเลือกความเร็ว
+            patternView.classList.add('hidden');
+            tempoView.classList.remove('hidden');
+
+            // แสดงชื่อและคำอธิบายของรูปแบบที่เลือก
+            dom.exerciseMenuModal.querySelector('#selected-pattern-title').textContent = exercise.name;
+            dom.exerciseMenuModal.querySelector('#selected-pattern-desc').textContent = exercise.description;
+
+            // เก็บข้อมูลรูปแบบและโหมดที่เลือกไว้ชั่วคราว
+            state.selectedExercise = exercise;
+            state.selectedMode = level.mode;
+        };
+        dom.exerciseList.appendChild(exerciseButton);
+    });
+
+    // 4. แสดง Modal
+    dom.exerciseMenuModal.classList.remove('hidden');
+}
+
+// ฟังก์ชันสำหรับผูกมนตร์ควบคุมทั้งหมด
+function attachEventListeners() {
+    // --- การควบคุมใน Modal ---
+    const modal = dom.exerciseMenuModal;
+    if (modal) { // ✨ ป้องกันชั้นที่ 1: ตรวจสอบว่ามี Modal อยู่จริง
+        const patternView = modal.querySelector('#pattern-selection-view');
+        const tempoView = modal.querySelector('#tempo-selection-view');
+        const bpmSlider = modal.querySelector('#bpm-slider');
+        const bpmDisplay = modal.querySelector('#bpm-display');
+        const startBtn = modal.querySelector('#start-practice-btn');
+        const backToPatternsBtn = modal.querySelector('#back-to-patterns-btn');
+        const modalCloseBtn = modal.querySelector('#modal-close-btn');
+
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                const selectedBpm = parseInt(bpmSlider.value, 10);
+                const finalExercise = {
+                    name: state.selectedExercise.name,
+                    pattern: state.selectedExercise.pattern,
+                    bpm: selectedBpm 
+                };
+                modal.classList.add('hidden');
+                startExercise(finalExercise, state.selectedMode);
+            });
+        }
+
+        if (backToPatternsBtn) {
+            backToPatternsBtn.addEventListener('click', () => {
+                if(tempoView && patternView) {
+                    tempoView.classList.add('hidden');
+                    patternView.classList.remove('hidden');
+                }
+            });
+        }
+        
+        if (modalCloseBtn) {
+            modalCloseBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+        }
+
+        if (bpmSlider && bpmDisplay) {
+            bpmSlider.addEventListener('input', () => {
+                bpmDisplay.textContent = `${bpmSlider.value} BPM`;
+            });
+        }
+    }
+
+    // --- การควบคุมทั่วไป ---
+    const freestyleHomeBtn = dom.freestyleScreen.querySelector('.home-btn');
+    if (freestyleHomeBtn) { // ✨ ป้องกันปุ่ม Freestyle
+        freestyleHomeBtn.addEventListener('click', () => showScreen('menu'));
+    }
+
+    const resultsHomeBtn = dom.resultsScreen.querySelector('.home-btn');
+    if (resultsHomeBtn) {
+        resultsHomeBtn.addEventListener('click', () => {
+            // ✨ ส่งสัญญาณปิดเกม แทนการกลับไปที่เมนูของเกม ✨
+            if (window.parent) {
+                window.parent.postMessage({ type: 'CLOSE_GAME' }, '*');
+            }
+            // dom.resultsScreen.classList.add('hidden');
+            // showScreen('menu');
+        });
+    }
+
+    const playAgainBtn = document.getElementById('play-again-btn');
+    if (playAgainBtn) { // ✨ ป้องกันปุ่มเล่นอีกครั้ง
+        playAgainBtn.addEventListener('click', () => {
+            if (state.currentExercise) {
+                dom.resultsScreen.classList.add('hidden');
+                startExercise(state.currentExercise, state.mode);
+            }
+        });
+    }
+    
+    // ✨ มนตร์บทสุดท้ายที่สำคัญที่สุด จะถูกร่ายเสมอ! ✨
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    // --- เพิ่มมนตร์ควบคุมหน้าต่างปรับจูน ---
+    const settingsBtn = document.getElementById('settings-btn');
+    settingsBtn.addEventListener('click', () => {
+        dom.calibrationModal.classList.remove('hidden');
+        startCalibration();
+    });
+
+        const closeGameBtn = document.getElementById('close-game-btn');
+    if (closeGameBtn) {
+        closeGameBtn.addEventListener('click', () => {
+            // ส่งสัญญาณ 'CLOSE_GAME' กลับไปที่แอปหลัก
+            if (window.parent) {
+                window.parent.postMessage({ type: 'CLOSE_GAME' }, '*');
+            }
+        });
+    }
+
+    dom.calibrationCloseBtn.addEventListener('click', () => {
+        state.isCalibrating = false;
+        clearTimeout(state.calibrationTimeout);
+        dom.calibrationModal.classList.add('hidden');
+    });
+
+    dom.calibrationTapBtn.addEventListener('click', () => {
+        if (state.isCalibrating && state.perfectHitTime && state.calibrationTaps.length < 5) {
+            const tapTime = performance.now();
+            const diff = tapTime - state.perfectHitTime;
+            state.calibrationTaps.push(diff);
+            dom.calibrationProgress.textContent = `รับค่า! (${state.calibrationTaps.length}/5)`;
+            
+            // เมื่อกดแล้ว ให้หยุดการทดสอบรอบถัดไปชั่วคราว แล้วเริ่มใหม่
+            clearTimeout(state.calibrationTimeout);
+            if (state.calibrationTaps.length < 5) {
+                state.calibrationTimeout = setTimeout(runCalibrationTest, 1500);
+            } else {
+                finishCalibration();
+            }
+        }
+    });
+}
+
+function buildFreestylePads() {
+    dom.freestylePads.innerHTML = ''; 
+    
+    for (const [drumName, drumInfo] of Object.entries(GAME_DATA.FREESTYLE_KIT)) {
+        const pad = document.createElement('button');
+        pad.className = `pad-base ${drumInfo.css}`;
+        pad.innerHTML = `${drumInfo.label}<br><span class="text-sm text-gray-400">${drumInfo.key === ' ' ? 'SPACE' : drumInfo.key.toUpperCase()}</span>`;
+
+        // --- ตรรกะพิเศษสำหรับแต่ละใบ ---
+        if (drumName === 'PEDAL_HAT') {
+            // เมื่อกด Pedal ค้างไว้
+            const pressPedal = () => {
+                state.isHiHatPedalDown = true;
+                playSound(drumInfo.sound); // เล่นเสียงเหยียบ 1 ครั้ง
+                pad.classList.add('active');
+            };
+            // เมื่อปล่อย Pedal
+            const releasePedal = () => {
+                state.isHiHatPedalDown = false;
+                pad.classList.remove('active');
+            };
+            pad.addEventListener('mousedown', pressPedal);
+            pad.addEventListener('touchstart', (e) => { e.preventDefault(); pressPedal(); });
+            pad.addEventListener('mouseup', releasePedal);
+            pad.addEventListener('touchend', releasePedal);
+            pad.addEventListener('mouseleave', releasePedal); // กรณีกดค้างแล้วลากเมาส์ออก
+
+        } else if (drumName === 'HIHAT_MAIN') {
+            // เมื่อตี Hi-Hat หลัก
+            const triggerHiHat = () => {
+                // ✨ ตรวจสอบว่า Pedal ถูกเหยียบอยู่หรือไม่ ✨
+                const soundToPlay = state.isHiHatPedalDown ? 'HIHAT' : 'HIHATOPEN';
+                playSound(soundToPlay);
+                pad.classList.add('active');
+                setTimeout(() => pad.classList.remove('active'), 100);
+            };
+            pad.addEventListener('mousedown', triggerHiHat);
+            pad.addEventListener('touchstart', (e) => { e.preventDefault(); triggerHiHat(); });
+
+        } else {
+            // กลองอื่นๆ ทำงานปกติ
+            const triggerSound = () => {
+                playSound(drumInfo.sound);
+                pad.classList.add('active');
+                setTimeout(() => pad.classList.remove('active'), 100);
+            };
+            pad.addEventListener('mousedown', triggerSound);
+            pad.addEventListener('touchstart', (e) => { e.preventDefault(); triggerSound(); });
+        }
+        
+        dom.freestylePads.appendChild(pad);
+    }
+}
+
+    //<-- 4. SOUND ENGINE -->
+    async function loadSounds() {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const soundPromises = Object.keys(GAME_DATA.ASSETS.audio).map(async key => {
+            try {
+                const response = await fetch(GAME_DATA.ASSETS.audio[key]);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                soundBank[key] = audioBuffer;
+            } catch (error) {
+                console.error(`Failed to load sound: ${key}`, error);
+            }
+        });
+        await Promise.all(soundPromises);
+        soundBank.context = audioContext;
+        console.log("All sounds loaded.");
+    }
+    
+    function playSound(soundName) {
+        if (!soundBank.context || !soundBank[soundName]) return;
+        const source = soundBank.context.createBufferSource();
+        source.buffer = soundBank[soundName];
+        source.connect(soundBank.context.destination);
+        source.start(0);
+    }
+
+    //<-- 5. GAMEPLAY CORE -->
+    function startExercise(exercise, mode) {
+        gameStartTime = Date.now(); // ✨ เริ่มจับเวลาตรงนี้
+        resetState();
+        state.currentExercise = exercise;
+        state.mode = mode;
+        
+        showScreen('game');
+        dom.patternName.textContent = exercise.name;
+        buildControls(mode);
+        generateNoteQueue();
+        updateUI();
+
+            // --- ✨ ร่ายมนตร์บทใหม่ตรงนี้ ✨ ---
+    // 1. คำนวณระยะเวลา 1 จังหวะจาก BPM
+    const quarterNoteTimeMs = (60 / exercise.bpm) * 1000;
+    // 2. คำนวณระยะเวลานับถอยหลังที่แท้จริง (สำหรับ 4 จังหวะ)
+    const countInDurationMs = quarterNoteTimeMs * 4;
+        
+        state.gameState = 'counting';
+        state.startTime = performance.now() + countInDurationMs;
+        requestAnimationFrame(gameLoop);
+    }
+
+function parsePattern(patternString, mode) {
+    const notes = patternString.trim().split(' ');
+    const noteTypeMap = {
+        'q': 'quarter', 'e': 'eighth', 's': 'sixteenth', 't': 'thirty_second',
+        'h': 'half', 'w': 'whole', 'i': 'triplet'
+    };
+    
+    return notes.map(n => {
+        const typeChar = n.charAt(0).toLowerCase();
+        const handChar = n.substring(1);
+
+        const duration = noteTypeMap[typeChar] || 'quarter'; // ถ้าไม่ระบุ ให้เป็นตัวดำ
+        let hand = handChar;
+
+        if (mode === 'groove') {
+            const drumMap = {'K': 'KICK', 'S': 'SNARE', 'H': 'HIHAT'};
+            hand = drumMap[handChar] || 'KICK';
+        }
+        
+        return { hand: hand, duration: duration };
+    });
+}
+
+    function generateNoteQueue() {
+        dom.noteTrack.innerHTML = '';
+        state.noteQueue = [];
+        const bpm = state.currentExercise.bpm;
+        const parsedPattern = parsePattern(state.currentExercise.pattern, state.mode);
+        const noteValueMap = { 
+            'whole': 1, 
+            'half': 2, 
+            'quarter': 4, 
+            'eighth': 8, 
+            'sixteenth': 16, 
+            'thirty_second': 32,
+            'triplet': 12 // 3 โน้ตใน 1 จังหวะตัวดำ (4 * 3 = 12)
+        };
+        const quarterNoteTimeMs = (60 / bpm) * 1000;
+        let currentTimeMs = 0; 
+
+        parsedPattern.forEach((p, i) => {
+            const noteDurationMs = quarterNoteTimeMs * (4 / noteValueMap[p.duration]);
+            
+            let yPos = 50; // Default center
+            if (state.mode === 'sticking') {
+                 yPos = p.hand === 'R' ? 40 : 60;
+            } else if (state.mode === 'groove') {
+                 if (p.hand === 'KICK') yPos = 80;
+                 if (p.hand === 'SNARE') yPos = 55;
+                 if (p.hand === 'HIHAT') yPos = 30;
+            }
+
+            const noteElement = document.createElement('div');
+            noteElement.className = `note note-${p.hand} w-16 h-16`;
+            noteElement.style.top = `${yPos}%`;
+            noteElement.innerHTML = `<svg viewBox="-15 -40 40 50" class="w-full h-full">${GAME_DATA.SVG_NOTES[p.duration]}</svg>`;
+            dom.noteTrack.appendChild(noteElement);
+
+            state.noteQueue.push({
+                id: i,
+                hand: p.hand,
+                time: currentTimeMs,
+                element: noteElement,
+                status: 'upcoming' // upcoming, hit, miss
+            });
+            currentTimeMs += noteDurationMs;
+        });
+    }
+    
+    function gameLoop(now) {
+            if (state.gameState === 'menu' || state.gameState === 'finished') return;
+    
+    // ส่วนของ Count-in
+    if (state.gameState === 'counting') {
+        const timeUntilStart = state.startTime - now;
+        if (timeUntilStart <= 0) {
+            state.gameState = 'playing';
+            dom.countInDisplay.textContent = '';
+            requestAnimationFrame(gameLoop);
+            return;
+        }
+
+        const quarterNoteTimeMs = (60 / state.currentExercise.bpm) * 1000;
+        const beatNumber = 4 - Math.floor(timeUntilStart / quarterNoteTimeMs);
+
+        if(beatNumber > 0 && beatNumber !== state.countInBeat) {
+            state.countInBeat = beatNumber;
+            dom.countInDisplay.textContent = beatNumber;
+            // อาจจะเพิ่มเสียง Metronome ที่นี่ได้
+            playSound('METRONOME'); 
+        }
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+        if (state.gameState !== 'playing') return;
+        
+        const elapsed = now - state.startTime;
+        state.gameTime = elapsed > 0 ? elapsed : 0;
+        const hitPositionX = dom.noteTrack.offsetWidth * 0.20;
+        
+        state.noteQueue.forEach(note => {
+            if (note.status === 'upcoming') {
+                const timeToHit = note.time - state.gameTime;
+                
+                if (timeToHit < -CONFIG.HIT_WINDOW_MS / 2) {
+                    note.status = 'miss';
+                    note.element.classList.add('miss');
+                    state.misses++;
+                    state.combo = 0;
+                    showFeedback('Miss');
+                    playSound('FAILURE');
+                    updateUI();
+                    return;
+                }
+                
+                const distanceToHit = timeToHit * CONFIG.NOTE_SPEED_PX_PER_MS;
+                note.element.style.transform = `translate(${hitPositionX + distanceToHit}px, -50%)`;
+                note.element.style.opacity = (distanceToHit < dom.noteTrack.offsetWidth) ? '1' : '0';
+            }
+        });
+
+        const quarterNoteTimeMs = (60 / state.currentExercise.bpm) * 1000;
+        const currentBeat = Math.floor(state.gameTime / quarterNoteTimeMs) % 4 + 1;
+        if(currentBeat !== state.lastBeat) {
+            state.lastBeat = currentBeat;
+            dom.beatCounter.textContent = currentBeat;
+
+            playSound('METRONOME');
+        }
+
+        const lastNote = state.noteQueue[state.noteQueue.length - 1];
+        if (state.gameTime > lastNote.time + 2000) {
+            endGame();
+        } else {
+            requestAnimationFrame(gameLoop);
+        }
+    }
+    
+    function handleHit(hitType) { // 'L', 'R', 'KICK', 'SNARE', 'HIHAT'
+        if (state.gameState !== 'playing') return;
+
+        const targetNote = state.noteQueue.find(n => n.status === 'upcoming');
+        if (!targetNote) return;
+
+    const adjustedGameTime = state.gameTime - state.latencyOffset;
+    const timeDifference = targetNote.time - adjustedGameTime;
+        
+        if (Math.abs(timeDifference) <= CONFIG.HIT_WINDOW_MS / 2) {
+            if (targetNote.hand === hitType) {
+                targetNote.status = 'hit';
+                targetNote.element.classList.add('hit');
+                
+                //playSound(hitType);
+                state.hits++;
+                state.combo++;
+                state.maxCombo = Math.max(state.maxCombo, state.combo);
+                
+                if (Math.abs(timeDifference) <= CONFIG.PERFECT_WINDOW_MS / 2) {
+                   state.score += 150 + (state.combo * 10);
+                   showFeedback('Perfect!');
+                } else {
+                   state.score += 100 + (state.combo * 10);
+                   showFeedback('Good');
+                }
+            } else {
+                state.combo = 0;
+                showFeedback('Wrong');
+                playSound('FAILURE');
+            }
+        } else {
+            state.combo = 0;
+        }
+        updateUI();
+    }
+
+    function endGame() {
+        state.gameState = 'finished';
+        const totalNotes = state.hits + state.misses;
+        const accuracy = totalNotes > 0 ? Math.round((state.hits / totalNotes) * 100) : 100;
+
+    // ✨✨✨ เริ่มส่วนที่แก้ไข/เพิ่มเข้ามา ✨✨✨
+    
+    // 1. คำนวณระยะเวลาที่เล่น (เป็นนาที)
+    const gameEndTime = Date.now();
+    const durationMs = gameEndTime - gameStartTime;
+    const durationMinutes = durationMs / 60000;
+
+    // 2. ส่งข้อมูลกลับไปที่แอปหลัก (index.html)
+    if (window.parent) {
+        window.parent.postMessage({
+            type: 'GAME_OVER',
+            payload: {
+                gameName: 'rhythm_core', 
+                score: state.score,
+                duration: durationMinutes
+            }
+        }, '*');
+    }
+    // ✨✨✨ จบส่วนที่แก้ไข/เพิ่มเข้ามา ✨✨✨
+
+        dom.resultsScore.textContent = state.score.toLocaleString();
+        dom.resultsMaxCombo.textContent = `x${state.maxCombo}`;
+        dom.resultsAccuracy.textContent = `${accuracy}%`;
+        dom.resultsAccuracyBar.style.width = `${accuracy}%`;
+        
+        let title = "พยายามอีกนิดนะ 🤨";
+        if (accuracy >= 95) title = "Perfect!! 🤩";
+        else if (accuracy >= 80) title = "ยอดเยี่ยม! 👍";
+        else if (accuracy >= 60) title = "ทำได้ดี! 🙂";
+        dom.resultsTitle.textContent = title;
+        
+        playSound('SUCCESS');
+        showScreen('results');
+    }
+
+// --- คาถาหลักในการปรับจูน ---
+function startCalibration() {
+    if (state.isCalibrating) return;
+    state.isCalibrating = true;
+    state.calibrationTaps = [];
+    dom.calibrationProgress.textContent = `กดปุ่ม TAP เพื่อเริ่ม (0/5)`;
+    dom.calibrationResult.textContent = '';
+    
+    // รอสักครู่แล้วเริ่มทดสอบครั้งแรก
+    clearTimeout(state.calibrationTimeout);
+    state.calibrationTimeout = setTimeout(runCalibrationTest, 1500); 
+}
+
+function runCalibrationTest() {
+    if (state.calibrationTaps.length >= 5) {
+        finishCalibration();
+        return;
+    }
+
+    const visualCue = dom.calibrationVisualCue;
+    visualCue.style.transitionDuration = '0s';
+    visualCue.classList.remove('animate');
+    visualCue.style.transform = 'scale(1)';
+
+    // บังคับให้ browser render ใหม่
+    visualCue.getBoundingClientRect(); 
+
+    // เริ่มอนิเมชันและตั้งเวลาเสียง
+    visualCue.style.transitionDuration = '0.5s';
+    visualCue.classList.add('animate');
+    
+    const perfectTime = performance.now() + 500; // 500ms คือระยะเวลาอนิเมชัน
+    playSound('HIHAT'); // เล่นเสียงพร้อมอนิเมชันจบ
+    state.perfectHitTime = perfectTime;
+
+    // ตั้งเวลาทดสอบครั้งถัดไป
+    state.calibrationTimeout = setTimeout(runCalibrationTest, 2000);
+}
+
+function finishCalibration() {
+    state.isCalibrating = false;
+    clearTimeout(state.calibrationTimeout);
+
+    // คำนวณค่าเฉลี่ย
+    const sum = state.calibrationTaps.reduce((a, b) => a + b, 0);
+    const avgOffset = Math.round(sum / state.calibrationTaps.length);
+    
+    state.latencyOffset = avgOffset;
+    localStorage.setItem('rhythmCoreLatencyOffset', state.latencyOffset); // บันทึกค่า
+
+    dom.calibrationProgress.textContent = `ตั้งค่าเสร็จสิ้น!`;
+    dom.calibrationResult.textContent = `ค่าความหน่วงของคุณ: ${avgOffset}ms`;
+}    
+
+    //<-- 6. UI & FEEDBACK -->
+    function updateUI() {
+        dom.score.textContent = state.score.toLocaleString();
+        dom.combo.textContent = `x${state.combo}`;
+        const total = state.hits + state.misses;
+        dom.accuracy.textContent = `${total > 0 ? Math.round((state.hits / total) * 100) : 100}%`;
+    }
+
+    function showFeedback(text) {
+        const el = document.createElement('div');
+        el.className = 'feedback-text';
+        const colorMap = {'Perfect!': '#34d399', 'Good': '#60a5fa', 'Wrong': '#f87171', 'Miss': '#9ca3af'};
+        el.style.color = colorMap[text] || '#FFF';
+        el.textContent = text;
+        dom.feedbackContainer.appendChild(el);
+        setTimeout(() => el.remove(), 500);
+    }
+    
+    function buildControls(mode) {
+        dom.controlArea.innerHTML = '';
+        if (mode === 'sticking') {
+            dom.controlArea.innerHTML = `
+            <div class="flex w-full max-w-lg justify-between items-center">
+                <button data-hit="L" class="drum-button w-36 h-36 rounded-full flex flex-col items-center justify-center text-orange-400 font-bold text-xl">L</button>
+                <button data-hit="R" class="drum-button w-36 h-36 rounded-full flex flex-col items-center justify-center text-blue-400 font-bold text-xl">R</button>
+            </div>`;
+        } else if (mode === 'groove') {
+             dom.controlArea.innerHTML = `
+            <div class="flex w-full max-w-lg justify-around items-center">
+                <button data-hit="KICK" class="drum-button w-28 h-28 rounded-full flex flex-col items-center justify-center text-yellow-500 font-bold text-lg">Kick (F)</button>
+                <button data-hit="SNARE" class="drum-button w-28 h-28 rounded-full flex flex-col items-center justify-center text-blue-400 font-bold text-lg">Snare (J)</button>
+                <button data-hit="HIHAT" class="drum-button w-28 h-28 rounded-full flex flex-col items-center justify-center text-cyan-400 font-bold text-lg">Hi-Hat (K)</button>
+            </div>`;
+        }
+        // Re-attach listeners for new buttons
+        dom.controlArea.querySelectorAll('button').forEach(btn => {
+        const hitType = btn.dataset.hit;
+
+        const action = () => {
+            // เล่นเสียงทันทีที่กด
+            const soundToPlay = (mode === 'sticking') ? 'SNARE' : hitType;
+            playSound(soundToPlay);
+
+            // เรียกใช้ logic การตัดสินผล
+            handleHit(hitType);
+        };
+
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); action(); });
+        btn.addEventListener('mousedown', action);
+    });
+}
+
+    //<-- 7. INPUT HANDLING -->
+function handleKeyDown(e) {
+    if (e.repeat) return;
+    const key = e.key.toLowerCase();
+    
+    // --- โหมด Freestyle (อัปเกรดให้รองรับ Pedal) ---
+    if (dom.freestyleScreen.classList.contains('hidden') === false) {
+        for (const [drumName, drumInfo] of Object.entries(GAME_DATA.FREESTYLE_KIT)) {
+            if (drumInfo.key === key) {
+                const pad = dom.freestylePads.querySelector(`.${drumInfo.css}`);
+
+                // --- ตรรกะพิเศษสำหรับแต่ละใบ ---
+                if (drumName === 'PEDAL_HAT') {
+                    // กดครั้งแรกเท่านั้น (ป้องกันเสียงซ้อนเมื่อกดค้าง)
+                    if (!state.isHiHatPedalDown) { 
+                        playSound(drumInfo.sound);
+                        state.isHiHatPedalDown = true;
+                    }
+                } else if (drumName === 'HIHAT_MAIN') {
+                    // ตรวจสอบสถานะ Pedal ก่อนเล่นเสียง
+                    const soundToPlay = state.isHiHatPedalDown ? 'HIHAT' : 'HIHATOPEN';
+                    playSound(soundToPlay);
+                } else {
+                    // กลองอื่นๆ เล่นเสียงตามปกติ
+                    playSound(drumInfo.sound);
+                }
+
+                if (pad) pad.classList.add('active');
+                return; // ออกจากการวนลูปและการตรวจสอบเงื่อนไขอื่น
+            }
+        }
+    }
+
+    // --- โหมดเล่นเกม (ส่วนนี้ทำงานเมื่อไม่ได้อยู่ในโหมด Freestyle) ---
+    if (state.gameState === 'playing') {
+        const keyMap = GAME_DATA.KEYMAP[state.mode];
+        if (keyMap && keyMap[key]) {
+            handleHit(keyMap[key]);
+            const btn = dom.controlArea.querySelector(`[data-hit="${keyMap[key]}"]`);
+            if(btn) btn.classList.add('active');
+        }
+    } 
+    // --- การควบคุมอื่นๆ (ส่วนนี้ทำงานเมื่อไม่ได้อยู่ใน 2 โหมดข้างต้น) ---
+    else if (state.gameState === 'menu' && key === 'enter') {
+        showExerciseMenu(GAME_DATA.LEVELS[0]);
+    } else if (state.gameState === 'finished' && key === 'enter') {
+        dom.resultsScreen.classList.add('hidden');
+        showScreen('menu');
+    }
+}
+
+function handleKeyUp(e) {
+    const key = e.key.toLowerCase();
+    
+    // --- โหมด Freestyle (อัปเกรดให้รองรับ Pedal) ---
+    if (dom.freestyleScreen.classList.contains('hidden') === false) {
+        for (const [drumName, drumInfo] of Object.entries(GAME_DATA.FREESTYLE_KIT)) {
+            if (drumInfo.key === key) {
+                // ✨ เมื่อปล่อยปุ่ม Pedal Hat ให้เปลี่ยนสถานะกลับ ✨
+                if (drumName === 'PEDAL_HAT') {
+                    state.isHiHatPedalDown = false;
+                }
+                const pad = dom.freestylePads.querySelector(`.${drumInfo.css}`);
+                if (pad) pad.classList.remove('active');
+                return; // ออกจากการวนลูปและการตรวจสอบเงื่อนไขอื่น
+            }
+        }
+    }
+
+    // --- โหมดเล่นเกม (ส่วนนี้ทำงานเมื่อไม่ได้อยู่ในโหมด Freestyle) ---
+    if (state.gameState === 'playing') {
+        const keyMap = GAME_DATA.KEYMAP[state.mode];
+        if (keyMap && keyMap[key]) {
+            const btn = dom.controlArea.querySelector(`[data-hit="${keyMap[key]}"]`);
+            if (btn) btn.classList.remove('active');
+        }
+    } 
+}
+
+    // Let's go!
+    window.onload = init;
+
+    </script>
+</body>
+</html>

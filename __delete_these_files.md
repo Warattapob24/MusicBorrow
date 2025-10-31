@@ -1,0 +1,12 @@
+login.js
+dashboard.js
+dashboard.html
+register.html
+register.js
+logout.js
+styles.css
+404.html
+supabaseClient.js
+test.html
+README.md
+.gitignore
