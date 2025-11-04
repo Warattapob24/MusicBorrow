@@ -1,4 +1,4 @@
-const CACHE_NAME = 'music-borrow-v5.2.019'; // เปลี่ยนชื่อนี้ทุกครั้งที่ต้องการบังคับอัปเดตใหญ่
+const CACHE_NAME = 'music-borrow-v5.2.020'; // เปลี่ยนชื่อนี้ทุกครั้งที่ต้องการบังคับอัปเดตใหญ่
 const urlsToCache = [
   '/',
   '/index.html',
