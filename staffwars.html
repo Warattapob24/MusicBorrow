@@ -204,8 +204,8 @@
                  <p class="text-lg text-slate-300 mb-4">คะแนนสุดท้ายของคุณคือ</p>
                  <p id="final-score" class="text-6xl font-bold text-cyan-400 mb-6">0</p>
                  <button id="restart-btn" class="w-full bg-cyan-500 text-slate-900 font-bold py-3 px-6 rounded-lg">เล่นอีกครั้ง</button>
-                 <button id="close-game-btn" style="background-color: #7f1d1d; margin-top: 10px;">ออก</button>
-             </div>
+                    <button id="close-game-btn" style="background-color: #7f1d1d; margin-top: 10px;">ออก</button>
+                </div>
         </div>
     </div>
 
@@ -890,7 +890,15 @@ if (closeGameBtn) {
         }
     });
 }
-    
+// ✨ [FIX] เพิ่ม Event Listener สำหรับปุ่ม "ออก" ที่หน้า Game Over
+const gameOverExitBtn = document.getElementById('exit-game-over-btn');
+if (gameOverExitBtn) {
+    gameOverExitBtn.addEventListener('click', () => {
+        if (window.parent) {
+            window.parent.postMessage({ type: 'CLOSE_GAME' }, '*');
+        }
+    });
+}    
     PitchCommandGame.init();
 </script>
 </body>
