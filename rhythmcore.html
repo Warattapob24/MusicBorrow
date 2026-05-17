@@ -443,27 +443,26 @@
 
     <script>
         // วางไว้บนสุดของ <script> ในไฟล์ Rhythm Core
-let currentUserData = null;
-let gameStartTime = 0;
+        let currentUserData = null;
+        let gameStartTime = 0;
 
-window.addEventListener('message', (event) => {
-    // ใช้ event.data.type ไม่ใช่ event.data.action
-    if (event.data.type === 'INIT_GAME') {
-        console.log("Rhythm Core received user data:", event.data.user);
-        currentUserData = event.data.user;
-    }
-});
+        const savedUser = localStorage.getItem('sd_game_user');
+        if (savedUser) {
+            currentUserData = JSON.parse(savedUser);
+            console.log("Rhythm Core รู้จักผู้เล่นแล้ว:", currentUserData.first_name);
+        }
+
         //<-- SCRIPT FOR ADAPTIVE HEIGHT -->
-function setTrueHeight() {
-    // คำนวณหา 1% ของความสูงที่ใช้งานได้จริง
-    const vh = window.innerHeight * 0.01;
-    // ตั้งค่าตัวแปร --vh ใน CSS
-    document.documentElement.style.setProperty('--vh', `${vh}px`);
-}
-// เรียกใช้คาถานี้เมื่อโหลดหน้าเว็บและเมื่อมีการปรับขนาดหน้าต่าง
-window.addEventListener('load', setTrueHeight);
-window.addEventListener('resize', setTrueHeight);
-setTrueHeight(); // เรียกใช้ครั้งแรกทันที
+        function setTrueHeight() {
+            // คำนวณหา 1% ของความสูงที่ใช้งานได้จริง
+            const vh = window.innerHeight * 0.01;
+            // ตั้งค่าตัวแปร --vh ใน CSS
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        // เรียกใช้คาถานี้เมื่อโหลดหน้าเว็บและเมื่อมีการปรับขนาดหน้าต่าง
+        window.addEventListener('load', setTrueHeight);
+        window.addEventListener('resize', setTrueHeight);
+        setTrueHeight(); // เรียกใช้ครั้งแรกทันที
 
     //<-- 1. GAME DATA & CONFIG -->
     const CONFIG = {
@@ -760,15 +759,22 @@ function attachEventListeners() {
         freestyleHomeBtn.addEventListener('click', () => showScreen('menu'));
     }
 
+    // 3. ปรับการทำงานของปุ่มกลับเมนูหน้า Results (ประมาณบรรทัด 450)
     const resultsHomeBtn = dom.resultsScreen.querySelector('.home-btn');
     if (resultsHomeBtn) {
         resultsHomeBtn.addEventListener('click', () => {
-            // ✨ ส่งสัญญาณปิดเกม แทนการกลับไปที่เมนูของเกม ✨
-            if (window.parent) {
-                window.parent.postMessage({ type: 'CLOSE_GAME' }, '*');
-            }
-            // dom.resultsScreen.classList.add('hidden');
-            // showScreen('menu');
+            const targetWindow = window.opener || window.parent;
+            if (targetWindow) targetWindow.postMessage({ type: 'CLOSE_GAME' }, '*');
+            window.close(); // ปิดแท็บ
+        });
+    }
+
+    const closeGameBtn = document.getElementById('close-game-btn');
+    if (closeGameBtn) {
+        closeGameBtn.addEventListener('click', () => {
+            const targetWindow = window.opener || window.parent;
+            if (targetWindow) targetWindow.postMessage({ type: 'CLOSE_GAME' }, '*');
+            window.close(); // ปิดแท็บ
         });
     }
 
@@ -791,16 +797,6 @@ function attachEventListeners() {
         dom.calibrationModal.classList.remove('hidden');
         startCalibration();
     });
-
-        const closeGameBtn = document.getElementById('close-game-btn');
-    if (closeGameBtn) {
-        closeGameBtn.addEventListener('click', () => {
-            // ส่งสัญญาณ 'CLOSE_GAME' กลับไปที่แอปหลัก
-            if (window.parent) {
-                window.parent.postMessage({ type: 'CLOSE_GAME' }, '*');
-            }
-        });
-    }
 
     dom.calibrationCloseBtn.addEventListener('click', () => {
         state.isCalibrating = false;
@@ -1074,6 +1070,13 @@ function parsePattern(patternString, mode) {
         const targetNote = state.noteQueue.find(n => n.status === 'upcoming');
         if (!targetNote) return;
 
+        // --- ส่วนที่แก้ไข: เปลี่ยนจากคอมเมนต์ เป็นการเล่นเสียงให้ถูกตัวแปร ---
+        if (state.mode === 'sticking') {
+            playSound('SNARE'); 
+        } else {
+            playSound(hitType); 
+        }
+
     const adjustedGameTime = state.gameTime - state.latencyOffset;
     const timeDifference = targetNote.time - adjustedGameTime;
         
@@ -1115,20 +1118,26 @@ function parsePattern(patternString, mode) {
     // 1. คำนวณระยะเวลาที่เล่น (เป็นนาที)
     const gameEndTime = Date.now();
     const durationMs = gameEndTime - gameStartTime;
-    const durationMinutes = durationMs / 60000;
 
-    // 2. ส่งข้อมูลกลับไปที่แอปหลัก (index.html)
-    if (window.parent) {
-        window.parent.postMessage({
+    // อุดช่องโหว่การฟาร์มเวลาแบบ AFK (ปล่อยเกมทิ้งไว้ไม่ยอมตี)
+    let durationMinutes = Math.floor(durationMs / 60000); // ใช้ Math.floor ด้วย อย่าลืม!
+
+    if (state.hits === 0) {
+        durationMinutes = 0; 
+    } else if (durationMinutes === 0 && durationMs >= 30000) { 
+        // เพิ่มเงื่อนไขว่าต้องเล่นเกิน 30 วินาทีถึงจะปัดเป็น 1 นาทีให้
+        durationMinutes = 1; 
+    } else if (durationMinutes === 0) {
+        durationMinutes = 0;
+    }
+
+    const targetWindow = window.opener || window.parent;
+    if (targetWindow) {
+        targetWindow.postMessage({
             type: 'GAME_OVER',
-            payload: {
-                gameName: 'rhythm_core', 
-                score: state.score,
-                duration: durationMinutes
-            }
+            payload: { gameName: 'rhythm_core', score: state.score, duration: durationMinutes }
         }, '*');
     }
-    // ✨✨✨ จบส่วนที่แก้ไข/เพิ่มเข้ามา ✨✨✨
 
         dom.resultsScore.textContent = state.score.toLocaleString();
         dom.resultsMaxCombo.textContent = `x${state.maxCombo}`;

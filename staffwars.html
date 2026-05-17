@@ -204,30 +204,23 @@
                  <p class="text-lg text-slate-300 mb-4">คะแนนสุดท้ายของคุณคือ</p>
                  <p id="final-score" class="text-6xl font-bold text-cyan-400 mb-6">0</p>
                  <button id="restart-btn" class="w-full bg-cyan-500 text-slate-900 font-bold py-3 px-6 rounded-lg">เล่นอีกครั้ง</button>
-                    <button id="close-game-btn" style="background-color: #7f1d1d; margin-top: 10px;">ออก</button>
+                    <button id="exit-game-over-btn" style="background-color: #7f1d1d; margin-top: 10px; padding: 10px 20px; border-radius: 8px; color: white;">ออก</button>
                 </div>
         </div>
     </div>
 
     <script type="module">
-        // Import Supabase to communicate with the backend
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-        const SUPABASE_URL = 'https://qsbvitqxwgtmopjjuxin.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzYnZpdHF4d2d0bW9wamp1eGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTExODMxNDksImV4cCI6MjA2Njc1OTE0OX0.7q2MR7ePBrZKMh08MlZDbeXbFWcoH3dZNgdzWGHOugY';
-        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
+        // 1. ค้นหาช่วงบรรทัด 144 และแทนที่การรับค่าแบบเดิมด้วยชุดนี้
         let currentUserData = null;
         let gameStartTime = null;
 
-        // Listen for the initial data from the main app
-        window.addEventListener('message', (event) => {
-            if (event.data.type === 'INIT_GAME') {
-                currentUserData = event.data.user;
-                // Initialize the game with user data
-                document.getElementById('user-info').textContent = `ผู้เล่น: ${currentUserData.nickname || currentUserData.first_name} | คะแนนสูงสุด: ${currentUserData.staff_wars_highscore}`;
-                document.getElementById('level').textContent = currentUserData.staff_wars_level;
-            }
-        });
+        // ดึงข้อมูลผู้เล่นที่ Dashboard ฝากไว้ทันทีที่โหลดหน้าเสร็จ
+        const savedUser = localStorage.getItem('sd_game_user');
+        if (savedUser) {
+            currentUserData = JSON.parse(savedUser);
+            document.getElementById('user-info').textContent = `ผู้เล่น: ${currentUserData.nickname || currentUserData.first_name} | คะแนนสูงสุด: ${currentUserData.staff_wars_highscore || 0}`;
+            document.getElementById('level').textContent = currentUserData.staff_wars_level || 1;
+        }
 
         const PitchCommandGame = {
 
@@ -390,6 +383,11 @@
 
             async startGame() {
                 if (this.state.isGameActive) return;
+                // หากข้อมูลผู้ใช้ยังไม่มา (Undefined) ให้รอ 500ms แล้วลองใหม่ แทนการปล่อยให้พัง
+                if (!currentUserData) {
+                    setTimeout(() => this.startGame(), 500);
+                    return;
+                }
                 this.playSound(this.audio.start);
                 this.els.startBtn.disabled = true;
                 
@@ -438,17 +436,25 @@
                 if (!currentUserData) return;
 
                 // 1. Calculate and log practice time
-    const gameEndTime = Date.now();
-    const durationInMinutes = (gameEndTime - gameStartTime) / 60000;
+                const gameEndTime = Date.now();
+                const durationMs = gameEndTime - gameStartTime;
+                
+                // อุดช่องโหว่การปั๊มเวลา: ใช้ Math.floor และบังคับให้เวลาเป็น 0 หากเล่นไม่ถึง 30 วินาที
+                let durationInMinutes = Math.floor(durationMs / 60000);
+                if (durationMs < 30000) {
+                    durationInMinutes = 0; // ตัดสิทธิ์การได้เวลาหากซ้อมน้อยกว่า 30 วินาที
+                } else if (durationInMinutes === 0) {
+                    durationInMinutes = 1; // อนุโลมให้ 1 นาที หากตั้งใจเล่นผ่านช่วง 30-59 วินาทีแรกมาได้
+                }
 
-    window.parent.postMessage({
-        type: 'GAME_OVER',
-        payload: {
-            gameName: 'staffwars',
-            score: this.state.score,
-            duration: durationInMinutes
-        }
-    }, '*');
+                // ส่งคะแนนกลับไปที่แท็บ Dashboard (opener) อย่างปลอดภัย
+                const targetWindow = window.opener || window.parent;
+                if (targetWindow) {
+                    targetWindow.postMessage({
+                        type: 'GAME_OVER',
+                        payload: { gameName: 'staffwars', score: this.state.score, duration: durationInMinutes }
+                    }, '*');
+                }
             },
             
             updateTimer() {
@@ -722,7 +728,7 @@
                     this.state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     const source = this.state.audioContext.createMediaStreamSource(this.state.mediaStream);
                     this.state.analyser = this.state.audioContext.createAnalyser();
-                    this.state.analyser.fftSize = 2048;
+                    this.state.analyser.fftSize = 1024;
                     source.connect(this.state.analyser);
                     this.state.dataArray = new Float32Array(this.state.analyser.fftSize);
                     return true;
@@ -799,32 +805,38 @@
             },
 
             autoCorrelate(buf, sampleRate) {
-                const SIZE = buf.length;
+                let SIZE = buf.length;
                 let rms = 0;
                 for (let i = 0; i < SIZE; i++) {
                     rms += buf[i] * buf[i];
                 }
                 rms = Math.sqrt(rms / SIZE);
-                if (rms < 0.01) return -1;
+                if (rms < 0.01) return -1; // ถ้าเสียงเบาไปข้ามเลย
 
                 let r1 = 0, r2 = SIZE - 1;
                 const thres = 0.2;
                 for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
                 for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
                 buf = buf.slice(r1, r2);
+                SIZE = buf.length;
 
-                const c = new Array(buf.length).fill(0);
-                for (let i = 0; i < buf.length; i++) {
-                    for (let j = 0; j < buf.length - i; j++) {
-                        c[i] += buf[j] * buf[j+i];
+                // ⚡ OPTIMIZATION: จำกัดการวนลูป (Max Lag) เพื่อไม่ให้ CPU มือถือค้าง
+                const c = new Array(SIZE).fill(0);
+                const maxLag = Math.min(SIZE, 1000); 
+                
+                for (let i = 0; i < maxLag; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < SIZE - i; j++) {
+                        sum += buf[j] * buf[j + i];
                     }
+                    c[i] = sum;
                 }
 
                 let d = 0;
-                while (d < c.length -1 && c[d] > c[d+1]) d++;
+                while (d < maxLag - 1 && c[d] > c[d + 1]) d++;
                 
                 let maxval = -1, maxpos = -1;
-                for (let i = d; i < buf.length; i++) {
+                for (let i = d; i < maxLag; i++) {
                     if (c[i] > maxval) {
                         maxval = c[i];
                         maxpos = i;
@@ -834,7 +846,7 @@
                 
                 let T0 = maxpos;
                 const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
-                if (x1 && x2 && x3) {
+                if (x1 !== undefined && x2 !== undefined && x3 !== undefined) {
                     const a = (x1 + x3 - 2 * x2) / 2;
                     const b = (x3 - x1) / 2;
                     if (a) T0 = T0 - b / (2 * a);
@@ -881,24 +893,23 @@
         }
     };
     
+// 3. ปรับปุ่มออกจากเกม (ใกล้ๆ บรรทัด 550)
 const closeGameBtn = document.getElementById('close-game-btn');
 if (closeGameBtn) {
     closeGameBtn.addEventListener('click', () => {
-        // ส่งสัญญาณ 'CLOSE_GAME' กลับไปที่แอปหลัก (index.html)
-        if (window.parent) {
-            window.parent.postMessage({ type: 'CLOSE_GAME' }, '*');
-        }
+        const targetWindow = window.opener || window.parent;
+        if (targetWindow) targetWindow.postMessage({ type: 'CLOSE_GAME' }, '*');
+        window.close(); // สั่งปิดแท็บนี้
     });
 }
-// ✨ [FIX] เพิ่ม Event Listener สำหรับปุ่ม "ออก" ที่หน้า Game Over
 const gameOverExitBtn = document.getElementById('exit-game-over-btn');
 if (gameOverExitBtn) {
     gameOverExitBtn.addEventListener('click', () => {
-        if (window.parent) {
-            window.parent.postMessage({ type: 'CLOSE_GAME' }, '*');
-        }
+        const targetWindow = window.opener || window.parent;
+        if (targetWindow) targetWindow.postMessage({ type: 'CLOSE_GAME' }, '*');
+        window.close(); // สั่งปิดแท็บนี้
     });
-}    
+}
     PitchCommandGame.init();
 </script>
 </body>
