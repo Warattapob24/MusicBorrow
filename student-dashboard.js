@@ -8,12 +8,14 @@
  */
 
 // นำ supabase ออกและ import api เข้ามาแทน
-import { authApi, notificationsExt, borrowExt, usersExt, repair, 
-         instrumentsExt, realtimeApi, gamesExt, knowledgeExt, statsApi, 
+import { authApi, notificationsExt, borrowExt, usersExt, repair,
+         instrumentsExt, realtimeApi, gamesExt, knowledgeExt, statsApi,
          badgesExt, rankingsExt, bossesApi, raidApi } from './api.js';
 import { currentUser, setCurrentUser, getCurrentUser } from './auth.js';
 import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
 import { buildPlayerCardHTML, triggerLevelUp, sharePlayerCard  } from './player-card.js';
+import { BadgeSystem } from './badge-system.js';
+import { renderBadgeGallery, setupBadgeGalleryEvents } from './badge-gallery.js';
 
 // เปลี่ยนจากการเรียก setView โดยตรง เป็นการเปลี่ยน Hash แทน
 window.__sdSetView = (viewName) => {
@@ -29,7 +31,7 @@ window.__sdSetView = (viewName) => {
 window.addEventListener('hashchange', () => {
     const viewName = window.location.hash.replace('#', '') || 'home';
     // ตรวจสอบ View ที่อนุญาต (ป้องกันมั่ว Hash)
-    const validViews = ['home', 'borrow', 'repairs', 'knowledge', 'games', 'profile'];
+    const validViews = ['home', 'borrow', 'repairs', 'knowledge', 'games', 'profile', 'badges'];
     if (validViews.includes(viewName)) {
         setView(viewName, getCurrentUser());
     }
@@ -931,12 +933,33 @@ const VIEWS = {
                     </div>
                     <div id="history-list" aria-busy="true" class="sd-list-container" style="margin-top:1rem;"></div>
                 </div>
+
+                <div id="game-history-section" style="margin-top:1.5rem;">
+                    <h3 class="sd-section-title">🎮 ประวัติการเล่นเกม</h3>
+                    <div id="game-history-list" aria-busy="true" class="sd-list-container"></div>
+                </div>
+
+                <div id="clip-history-section" style="margin-top:1.5rem;">
+                    <h3 class="sd-section-title">📺 ประวัติดูคลิปการเรียนรู้</h3>
+                    <div id="clip-history-list" aria-busy="true" class="sd-list-container"></div>
+                </div>
+
+                <div id="repair-history-section" style="margin-top:1.5rem;">
+                    <h3 class="sd-section-title">🔧 ประวัติแจ้งซ่อม</h3>
+                    <div id="repair-history-list" aria-busy="true" class="sd-list-container"></div>
+                </div>
+
                 <div class="sd-bottom-spacer"></div>`;
         },
         async afterRender(user) {
             await renderMyHistory();
             document.getElementById('history-filter-time')?.addEventListener('change', filterMyHistory);
             document.getElementById('history-filter-status')?.addEventListener('change', filterMyHistory);
+            await Promise.all([
+                renderGameHistory(user.id),
+                renderClipHistory(user.id),
+                renderRepairHistory(user.id),
+            ]);
         }
     },
 
@@ -1081,8 +1104,11 @@ const VIEWS = {
                 </div>
 
                 <div id="badge-section" style="margin-bottom: 2rem;">
-                    <h3 class="sd-section-title">🏅 เหรียญตราของฉัน</h3>
-                    <div id="badge-list" aria-busy="true" class="sd-badge-container"></div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 0 0.5rem 0;">
+                        <h3 class="sd-section-title" style="margin:0;">🏅 เหรียญตราของฉัน</h3>
+                        <a href="#" onclick="window.__sdSetView('badges'); return false;" style="font-size: 0.8rem; color: var(--pico-primary); font-weight: 500;">ดูทั้งหมด →</a>
+                    </div>
+                    <div id="badge-list" aria-busy="true" style="display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 0.5rem 0;"></div>
                 </div>
 
                 ${user.student_group === 'club' ? `
@@ -1112,29 +1138,6 @@ const VIEWS = {
             document.getElementById('sd-edit-profile-btn')?.addEventListener('click', handleEditProfile);
             
             await renderMyBadges(user.id);
-            
-            const badgeContainer = document.getElementById('badge-list');
-            if (badgeContainer) {
-                const badgesWithTitle = badgeContainer.querySelectorAll('[title]');
-                badgesWithTitle.forEach(badge => {
-                    const description = badge.getAttribute('title');
-                    badge.style.cursor = 'pointer';
-                    badge.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        if (typeof Swal !== 'undefined') {
-                            Swal.fire({
-                                title: 'รายละเอียดเหรียญตรา',
-                                text: description,
-                                icon: 'info',
-                                confirmButtonText: 'ปิดหน้าต่าง',
-                                confirmButtonColor: 'var(--pico-primary)'
-                            });
-                        } else {
-                            alert(description);
-                        }
-                    });
-                });
-            }
 
             // ✨ ลบตรรกะการซ่อน DOM ทิ้งเพราะเราจัดการตั้งแต่ตอนดึงข้อมูลแล้ว
             if (user.student_group === 'club') {
@@ -1963,9 +1966,12 @@ const VIEWS = {
     bosses: {
         label: 'ล่าบอส',
         icon: '🐉',
+        _unsubRaid: null,   // cleanup handle สำหรับ realtime subscription ของ raid status
+        _raidPollInterval: null, // interval สำหรับ poll ผลสอบ (fallback กรณี realtime ช้า)
         render() {
             return `
                 ${renderUnifiedCard({ emoji: '🐉', title: 'กระดานล่าบอส', subtitle: 'ท้าทายบทสอบเพื่อรับ XP และดาวสะสม' })}
+                <div id="sd-raid-status"></div>
                 <div id="sd-boss-list" aria-busy="true" style="margin-bottom: 2rem;">
                     <p style="text-align:center; padding: 2rem; color: var(--pico-muted-color);">กำลังอัปเดตกระดานเควสต์...</p>
                 </div>
@@ -1974,6 +1980,242 @@ const VIEWS = {
         },
         async afterRender(user) {
             const container = document.getElementById('sd-boss-list');
+
+            // ── Raid Status Card ────────────────────────────────────────────
+            // Cleanup subscription เก่าถ้ามี (กัน memory leak เมื่อ tab เปลี่ยน)
+            if (this._unsubRaid) { this._unsubRaid(); this._unsubRaid = null; }
+            if (this._raidPollInterval) { clearInterval(this._raidPollInterval); this._raidPollInterval = null; }
+
+            const renderRaidCard = async (lobby) => {
+                const wrap = document.getElementById('sd-raid-status');
+                if (!wrap) return;
+                if (!lobby) { wrap.innerHTML = ''; return; }
+
+                const { status, room_code, bosses: boss } = lobby.raid_lobbies || {};
+                const bossTitle = boss?.title || '?';
+                const lobbyId = lobby.raid_lobbies?.id;
+                const isWaiting = status === 'waiting';
+
+                // แสดง card พร้อม skeleton รายชื่อก่อน
+                wrap.innerHTML = `
+                    <div style="background:linear-gradient(135deg,#0f172a,#1e293b); border:2px solid ${isWaiting ? '#3b82f6' : '#ef4444'};
+                                border-radius:20px; padding:1.5rem; margin-bottom:1.25rem; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+                        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.25rem;">
+                            <div style="font-size:3rem; ${isWaiting ? '' : 'animation:spin 2s linear infinite'}">
+                                ${isWaiting ? '⏳' : '⚔️'}
+                            </div>
+                            <div>
+                                <div style="font-size:1.2rem; font-weight:900; color:${isWaiting ? '#60a5fa' : '#f87171'}">
+                                    ${isWaiting ? '🎯 กำลังรอเริ่มสอบ...' : '⚔️ การสอบกำลังดำเนินอยู่!'}
+                                </div>
+                                <div style="color:#94a3b8; font-size:0.9rem; margin-top:0.25rem;">
+                                    บอส: <strong style="color:#e2e8f0">${escapeHtml(bossTitle)}</strong>
+                                    &nbsp;|&nbsp; รหัส: <span style="color:${isWaiting ? '#60a5fa' : '#f87171'}; font-family:monospace; font-size:1.1rem; letter-spacing:4px; font-weight:800">${escapeHtml(room_code || '')}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sd-raid-members" style="color:#94a3b8; text-align:center; padding:0.5rem;">
+                            <span style="opacity:0.5">กำลังโหลดรายชื่อสมาชิก...</span>
+                        </div>
+                    </div>
+                `;
+
+                // Fetch รายชื่อผู้เข้าร่วมแบบ async
+                if (lobbyId) {
+                    try {
+                        const members = await raidApi.getLobbyParticipants(lobbyId);
+                        const membersEl = document.getElementById('sd-raid-members');
+                        if (!membersEl) return;
+                        if (!members.length) {
+                            membersEl.innerHTML = '<span style="opacity:0.5; font-size:0.9rem;">ยังไม่มีสมาชิกในปาร์ตี้</span>';
+                        } else {
+                            membersEl.innerHTML = `
+                                <div style="font-size:0.85rem; color:#64748b; margin-bottom:0.5rem; font-weight:600; text-transform:uppercase; letter-spacing:1px;">
+                                    สมาชิกปาร์ตี้ (${members.length} คน)
+                                </div>
+                                <div style="display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:center;">
+                                    ${members.map(m => `
+                                        <span style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3);
+                                                     color:#93c5fd; padding:0.3rem 0.75rem; border-radius:999px; font-size:0.85rem; font-weight:600;">
+                                            ${escapeHtml(m.name)}
+                                        </span>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }
+                    } catch (_) {
+                        const membersEl = document.getElementById('sd-raid-members');
+                        if (membersEl) membersEl.innerHTML = '<span style="opacity:0.4; font-size:0.85rem;">โหลดรายชื่อไม่สำเร็จ</span>';
+                    }
+                }
+            };
+
+            // ปิดการ์ดผลสอบและ mark ว่าเห็นแล้ว (global เพื่อให้ onclick ใน innerHTML เรียกได้)
+            window.__sdCloseRaidResult = (lobbyId) => {
+                const w = document.getElementById('sd-raid-status');
+                if (w) w.innerHTML = '';
+                if (lobbyId) localStorage.setItem(`raid_result_seen_${lobbyId}`, '1');
+            };
+
+            // แสดงผลสอบ (passed / failed) หลังครูบันทึกผล
+            // lobbyId — ใช้ mark localStorage กัน show ซ้ำในครั้งที่ 2
+            const renderResultCard = (resultStatus, bossTitle, lobbyId = null) => {
+                // ถ้าเคยปิดการ์ดนี้ไปแล้ว → ไม่แสดงอีก
+                if (lobbyId && localStorage.getItem(`raid_result_seen_${lobbyId}`)) return;
+                const wrap = document.getElementById('sd-raid-status');
+                if (!wrap) return;
+                const passed = resultStatus === 'passed';
+                wrap.innerHTML = `
+                    <div style="position:relative; background:linear-gradient(135deg,${passed ? '#0a1f10,#0f2d17' : '#1f0a0a,#2d0f0f'});
+                                border:2px solid ${passed ? '#22c55e' : '#ef4444'};
+                                border-radius:20px; padding:1.75rem; margin-bottom:1.25rem;
+                                box-shadow:0 8px 32px rgba(0,0,0,0.4); text-align:center;">
+                        <button onclick="window.__sdCloseRaidResult('${lobbyId || ''}')"
+                            style="position:absolute; top:0.6rem; right:0.75rem;
+                                   background:rgba(255,255,255,0.1); border:none; border-radius:50%;
+                                   width:1.8rem; height:1.8rem; cursor:pointer; font-size:0.9rem;
+                                   color:#94a3b8; line-height:1; display:flex; align-items:center; justify-content:center;">✕</button>
+                        <div style="font-size:4rem; margin-bottom:0.75rem;">
+                            ${passed ? '🏆' : '💔'}
+                        </div>
+                        <div style="font-size:1.5rem; font-weight:900; color:${passed ? '#4ade80' : '#f87171'}; margin-bottom:0.4rem;">
+                            ${passed ? 'ผ่านแล้ว! ยอดเยี่ยม! 🎉' : 'สอบตก... ไว้สู้ใหม่ 💪'}
+                        </div>
+                        <div style="color:#94a3b8; font-size:0.95rem; margin-bottom:1rem;">
+                            บอส: <strong style="color:#e2e8f0">${escapeHtml(bossTitle || '?')}</strong>
+                        </div>
+                        <div style="display:inline-block;
+                                    background:${passed ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'};
+                                    border:1px solid ${passed ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'};
+                                    border-radius:999px; padding:0.5rem 1.25rem;
+                                    color:${passed ? '#86efac' : '#fca5a5'}; font-weight:700; font-size:0.9rem;">
+                            ${passed ? '🌟 ได้รับ XP + ดาวแล้ว!' : '❤️ HP ถูกหักแล้ว — ฝึกซ้อมเพื่อฟื้นฟูนะ'}
+                        </div>
+                    </div>
+                `;
+                // ไม่มี auto-hide timer — ผู้ใช้ต้องกด ✕ เองเพื่อปิด
+            };
+
+            // helper สำหรับ subscribe ที่ใช้ซ้ำสองจุด
+            const subscribeRaidStatus = (lobbyId, lobbyRef) => {
+                return raidApi.subscribeToLobbyStatus(lobbyId, async (newLobby) => {
+                    const s = newLobby?.status;
+                    if (s === 'waiting' || s === 'raiding') {
+                        lobbyRef.status = s;
+                        void renderRaidCard({ raid_lobbies: lobbyRef });
+                        // เริ่ม poll ผลสอบทุก 5 วิ กรณี realtime "closed" ไม่มาถึง
+                        if (s === 'raiding' && !this._raidPollInterval) {
+                            this._raidPollInterval = setInterval(async () => {
+                                try {
+                                    const result = await raidApi.getMyRaidResult(lobbyId, user.id);
+                                    const rs = result?.result_status;
+                                    if (rs === 'passed' || rs === 'failed') {
+                                        clearInterval(this._raidPollInterval); this._raidPollInterval = null;
+                                        renderResultCard(rs, lobbyRef.bosses?.title || '', lobbyId);
+                                        localStorage.setItem(`raid_result_seen_${lobbyId}`, '1');
+                                        Swal.fire({
+                                            icon: rs === 'passed' ? 'success' : 'error',
+                                            title: rs === 'passed' ? '🏆 ผ่านแล้ว! ยอดเยี่ยม!' : '💔 สอบตก... ไว้สู้ใหม่',
+                                            text: rs === 'passed'
+                                                ? `คุณผ่านบอส "${lobbyRef.bosses?.title || ''}" แล้ว! ได้รับ XP + ดาวเพิ่มแล้ว 🌟`
+                                                : `คุณสอบบอส "${lobbyRef.bosses?.title || ''}" ไม่ผ่าน ❤️ HP ถูกหักแล้ว`,
+                                            confirmButtonText: 'รับทราบ',
+                                        });
+                                    }
+                                } catch (_) { /* ignore */ }
+                            }, 5000);
+                        }
+                    } else if (s === 'closed') {
+                        // กัน race: หยุด poll ก่อนดึงผลสอบจาก realtime
+                        if (this._raidPollInterval) { clearInterval(this._raidPollInterval); this._raidPollInterval = null; }
+                        // ดึงผลสอบของนักเรียน
+                        const result = await raidApi.getMyRaidResult(lobbyId, user.id);
+                        const rs = result?.result_status;
+                        const bossTitle = lobbyRef.bosses?.title || '';
+                        // แสดงใน div (ปิดได้ด้วยปุ่ม ✕)
+                        renderResultCard(rs, bossTitle, lobbyId);
+                        // แสดง Swal แจ้งเตือนทันที
+                        if (rs === 'passed' || rs === 'failed') {
+                            localStorage.setItem(`raid_result_seen_${lobbyId}`, '1');
+                            Swal.fire({
+                                icon: rs === 'passed' ? 'success' : 'error',
+                                title: rs === 'passed' ? '🏆 ผ่านแล้ว! ยอดเยี่ยม!' : '💔 สอบตก... ไว้สู้ใหม่',
+                                text: rs === 'passed'
+                                    ? `คุณผ่านบอส "${bossTitle}" แล้ว! ได้รับ XP + ดาวเพิ่มแล้ว 🌟`
+                                    : `คุณสอบบอส "${bossTitle}" ไม่ผ่าน ❤️ HP ถูกหักแล้ว`,
+                                confirmButtonText: 'รับทราบ',
+                                timer: 8000,
+                                timerProgressBar: true,
+                            });
+                        }
+                        if (this._unsubRaid) { this._unsubRaid(); this._unsubRaid = null; }
+                    } else {
+                        void renderRaidCard(null);
+                        if (this._unsubRaid) { this._unsubRaid(); this._unsubRaid = null; }
+                    }
+                });
+            };
+
+            // ตรวจว่านักเรียนอยู่ใน lobby อยู่หรือเปล่า
+            const activePart = await raidApi.getActiveRaidForUser(user.id);
+
+            if (activePart) {
+                // มี active lobby → แสดง status card + subscribe
+                await renderRaidCard(activePart);
+                this._unsubRaid = subscribeRaidStatus(activePart.raid_lobbies.id, activePart.raid_lobbies);
+                // ถ้าเปิดหน้าขณะ raiding อยู่แล้ว → เริ่ม poll ทันทีโดยไม่รอ realtime event
+                if (activePart.raid_lobbies.status === 'raiding' && !this._raidPollInterval) {
+                    this._raidPollInterval = setInterval(async () => {
+                        try {
+                            const lobbyRef = activePart.raid_lobbies;
+                            const result = await raidApi.getMyRaidResult(lobbyRef.id, user.id);
+                            const rs = result?.result_status;
+                            if (rs === 'passed' || rs === 'failed') {
+                                clearInterval(this._raidPollInterval); this._raidPollInterval = null;
+                                renderResultCard(rs, lobbyRef.bosses?.title || '', lobbyRef.id);
+                                localStorage.setItem(`raid_result_seen_${lobbyRef.id}`, '1');
+                                Swal.fire({
+                                    icon: rs === 'passed' ? 'success' : 'error',
+                                    title: rs === 'passed' ? '🏆 ผ่านแล้ว! ยอดเยี่ยม!' : '💔 สอบตก... ไว้สู้ใหม่',
+                                    text: rs === 'passed'
+                                        ? `คุณผ่านบอส "${lobbyRef.bosses?.title || ''}" แล้ว! ได้รับ XP + ดาวเพิ่มแล้ว 🌟`
+                                        : `คุณสอบบอส "${lobbyRef.bosses?.title || ''}" ไม่ผ่าน ❤️ HP ถูกหักแล้ว`,
+                                    confirmButtonText: 'รับทราบ',
+                                });
+                            }
+                        } catch (_) { /* ignore */ }
+                    }, 5000);
+                }
+            } else {
+                // ไม่มี active lobby → ตรวจผลสอบล่าสุด (fallback กรณี realtime ไม่ทำงาน)
+                const latestResult = await raidApi.getLatestRaidResultForUser(user.id);
+                if (latestResult?.result_status) {
+                    // ตรวจว่าผลนี้เกิดขึ้นใน 24 ชั่วโมงที่ผ่านมา
+                    const joinedAt = new Date(latestResult.joined_at || 0).getTime();
+                    if (Date.now() - joinedAt < 24 * 60 * 60 * 1000) {
+                        const rs = latestResult.result_status;
+                        const bossTitle = latestResult.raid_lobbies?.bosses?.title || '';
+                        const fallbackLobbyId = latestResult.raid_lobbies?.id;
+                        // renderResultCard ตรวจ localStorage เองว่าเคยปิดแล้วหรือยัง
+                        renderResultCard(rs, bossTitle, fallbackLobbyId);
+                        // แจ้ง Swal ครั้งเดียวต่อ lobby (ใช้ localStorage กัน spam)
+                        const seenKey = `raid_result_seen_${fallbackLobbyId}`;
+                        if (!localStorage.getItem(seenKey)) {
+                            localStorage.setItem(seenKey, '1');
+                            Swal.fire({
+                                icon: rs === 'passed' ? 'success' : 'error',
+                                title: rs === 'passed' ? '🏆 ผ่านแล้ว! ยอดเยี่ยม!' : '💔 สอบตก... ไว้สู้ใหม่',
+                                text: rs === 'passed'
+                                    ? `คุณผ่านบอส "${bossTitle}" แล้ว! ได้รับ XP + ดาวเพิ่มแล้ว 🌟`
+                                    : `คุณสอบบอส "${bossTitle}" ไม่ผ่าน ❤️ HP ถูกหักแล้ว`,
+                                confirmButtonText: 'รับทราบ',
+                            });
+                        }
+                    }
+                }
+            }
+            // ─────────────────────────────────────────────────────────────────
+
             try {
                 // ดึงข้อมูล HP ของผู้เล่นปัจจุบัน และรายการบอสผ่าน API (No Supabase Code here!)
                 const [userStatsRes, bossesRes] = await Promise.all([
@@ -1992,6 +2234,14 @@ const VIEWS = {
                     return;
                 }
 
+                // ดึงสถิติส่วนตัวของนักเรียนสำหรับบอสทุกตัวพร้อมกัน
+                const myBossStatsMap = {};
+                await Promise.all(bosses.map(async b => {
+                    try {
+                        myBossStatsMap[b.id] = await raidApi.getMyBossStats(user.id, b.id);
+                    } catch (_) { myBossStatsMap[b.id] = { total: 0, passed: 0, failed: 0 }; }
+                }));
+
                 let html = '';
 
                 // แจ้งเตือนถ้าหัวใจหมด
@@ -2009,7 +2259,18 @@ const VIEWS = {
                      </div>`;
                 }
 
-                html += bosses.map(b => `
+                html += bosses.map(b => {
+                    const s = myBossStatsMap[b.id];
+                    const myStatsHtml = s?.total > 0
+                        ? `<div style="margin-top:0.75rem; padding:0.5rem 0.75rem;
+                                      background:rgba(255,255,255,0.05); border-radius:10px;
+                                      font-size:0.8rem; color:var(--pico-muted-color);">
+                               ⚔️ ล่า <strong style="color:var(--pico-color);">${s.total} ครั้ง</strong>
+                               · <span style="color:#4ade80;">✅ ชนะ ${s.passed}</span>
+                               · <span style="color:#f87171;">❌ แพ้ ${s.failed}</span>
+                           </div>`
+                        : '';
+                    return `
                     <div class="sd-list-container" style="margin-bottom: 1rem; padding: 1.5rem; opacity: ${hp <= 0 ? 0.6 : 1}; transition: transform 0.2s;">
                         <div style="display:flex; gap: 1rem; align-items:flex-start;">
                             <div style="font-size: 2.5rem; line-height: 1;">👹</div>
@@ -2020,20 +2281,44 @@ const VIEWS = {
                                     <span class="sd-badge" style="background:rgba(139,92,246,0.15); color:#8b5cf6; padding: 2px 8px; border-radius: 99px; font-size: 0.75rem; font-weight: bold;">+${b.reward_xp} XP</span>
                                     <span class="sd-badge" style="background:rgba(245,158,11,0.15); color:#f59e0b; padding: 2px 8px; border-radius: 99px; font-size: 0.75rem; font-weight: bold;">+${b.reward_stars} ⭐️ ดาว</span>
                                 </div>
+                                ${myStatsHtml}
                             </div>
                         </div>
-                        
+
                         <div style="display: flex; gap: 0.5rem; margin-top: 1.25rem;">
                             <button class="sd-btn-outline" style="flex:1; padding:0.6rem; font-size: 0.85rem;" data-boss-action="join-lobby" data-boss-id="${b.id}" ${hp <= 0 ? 'disabled' : ''}>🤝 เข้าปาร์ตี้ (ใส่รหัส)</button>
                             <button class="sd-btn-primary" style="flex:1; padding:0.6rem; font-size: 0.85rem;" data-boss-action="submit-video" data-boss-id="${b.id}" ${hp <= 0 ? 'disabled' : ''}>🎥 ส่งคลิปโจมตี</button>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
                 
                 container.innerHTML = html;
                 container.removeAttribute('aria-busy');
 
+                // helper: ปิดปุ่ม join เฉพาะบอสที่นักเรียนอยู่ใน lobby (targetBossId=null → ปิดทุกบอส)
+                const disableJoinButtons = (targetBossId = null) => {
+                    const sel = targetBossId
+                        ? `[data-boss-action="join-lobby"][data-boss-id="${targetBossId}"]`
+                        : '[data-boss-action="join-lobby"]';
+                    container.querySelectorAll(sel).forEach(btn => {
+                        btn.disabled = true;
+                        btn.textContent = '✅ อยู่ในปาร์ตี้แล้ว';
+                        btn.style.opacity = '0.6';
+                    });
+                };
+
+                // ถ้ามี active lobby อยู่แล้ว → ปิดปุ่มเฉพาะบอสนั้น
+                if (activePart) disableJoinButtons(activePart.raid_lobbies?.boss_id);
+
                 const handleJoinLobby = async (bossId) => {
+                    // ตรวจก่อนว่าอยู่ใน lobby แล้วหรือยัง (กัน duplicate key error)
+                    const existing = await raidApi.getActiveRaidForUser(user.id);
+                    if (existing) {
+                        disableJoinButtons(existing.raid_lobbies?.boss_id);
+                        Swal.fire('อยู่ในปาร์ตี้แล้ว!', 'คุณเข้าร่วมปาร์ตี้ล่าบอสไปแล้ว รอครูกดเริ่มสอบได้เลย 🎯', 'info');
+                        return;
+                    }
+
                     const { value: roomCode } = await Swal.fire({
                         title: 'เข้าร่วมปาร์ตี้ล่าบอส',
                         input: 'text',
@@ -2048,8 +2333,23 @@ const VIEWS = {
                     try {
                         await raidApi.joinLobby(user.id, roomCode);
                         Swal.fire('เข้าร่วมสำเร็จ!', 'คุณอยู่ในห้องสอบแล้ว รอครูกดเริ่มสอบเลย!', 'success');
+                        // อัปเดต status card ทันทีหลัง join สำเร็จ
+                        const newActivePart = await raidApi.getActiveRaidForUser(user.id);
+                        disableJoinButtons(newActivePart?.raid_lobbies?.boss_id ?? bossId);
+                        await renderRaidCard(newActivePart);
+                        // Subscribe ถ้ายังไม่มี subscription (กัน duplicate channel)
+                        if (newActivePart?.raid_lobbies?.id && !this._unsubRaid) {
+                            this._unsubRaid = subscribeRaidStatus(newActivePart.raid_lobbies.id, newActivePart.raid_lobbies);
+                        }
                     } catch (err) {
-                        Swal.fire('ผิดพลาด', err.message || 'รหัสห้องไม่ถูกต้อง หรือห้องปิดไปแล้ว', 'error');
+                        // duplicate key = อยู่ในห้องนี้แล้ว
+                        const isDupe = err.message?.includes('duplicate') || err.message?.includes('unique constraint');
+                        if (isDupe) {
+                            disableJoinButtons(bossId);
+                            Swal.fire('อยู่ในปาร์ตี้แล้ว!', 'คุณเข้าร่วมห้องสอบนี้ไปแล้ว รอครูกดเริ่มสอบได้เลย 🎯', 'info');
+                        } else {
+                            Swal.fire('ผิดพลาด', err.message || 'รหัสห้องไม่ถูกต้อง หรือห้องปิดไปแล้ว', 'error');
+                        }
                     }
                 };
 
@@ -2087,6 +2387,26 @@ const VIEWS = {
 
             } catch (err) {
                 container.innerHTML = `<p style="color:var(--pico-del-color); text-align:center;">เกิดข้อผิดพลาด: ${err.message}</p>`;
+            }
+        }
+    },
+
+    badges: {
+        label: 'เหรียญตรา',
+        render(user) {
+            return `
+                <div id="badge-gallery-container" style="min-height: 400px; padding: 1rem; text-align: center;">
+                    <p style="color: var(--pico-muted-color); margin-top: 2rem;">กำลังโหลดแกลเลอรีเหรียญตรา...</p>
+                </div>`;
+        },
+        async afterRender(user) {
+            const container = document.getElementById('badge-gallery-container');
+            if (!container) return;
+            try {
+                container.innerHTML = await renderBadgeGallery(user.id);
+                setupBadgeGalleryEvents();
+            } catch (err) {
+                container.innerHTML = `<p style="color:var(--pico-del-color); text-align:center;">โหลดแกลเลอรีล้มเหลว: ${err.message}</p>`;
             }
         }
     },
@@ -3314,6 +3634,7 @@ export async function filterMyHistory() {
         });
 
         const getDisplayStatus = (log) => {
+            if (log.is_force_returned) return { text: '🔴 บังคับคืน', color: '#dc2626' };
             if (log.return_timestamp) {
                 return log.problem_description ? { text: 'แจ้งซ่อม', color: 'var(--pico-del-color)' } : { text: 'คืนแล้ว', color: '#10b981' };
             }
@@ -3332,7 +3653,7 @@ export async function filterMyHistory() {
         } else {
             const html = filteredHistory.map(log => {
                 const status = getDisplayStatus(log);
-                const instrumentName = log.instrument_name || 'เครื่องดนตรีที่ถูกลบ';
+                const instrumentName = log.instruments?.name || log.instrument_name || 'เครื่องดนตรีที่ถูกลบ';
                 return `
                 <div class="sd-list-item">
                     <div class="sd-list-content">
@@ -3344,7 +3665,8 @@ export async function filterMyHistory() {
                             ยืม: ${new Date(log.borrow_timestamp).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})} น.
                             ${log.return_timestamp ? `<br>คืน: ${new Date(log.return_timestamp).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})} น.` : ''}
                         </div>
-                        ${log.problem_description ? `<div style="font-size:0.8rem; color:var(--pico-del-color); margin-top:4px;">ซ่อม: ${escapeHtml(log.problem_description)}</div>` : ''}
+                        ${log.problem_description ? `<div style="font-size:0.8rem; color:var(--pico-del-color); margin-top:4px;"><strong>⚠️ แจ้งซ่อม:</strong> ${escapeHtml(log.problem_description)}</div>` : ''}
+                        ${log.latest_repair_status ? `<div style="font-size:0.8rem; margin-top:4px;"><strong>🔧 สถานะซ่อม:</strong> <span style="color:#7c3aed; background:rgba(124,58,237,0.15); padding:1px 6px; border-radius:6px;">${escapeHtml(log.latest_repair_status)}</span></div>` : ''}
                     </div>
                 </div>`;
             }).join('');
@@ -3355,38 +3677,128 @@ export async function filterMyHistory() {
     } finally { if (listEl) listEl.removeAttribute('aria-busy'); }
 }
 
+async function renderGameHistory(userId) {
+    const el = document.getElementById('game-history-list');
+    if (!el) return;
+    el.setAttribute('aria-busy', 'true');
+    try {
+        const { data, error } = await gamesExt.getUserSessions(userId);
+        if (error) throw error;
+        if (!data?.length) {
+            el.innerHTML = '<p style="text-align:center; padding:1rem; color:var(--pico-muted-color);">ยังไม่มีประวัติการเล่นเกม</p>';
+            return;
+        }
+        const GAME_NAMES = { 'staffwars': '🎼 ห้องโน้ต (Staff Wars)', 'rhythmcore': '🥁 ห้องจังหวะ (Rhythm Core)' };
+        el.innerHTML = data.map(s => {
+            const name = GAME_NAMES[s.game_name] || escapeHtml(s.game_name || 'เกม');
+            const dateStr = s.created_at ? new Date(s.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+            return `<div class="sd-list-item">
+                <div class="sd-list-content">
+                    <div class="sd-list-title" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>${name}</span>
+                        <span style="font-size:0.8rem; font-weight:bold; color:#f59e0b;">⭐ ${s.score ?? 0} คะแนน</span>
+                    </div>
+                    <div class="sd-list-subtitle" style="font-size:0.8rem; margin-top:3px;">
+                        ${dateStr} น. ${s.duration_minutes ? `· ${s.duration_minutes} นาที` : ''}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        el.innerHTML = `<p style="color:var(--pico-del-color); text-align:center;">ผิดพลาด: ${escapeHtml(e.message)}</p>`;
+    } finally { el.removeAttribute('aria-busy'); }
+}
+
+async function renderClipHistory(userId) {
+    const el = document.getElementById('clip-history-list');
+    if (!el) return;
+    el.setAttribute('aria-busy', 'true');
+    try {
+        const { data, error } = await knowledgeExt.getClipHistory(userId);
+        if (error) throw error;
+        if (!data?.length) {
+            el.innerHTML = '<p style="text-align:center; padding:1rem; color:var(--pico-muted-color);">ยังไม่มีประวัติการดูคลิป</p>';
+            return;
+        }
+        el.innerHTML = data.map(s => {
+            const title = s.knowledge_links?.title || s.instrument_type || 'คลิปการเรียนรู้';
+            const dateStr = s.created_at ? new Date(s.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+            return `<div class="sd-list-item">
+                <div class="sd-list-content">
+                    <div class="sd-list-title" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>📺 ${escapeHtml(title)}</span>
+                        <span style="font-size:0.8rem; font-weight:bold; color:#10b981;">+${s.exp_awarded ?? 0} EXP</span>
+                    </div>
+                    <div class="sd-list-subtitle" style="font-size:0.8rem; margin-top:3px;">
+                        ${dateStr} น. · ${s.minutes_added ?? 0} นาที${s.instrument_type ? ` · ${escapeHtml(s.instrument_type)}` : ''}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        el.innerHTML = `<p style="color:var(--pico-del-color); text-align:center;">ผิดพลาด: ${escapeHtml(e.message)}</p>`;
+    } finally { el.removeAttribute('aria-busy'); }
+}
+
+async function renderRepairHistory(userId) {
+    const el = document.getElementById('repair-history-list');
+    if (!el) return;
+    el.setAttribute('aria-busy', 'true');
+    try {
+        const { data, error } = await repair.getUserHistory(userId);
+        if (error) throw error;
+        if (!data?.length) {
+            el.innerHTML = '<p style="text-align:center; padding:1rem; color:var(--pico-muted-color);">ยังไม่มีประวัติแจ้งซ่อม</p>';
+            return;
+        }
+        const STATUS_COLOR = { 'แจ้งซ่อม': '#f59e0b', 'กำลังซ่อม': '#3b82f6', 'ซ่อมเสร็จ': '#10b981', 'ยกเลิก': '#6b7280' };
+        el.innerHTML = data.map(r => {
+            const instName = r.instruments?.name || '—';
+            const status = r.repair_status || 'แจ้งซ่อมแล้ว';
+            const color = STATUS_COLOR[status] || '#f59e0b';
+            const dateStr = r.created_at ? new Date(r.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+            return `<div class="sd-list-item">
+                <div class="sd-list-content">
+                    <div class="sd-list-title" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>🔧 ${escapeHtml(instName)}</span>
+                        <span style="font-size:0.8rem; font-weight:bold; color:${color}; background:${color}20; padding:2px 8px; border-radius:12px;">${escapeHtml(status)}</span>
+                    </div>
+                    <div class="sd-list-subtitle" style="font-size:0.8rem; margin-top:3px;">แจ้งเมื่อ: ${dateStr} น.</div>
+                    ${r.problem_description ? `<div style="font-size:0.8rem; margin-top:4px; color:var(--pico-muted-color);">⚠️ ${escapeHtml(r.problem_description)}</div>` : ''}
+                    ${r.repair_notes ? `<div style="font-size:0.8rem; margin-top:4px;">📝 ${escapeHtml(r.repair_notes)}</div>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        el.innerHTML = '<p style="text-align:center; padding:1rem; color:var(--pico-muted-color);">ยังไม่มีประวัติแจ้งซ่อม</p>';
+    } finally { el.removeAttribute('aria-busy'); }
+}
+
 export async function renderMyBadges(userId) {
     const listEl = document.getElementById('badge-list');
     if (!listEl) return;
     listEl.setAttribute('aria-busy', 'true');
     try {
         const [defsRes, badgesRes] = await Promise.all([
-            badgesExt.getDefinitions(),
+            badgesExt.getAvailableBadges(),
             badgesExt.getUserBadges(userId),
         ]);
         if (defsRes.error) throw defsRes.error;
         if (badgesRes.error) throw badgesRes.error;
 
-        const iconMap = defsRes.data.reduce((acc, d) => {
-            if (d.badge_name) acc[d.badge_name.trim()] = d.badge_icon;
-            return acc;
-        }, {});
+        const userBadgeNames = new Set((badgesRes.data || []).map(b => b.badge_name));
+        const earnedDefs = (defsRes.data || []).filter(d => userBadgeNames.has(d.badge_name));
 
-        if (!badgesRes.data?.length) {
-            listEl.innerHTML = '<p style="color:var(--pico-muted-color); text-align:center; padding: 1rem;">ยังไม่มีเหรียญตราที่ได้รับ</p>';
+        if (!earnedDefs.length) {
+            listEl.innerHTML = '<p style="color:var(--pico-muted-color); text-align:center; padding: 1rem;">ยังไม่มีเหรียญตราที่ได้รับ ลองยืมเครื่องดนตรีเพื่อปลดล็อค!</p>';
         } else {
-            listEl.innerHTML = badgesRes.data.map(b => {
-                if (!b.badge_name) return '';
-                const icon = iconMap[b.badge_name.trim()] || '🏅';
-                return `
-                <div style="display:inline-flex; align-items:center; gap:0.5rem; background:var(--pico-form-element-background-color); padding:0.5rem 0.8rem; border-radius:99px; font-size:0.85rem; border:1px solid var(--pico-muted-border-color);" title="${escapeHtml(b.badge_description||'')}">
-                    <span style="font-size:1.2rem;">${icon}</span>
-                    <span style="font-weight:600; color:var(--pico-color);">${escapeHtml(b.badge_name)}</span>
-                </div>`;
-            }).join(' ');
+            listEl.innerHTML = earnedDefs.map(b => BadgeSystem.renderBadgeCard(b, { size: 'small' })).join('');
         }
-    } catch (err) { listEl.innerHTML = `<p style="color:var(--pico-del-color); text-align:center;">โหลดข้อมูลเหรียญตราล้มเหลว</p>`; } 
-    finally { listEl.removeAttribute('aria-busy'); }
+    } catch (err) {
+        listEl.innerHTML = `<p style="color:var(--pico-del-color); text-align:center;">โหลดข้อมูลเหรียญตราล้มเหลว</p>`;
+    } finally {
+        listEl.removeAttribute('aria-busy');
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

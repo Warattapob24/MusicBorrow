@@ -227,18 +227,32 @@ export const bossesApi = {
      */
     async getBossStats() {
         try {
-            const { data, error } = await supabase
-                .from('boss_requests')
-                .select('boss_id, status');
-            if (error) throw error;
+            // รวมสถิติจาก 2 แหล่ง: boss_requests (วิดีโอ) + raid_participants (ปาร์ตี้)
+            const [reqRes, raidRes] = await Promise.all([
+                supabase.from('boss_requests').select('boss_id, status'),
+                supabase.rpc('get_boss_raid_stats')
+            ]);
+
             const map = {};
-            (data || []).forEach(row => {
+
+            // สถิติวิดีโอ
+            (reqRes.data || []).forEach(row => {
                 const key = String(row.boss_id);
                 if (!map[key]) map[key] = { total: 0, passed: 0, failed: 0 };
                 map[key].total += 1;
                 if (row.status === 'passed' || row.status === 'approved') map[key].passed += 1;
                 if (row.status === 'failed' || row.status === 'rejected')  map[key].failed += 1;
             });
+
+            // สถิติ raid (ปาร์ตี้)
+            (raidRes.data || []).forEach(row => {
+                const key = String(row.boss_id);
+                if (!map[key]) map[key] = { total: 0, passed: 0, failed: 0 };
+                map[key].total  += Number(row.total)  || 0;
+                map[key].passed += Number(row.passed) || 0;
+                map[key].failed += Number(row.failed) || 0;
+            });
+
             return { data: map, error: null };
         } catch (error) {
             return { data: {}, error };
@@ -322,6 +336,128 @@ export const raidApi = {
         const { data, error } = await supabase.from('raid_lobbies').update({ status }).eq('id', lobbyId).select().single();
         if (error) throw error;
         return data;
+    },
+    /**
+     * ดึงชื่อ-นามสกุลของ user คนเดียว (ใช้ตอน Realtime INSERT ที่ไม่มี join data)
+     */
+    async getParticipantUser(userId) {
+        const { data } = await supabase
+            .from('users')
+            .select('id, first_name, last_name')
+            .eq('id', userId)
+            .single();
+        return data;
+    },
+    /**
+     * ดึงรายชื่อผู้เข้าร่วม lobby (สำหรับแสดงในหน้านักเรียน)
+     */
+    async getLobbyParticipants(lobbyId) {
+        const { data } = await supabase
+            .from('raid_participants')
+            .select('id, user_id, users(first_name, last_name)')
+            .eq('lobby_id', lobbyId);
+        return (data || []).map(p => ({
+            user_id: p.user_id,
+            name: p.users
+                ? `${p.users.first_name || ''} ${p.users.last_name || ''}`.trim() || 'ไม่ทราบชื่อ'
+                : 'ไม่ทราบชื่อ'
+        }));
+    },
+    /**
+     * ดึง raid_participants ทั้งหมดของ lobby พร้อม join users (ใช้ตอนเริ่มสอบเพื่อให้ชื่อครบ)
+     */
+    async getParticipantsWithUsers(lobbyId) {
+        const { data, error } = await supabase
+            .from('raid_participants')
+            .select('*, users(first_name, last_name)')
+            .eq('lobby_id', lobbyId);
+        if (error) throw error;
+        return data || [];
+    },
+    /**
+     * ดึง lobby ที่นักเรียนอยู่ในปัจจุบัน (status: waiting หรือ raiding)
+     */
+    async getActiveRaidForUser(userId) {
+        const { data } = await supabase
+            .from('raid_participants')
+            .select('*, raid_lobbies(id, room_code, status, boss_id, bosses(title))')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(10);
+        // หา lobby ที่ยัง active (waiting หรือ raiding)
+        return (data || []).find(p =>
+            p.raid_lobbies?.status === 'waiting' || p.raid_lobbies?.status === 'raiding'
+        ) || null;
+    },
+    /**
+     * Subscribe เฉพาะ lobby status (สำหรับนักเรียนดู status card)
+     * คืน cleanup function
+     */
+    subscribeToLobbyStatus(lobbyId, onChange) {
+        const channel = supabase.channel(`student-raid-${lobbyId}`)
+            .on('postgres_changes', {
+                event: 'UPDATE', schema: 'public',
+                table: 'raid_lobbies', filter: `id=eq.${lobbyId}`
+            }, payload => onChange(payload.new))
+            .subscribe();
+        return () => supabase.removeChannel(channel);
+    },
+    /**
+     * ดึงผลสอบของนักเรียนจาก lobby ที่ปิดแล้ว
+     */
+    async getMyRaidResult(lobbyId, userId) {
+        const { data } = await supabase
+            .from('raid_participants')
+            .select('result_status, raid_lobbies(id, boss_id, status, bosses(title))')
+            .eq('lobby_id', lobbyId)
+            .eq('user_id', userId)
+            .maybeSingle();
+        return data;
+    },
+    /**
+     * ดึงผลสอบล่าสุดของนักเรียน (lobby ปิดแล้ว + มี result จริง)
+     * ใช้เป็น fallback กรณี realtime ไม่ทำงาน หรือเปิดหน้าหลังสอบแล้ว
+     */
+    async getLatestRaidResultForUser(userId) {
+        const { data } = await supabase
+            .from('raid_participants')
+            .select('result_status, joined_at, raid_lobbies(id, boss_id, status, bosses(title))')
+            .eq('user_id', userId)
+            .in('result_status', ['passed', 'failed'])
+            .order('joined_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        return data;
+    },
+
+    /**
+     * ดึงประวัติการสอบบอส (ผ่าน/ตก) ทั้งหมดของบอสตัวนั้น สำหรับแสดงใน admin
+     */
+    async getBossExamHistory(bossId) {
+        const { data, error } = await supabase
+            .from('raid_participants')
+            .select('result_status, joined_at, users(first_name, last_name), raid_lobbies!inner(boss_id, status)')
+            .eq('raid_lobbies.boss_id', bossId)
+            .eq('raid_lobbies.status', 'closed')
+            .in('result_status', ['passed', 'failed'])
+            .order('joined_at', { ascending: false })
+            .limit(50);
+        return { data: data || [], error };
+    },
+    /**
+     * ดึงสถิติส่วนตัวของนักเรียนสำหรับบอสตัวนั้น (สอบกี่ครั้ง ผ่าน/ตก)
+     */
+    async getMyBossStats(userId, bossId) {
+        const { data } = await supabase
+            .from('raid_participants')
+            .select('result_status, raid_lobbies!inner(boss_id)')
+            .eq('user_id', userId)
+            .eq('raid_lobbies.boss_id', bossId)
+            .in('result_status', ['passed', 'failed']);
+        if (!data) return { total: 0, passed: 0, failed: 0 };
+        const passed = data.filter(r => r.result_status === 'passed').length;
+        const failed = data.filter(r => r.result_status === 'failed').length;
+        return { total: data.length, passed, failed };
     }
 };
 
@@ -640,7 +776,12 @@ export const borrowExt = {
         } catch (error) { return { data: null, error }; }
     },
     async getMyBorrowedItems(userId) { return supabase.rpc('get_my_borrowed_items', { p_user_id: userId }); },
-    async getUserHistory(userId) { return supabase.rpc('get_user_borrow_history', { p_user_id: userId }); }
+    async getUserHistory(userId) {
+        return supabase.from('borrow_logs')
+            .select('*, instruments(name)')
+            .eq('student_id', userId)
+            .order('borrow_timestamp', { ascending: false });
+    }
 };
 
 export const repair = {
@@ -655,6 +796,22 @@ export const repair = {
             if (error) throw error;
             return { error: null };
         } catch (error) { return { error }; }
+    },
+    async getUserHistory(userId) {
+        const [{ data: byUser }, { data: borrowIds }] = await Promise.all([
+            supabase.from('repair_logs').select('*, instruments(name)').eq('reported_by_user_id', userId),
+            supabase.from('borrow_logs').select('id').eq('student_id', userId)
+        ]);
+        const ids = (borrowIds || []).map(b => b.id).filter(Boolean);
+        let byBorrows = [];
+        if (ids.length) {
+            const { data } = await supabase.from('repair_logs').select('*, instruments(name)').in('borrow_log_id', ids);
+            byBorrows = data || [];
+        }
+        const seen = new Set();
+        const data = [...(byUser || []), ...byBorrows].filter(r => !seen.has(r.id) && seen.add(r.id));
+        data.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        return { data, error: null };
     }
 };
 
@@ -693,6 +850,13 @@ export const gamesExt = {
     },
     async getLeaderboard(gameName, userId) {
         return supabase.rpc('get_game_leaderboard', { p_game_name: gameName, p_user_id: userId });
+    },
+    async getUserSessions(userId, limit = 15) {
+        return supabase.from('game_sessions')
+            .select('game_name, score, duration_minutes, start_time, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(limit);
     }
 };
 
@@ -756,6 +920,14 @@ export const knowledgeExt = {
     /** Per-instrument-type learning history for the current user. */
     async getLearningHistory(limit = 50) {
         return supabase.rpc('get_user_learning_history', { p_limit: limit });
+    },
+    /** Individual clip-viewing sessions with clip title for the current user. */
+    async getClipHistory(userId, limit = 15) {
+        return supabase.from('learning_sessions')
+            .select('instrument_type, minutes_added, exp_awarded, created_at, knowledge_links(title)')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(limit);
     },
 };
 
@@ -857,14 +1029,31 @@ export const badges = {
 };
 
 export const badgesExt = {
-    async checkAndAward(userId, logId) { 
-        return supabase.rpc('check_new_badges_after_borrow', { p_user_id: userId, p_log_id: logId }); 
+    async checkAndAward(userId, logId) {
+        return supabase.rpc('check_new_badges_after_borrow', { p_user_id: userId, p_log_id: logId });
     },
-    async getDefinitions() { 
-        return supabase.from('badge_definitions').select('badge_name, badge_icon'); 
+    async getDefinitions() {
+        return supabase.from('badge_definitions').select('badge_name, badge_icon');
     },
-    async getUserBadges(userId) { 
-        return supabase.from('badges').select('badge_name, badge_description').eq('user_id', userId); 
+    async getUserBadges(userId) {
+        return supabase.from('badges').select('badge_name, badge_description').eq('user_id', userId);
+    },
+    async getBadgeWithProgression(badgeName) {
+        const [defs, tiers] = await Promise.all([
+            supabase.from('badge_definitions').select('*').eq('badge_name', badgeName),
+            supabase.from('badge_progression_tiers').select('*').eq('badge_name', badgeName)
+        ]);
+        return { definition: defs?.data?.[0], tiers: tiers?.data || [], error: defs?.error || tiers?.error || null };
+    },
+    async getAvailableBadges() {
+        const { data, error } = await supabase.from('badge_definitions').select('*, badge_progression_tiers(*)').order('badge_name');
+        return { data: data || [], error };
+    },
+    async getUserAchievementProgress(userId) {
+        return supabase.rpc('get_user_achievement_progress', { p_user_id: userId });
+    },
+    async getGalleryStats(userId) {
+        return supabase.rpc('get_badge_gallery_stats', { p_user_id: userId });
     }
 };
 
@@ -1222,7 +1411,25 @@ export const adminExt = {
     async awardBadge(userId, badgeName, description) { return supabase.from('badges').insert({ user_id: userId, badge_name: badgeName, badge_description: description }); },
     async removeBadge(badgeId) { return supabase.from('badges').delete().eq('id', badgeId); },
     async getInstrumentBorrowLogs(instrumentId) { return supabase.from('borrow_logs').select('*').eq('instrument_id', instrumentId); },
-    async getUserBorrowLogs(userId) { return supabase.from('borrow_logs').select('*').eq('student_id', userId).order('borrow_timestamp', { ascending: false }); },
+    async getUserBorrowLogs(userId) { return supabase.from('borrow_logs').select('*, instruments(name, type)').eq('student_id', userId).order('borrow_timestamp', { ascending: false }); },
+    async getUserGameSessions(userId) { return supabase.from('game_sessions').select('*').eq('user_id', userId); },
+    async getUserLearningSessions(userId) { return supabase.from('learning_sessions').select('*, knowledge_links(title)').eq('user_id', userId); },
+    async getUserRepairLogs(userId) {
+        const [{ data: byUser }, { data: borrowIds }] = await Promise.all([
+            supabase.from('repair_logs').select('*, instruments(name)').eq('reported_by_user_id', userId),
+            supabase.from('borrow_logs').select('id').eq('student_id', userId)
+        ]);
+        const ids = (borrowIds || []).map(b => b.id).filter(Boolean);
+        let byBorrows = [];
+        if (ids.length) {
+            const { data } = await supabase.from('repair_logs').select('*, instruments(name)').in('borrow_log_id', ids);
+            byBorrows = data || [];
+        }
+        const seen = new Set();
+        const data = [...(byUser || []), ...byBorrows].filter(r => !seen.has(r.id) && seen.add(r.id));
+        data.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        return { data, error: null };
+    },
     async uploadInstrumentImage(file) {
         try {
             const fileExt = file.name.split('.').pop();
