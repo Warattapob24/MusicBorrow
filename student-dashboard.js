@@ -3788,7 +3788,7 @@ export async function renderMyBadges(userId) {
         } else {
             listEl.innerHTML = userBadges.map(b => BadgeSystem.renderBadgeCard({
                 badge_name: b.badge_name,
-                badge_icon: '🏅',
+                badge_icon: BadgeSystem.getBadgeIcon(b.badge_name),
                 badge_description: b.badge_description || '',
                 rarity: 'common'
             }, { size: 'small' })).join('');

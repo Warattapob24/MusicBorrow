@@ -8,7 +8,7 @@
 //   6. [NEW] Added 'push' event listener for background notifications
 //   7. [NEW] Enhanced 'notificationclick' to focus existing tabs instead of always opening new ones
 
-const CACHE_NAME = 'music-borrow-v6.0.079'; // Fix: autoCorrelate edge guard (T=0/overflow crash in tuner)
+const CACHE_NAME = 'music-borrow-v6.0.132'; // redesign: badge icon mapping + colorful gallery + mobile layout
 
 const PRECACHE_URLS = [
     '/',

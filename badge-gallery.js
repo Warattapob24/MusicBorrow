@@ -20,7 +20,7 @@ export async function renderBadgeGallery(userId) {
         // แปลง badges จาก user badges table (ข้อมูลจริง)
         const earnedBadges = userBadges.map(ub => ({
             badge_name: ub.badge_name,
-            badge_icon: '🏅',
+            badge_icon: BadgeSystem.getBadgeIcon(ub.badge_name),
             badge_description: ub.badge_description || '',
             rarity: 'common'
         }));

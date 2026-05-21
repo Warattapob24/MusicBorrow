@@ -4,10 +4,33 @@
 import { escapeHtml } from './utils.js';
 
 export const BadgeSystem = {
+    // Map badge name → emoji by keyword matching
+    getBadgeIcon(badgeName = '') {
+        const n = badgeName;
+        if (n.includes('จิตอาสา'))                          return '🤝';
+        if (n.includes('เวที') || n.includes('ดาวเด่น'))    return '🌟';
+        if (n.includes('ดาวรุ่ง') || n.includes('พุ่ง'))   return '🚀';
+        if (n.includes('มือใหม่') || n.includes('เดินทาง')) return '🎒';
+        if (n.includes('ผู้ช่วยอาจารย์'))                   return '👨‍🏫';
+        if (n.includes('สอบ') || n.includes('ทดสอบ'))       return '🏆';
+        if (n.includes('รู้') || n.includes('ใฝ่'))         return '📚';
+        if (n.includes('มาราธอน'))                          return '⏱️';
+        if (n.includes('ตื่นเช้า') || n.includes('วิหค'))  return '🌅';
+        if (n.includes('ชั่วโมง') || n.includes('ศิษย์เอก')) return '⏰';
+        if (n.includes('สมาชิก'))                           return '👤';
+        if (n.includes('สายฟ้า'))                           return '⚡';
+        if (n.includes('อาจารย์รุ่นเยาว์'))                 return '🎓';
+        return '🎵';
+    },
+
     // Render a single badge card (reusable)
     renderBadgeCard(badgeData, options = {}) {
         const { size = 'medium', showProgress = false, tier = null } = options;
-        const { badge_name, badge_icon, rarity = 'common', badge_description } = badgeData;
+        const { badge_name, badge_icon: _rawIcon, rarity = 'common', badge_description } = badgeData;
+        // ใช้ getBadgeIcon เป็น fallback ถ้า icon ว่างหรือเป็น '🏅'
+        const badge_icon = (!_rawIcon || _rawIcon === '🏅')
+            ? this.getBadgeIcon(badge_name)
+            : _rawIcon;
 
         const sizeClass = {
             small: 'badge-card-small',
