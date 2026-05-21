@@ -7,46 +7,50 @@ import { escapeHtml } from './utils.js';
 
 export async function renderBadgeGallery(userId) {
     try {
-        const [badgesRes, statsRes, progressRes, userBadgesRes] = await Promise.all([
-            badgesExt.getAvailableBadges(),
+        const [statsRes, progressRes, userBadgesRes] = await Promise.all([
             badgesExt.getGalleryStats(userId),
             badgesExt.getUserAchievementProgress(userId),
             badgesExt.getUserBadges(userId)
         ]);
 
-        const badges = badgesRes.data || [];
-        const stats = statsRes.data || {};
+        const stats = statsRes.data?.[0] || {};
         const progress = progressRes.data || [];
         const userBadges = userBadgesRes.data || [];
 
-        const statsWidget = renderStatsWidget(stats);
+        // แปลง badges จาก user badges table (ข้อมูลจริง)
+        const earnedBadges = userBadges.map(ub => ({
+            badge_name: ub.badge_name,
+            badge_icon: '🏅',
+            badge_description: ub.badge_description || '',
+            rarity: 'common'
+        }));
+
+        const statsWidget = renderStatsWidget(stats, earnedBadges.length);
         const filterBar = renderFilterBar();
-        const earnedBadges = badges.filter(b => userBadges.some(ub => ub.badge_name === b.badge_name));
-        const lockedBadges = badges.filter(b => !userBadges.some(ub => ub.badge_name === b.badge_name));
 
         const earnedSection = earnedBadges.length > 0 ? `
             <div class="badge-section">
-                <h3 class="section-title">Earned Badges (${earnedBadges.length})</h3>
+                <h3 class="section-title">เหรียญตราที่ได้รับ (${earnedBadges.length})</h3>
                 <div class="badge-gallery-grid">
                     ${earnedBadges.map(b => BadgeSystem.renderBadgeCard(b, { size: 'medium' })).join('')}
                 </div>
             </div>
-        ` : '<div class="no-badges">No badges earned yet. Keep playing to unlock badges!</div>';
+        ` : `<div class="no-badges">ยังไม่มีเหรียญตราที่ได้รับ ลองยืมเครื่องดนตรีเพื่อปลดล็อค!</div>`;
 
-        const lockedSection = lockedBadges.length > 0 ? `
+        const progressSection = progress.length > 0 ? `
             <div class="badge-section">
-                <h3 class="section-title">Available Badges (${lockedBadges.length})</h3>
+                <h3 class="section-title">ความคืบหน้า Achievement</h3>
                 <div class="badge-gallery-grid">
-                    ${lockedBadges.map(b => renderLockedBadgeCard(b, progress)).join('')}
+                    ${progress.filter(a => !a.unlocked).map(a => renderProgressCard(a)).join('')}
                 </div>
             </div>
         ` : '';
 
-        const html = `
+        return `
             <div class="badge-gallery-page">
                 <div class="badge-gallery-header">
-                    <h2>Badge Gallery</h2>
-                    <p class="subtitle">Earn badges by completing achievements</p>
+                    <h2>🏅 แกลเลอรีเหรียญตรา</h2>
+                    <p class="subtitle">สะสมเหรียญตราจากกิจกรรมการยืมเครื่องดนตรี</p>
                 </div>
 
                 ${statsWidget}
@@ -57,47 +61,46 @@ export async function renderBadgeGallery(userId) {
 
                 <div class="badge-gallery-content">
                     ${earnedSection}
-                    ${lockedSection}
+                    ${progressSection}
                 </div>
             </div>
         `;
-
-        return html;
     } catch (error) {
         console.error('Error rendering badge gallery:', error);
-        return '<div class="error">Failed to load badge gallery</div>';
+        return '<div class="error" style="text-align:center; padding:2rem; color:var(--pico-del-color);">โหลดแกลเลอรีล้มเหลว กรุณาลองใหม่อีกครั้ง</div>';
     }
 }
 
-function renderStatsWidget(stats) {
+function renderStatsWidget(stats, earnedCount) {
     const {
-        earned_count = 0,
         total_available = 0,
         completion_pct = 0,
         rarest_earned = null,
         collecting_streak = 0
     } = stats;
 
+    const pct = total_available > 0 ? Math.round((earnedCount / total_available) * 100) : 0;
+
     return `
         <div class="badge-stats-widget">
             <div class="stat-item">
-                <div class="stat-label">Progress</div>
-                <div class="stat-number">${completion_pct}%</div>
+                <div class="stat-label">ความคืบหน้า</div>
+                <div class="stat-number">${pct}%</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${completion_pct}%"></div>
+                    <div class="progress-fill" style="width: ${pct}%"></div>
                 </div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">Earned Badges</div>
-                <div class="stat-number">${earned_count}/${total_available}</div>
+                <div class="stat-label">เหรียญที่ได้รับ</div>
+                <div class="stat-number">${earnedCount}${total_available > 0 ? `/${total_available}` : ''}</div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">Rarest Badge</div>
-                <div class="stat-value">${rarest_earned ? escapeHtml(rarest_earned) : 'None yet'}</div>
+                <div class="stat-label">เหรียญหายากสุด</div>
+                <div class="stat-value">${rarest_earned ? escapeHtml(rarest_earned) : 'ยังไม่มี'}</div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">Collecting Streak</div>
-                <div class="stat-number">${collecting_streak} days</div>
+                <div class="stat-label">ยืมต่อเนื่อง</div>
+                <div class="stat-number">${collecting_streak} วัน</div>
             </div>
         </div>
     `;
@@ -107,56 +110,46 @@ function renderFilterBar() {
     return `
         <div class="badge-filter-bar">
             <div class="filter-group">
-                <label>Filter by Rarity:</label>
+                <label>กรองตามความหายาก:</label>
                 <div class="filter-buttons">
-                    <button class="filter-btn active" data-rarity="all">All</button>
-                    <button class="filter-btn" data-rarity="common">Common</button>
-                    <button class="filter-btn" data-rarity="rare">Rare</button>
+                    <button class="filter-btn active" data-rarity="all">ทั้งหมด</button>
+                    <button class="filter-btn" data-rarity="common">ธรรมดา</button>
+                    <button class="filter-btn" data-rarity="rare">หายาก</button>
                     <button class="filter-btn" data-rarity="epic">Epic</button>
-                    <button class="filter-btn" data-rarity="legendary">Legendary</button>
+                    <button class="filter-btn" data-rarity="legendary">ตำนาน</button>
                 </div>
             </div>
             <div class="filter-group">
-                <label>Sort by:</label>
+                <label>เรียงตาม:</label>
                 <select class="sort-select">
-                    <option value="recent">Recently Earned</option>
-                    <option value="rarity">Rarity</option>
-                    <option value="name">Name</option>
-                    <option value="progress">Progress</option>
+                    <option value="recent">ได้รับล่าสุด</option>
+                    <option value="name">ชื่อ</option>
+                    <option value="rarity">ความหายาก</option>
                 </select>
             </div>
         </div>
     `;
 }
 
-function renderLockedBadgeCard(badgeData, achievements = []) {
-    const { badge_name, badge_icon, rarity = 'common' } = badgeData;
-    const relevant = achievements.filter(a => a.reward_badge_name === badge_name);
-
-    const unlockedConditions = relevant
-        .map(a => `
-            <div class="unlock-condition">
-                <div class="condition-name">${escapeHtml(a.achievement_name)}</div>
-                <div class="condition-progress">
-                    <div class="progress-text">${a.condition_current}/${a.condition_value}</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${Math.min(100, (a.condition_current / a.condition_value) * 100)}%"></div>
-                    </div>
-                </div>
-            </div>
-        `)
-        .join('');
+function renderProgressCard(achievement) {
+    const { achievement_name, condition_current = 0, condition_value = 1, reward_badge_name, rarity = 'common' } = achievement;
+    const pct = Math.min(100, Math.round((condition_current / condition_value) * 100));
 
     return `
-        <div class="badge-card badge-locked badge-rarity-${rarity}" data-badge-name="${escapeHtml(badge_name)}">
+        <div class="badge-card badge-locked badge-rarity-${rarity}" data-badge-name="${escapeHtml(reward_badge_name || '')}">
             <div class="badge-card-inner">
                 <div class="badge-card-front">
-                    <div class="badge-icon locked-icon">${badge_icon}</div>
-                    <div class="badge-locked-label">Locked</div>
+                    <div class="badge-icon locked-icon">🔒</div>
+                    <div class="badge-name">${escapeHtml(reward_badge_name || 'ยังไม่ปลดล็อค')}</div>
+                    <div class="badge-locked-label">ยังไม่ได้รับ</div>
                 </div>
                 <div class="badge-card-back">
-                    <div class="unlock-section">
-                        ${unlockedConditions}
+                    <div class="badge-name">${escapeHtml(achievement_name)}</div>
+                    <div class="condition-progress">
+                        <div class="progress-text" style="font-size:0.65rem; color:var(--text-subtle);">${condition_current}/${condition_value}</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${pct}%"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -165,67 +158,37 @@ function renderLockedBadgeCard(badgeData, achievements = []) {
 }
 
 export function showBadgeDetailModal(badgeName, badgeData, achievements = []) {
-    const { badge_icon, badge_description, rarity = 'common' } = badgeData;
-
-    const relevant = achievements.filter(a => a.reward_badge_name === badgeName);
-    const achievementsList = relevant
-        .map(a => `
-            <div class="achievement-item">
-                <div class="achievement-icon">🏆</div>
-                <div class="achievement-info">
-                    <div class="achievement-name">${escapeHtml(a.achievement_name)}</div>
-                    <div class="achievement-desc">${escapeHtml(a.description || '')}</div>
-                </div>
-            </div>
-        `)
-        .join('');
+    const { badge_icon = '🏅', badge_description = '', rarity = 'common' } = badgeData;
 
     const modalHtml = `
         <div class="modal-overlay" id="badge-detail-modal">
             <div class="modal-content">
                 <button class="modal-close">&times;</button>
-
                 <div class="modal-header">
                     <div class="badge-icon-large">${badge_icon}</div>
                     <h3>${escapeHtml(badgeName)}</h3>
                     <span class="badge-rarity-tag badge-rarity-${rarity}">${escapeHtml(rarity)}</span>
                 </div>
-
                 <div class="modal-body">
                     <div class="badge-desc-section">
-                        <h4>Description</h4>
-                        <p>${escapeHtml(badge_description || '')}</p>
+                        <h4>รายละเอียด</h4>
+                        <p>${escapeHtml(badge_description)}</p>
                     </div>
-
-                    ${relevant.length > 0 ? `
-                        <div class="achievements-section">
-                            <h4>How to Unlock</h4>
-                            <div class="achievements-list">
-                                ${achievementsList}
-                            </div>
-                        </div>
-                    ` : '<div class="no-achievements">No unlock conditions available</div>'}
                 </div>
             </div>
         </div>
     `;
 
-    // Insert modal into DOM
     const container = document.getElementById('badge-gallery-container') || document.body;
     const modal = document.createElement('div');
     modal.innerHTML = modalHtml;
     container.appendChild(modal);
 
-    // Setup close handler
     const closeBtn = modal.querySelector('.modal-close');
     const overlay = modal.querySelector('.modal-overlay');
-
     const closeModal = () => modal.remove();
-
     closeBtn.addEventListener('click', closeModal);
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeModal();
-    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
     return modal;
 }
@@ -235,28 +198,25 @@ export function filterBadgesByRarity(badges, rarity) {
     return badges.filter(b => (b.rarity || 'common') === rarity);
 }
 
-// Setup event delegation for badge cards
 export function setupBadgeGalleryEvents() {
     const container = document.getElementById('badge-gallery-container');
     if (!container) return;
 
-    // Filter buttons
     container.addEventListener('click', (e) => {
         if (e.target.classList.contains('filter-btn')) {
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            container.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             e.target.classList.add('active');
-            const rarity = e.target.dataset.rarity;
-            filterGalleryDisplay(rarity);
+            filterGalleryDisplay(e.target.dataset.rarity);
         }
     });
 
-    // Badge card click for detail modal
     container.addEventListener('click', (e) => {
-        const card = e.target.closest('.badge-card');
+        const card = e.target.closest('.badge-card:not(.badge-locked)');
         if (card) {
             const badgeName = card.dataset.badgeName;
-            console.log('Badge clicked:', badgeName);
-            // TODO: Load and show badge detail modal
+            const icon = card.querySelector('.badge-icon')?.textContent || '🏅';
+            const desc = card.querySelector('.badge-description')?.textContent || '';
+            showBadgeDetailModal(badgeName, { badge_icon: icon, badge_description: desc, rarity: 'common' });
         }
     });
 }

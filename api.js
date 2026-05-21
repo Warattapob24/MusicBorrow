@@ -1046,7 +1046,7 @@ export const badgesExt = {
         return { definition: defs?.data?.[0], tiers: tiers?.data || [], error: defs?.error || tiers?.error || null };
     },
     async getAvailableBadges() {
-        const { data, error } = await supabase.from('badge_definitions').select('*, badge_progression_tiers(*)').order('badge_name');
+        const { data, error } = await supabase.from('badge_definitions').select('*').order('badge_name');
         return { data: data || [], error };
     },
     async getUserAchievementProgress(userId) {

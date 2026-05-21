@@ -3779,20 +3779,19 @@ export async function renderMyBadges(userId) {
     if (!listEl) return;
     listEl.setAttribute('aria-busy', 'true');
     try {
-        const [defsRes, badgesRes] = await Promise.all([
-            badgesExt.getAvailableBadges(),
-            badgesExt.getUserBadges(userId),
-        ]);
-        if (defsRes.error) throw defsRes.error;
+        const badgesRes = await badgesExt.getUserBadges(userId);
         if (badgesRes.error) throw badgesRes.error;
 
-        const userBadgeNames = new Set((badgesRes.data || []).map(b => b.badge_name));
-        const earnedDefs = (defsRes.data || []).filter(d => userBadgeNames.has(d.badge_name));
-
-        if (!earnedDefs.length) {
+        const userBadges = badgesRes.data || [];
+        if (!userBadges.length) {
             listEl.innerHTML = '<p style="color:var(--pico-muted-color); text-align:center; padding: 1rem;">ยังไม่มีเหรียญตราที่ได้รับ ลองยืมเครื่องดนตรีเพื่อปลดล็อค!</p>';
         } else {
-            listEl.innerHTML = earnedDefs.map(b => BadgeSystem.renderBadgeCard(b, { size: 'small' })).join('');
+            listEl.innerHTML = userBadges.map(b => BadgeSystem.renderBadgeCard({
+                badge_name: b.badge_name,
+                badge_icon: '🏅',
+                badge_description: b.badge_description || '',
+                rarity: 'common'
+            }, { size: 'small' })).join('');
         }
     } catch (err) {
         listEl.innerHTML = `<p style="color:var(--pico-del-color); text-align:center;">โหลดข้อมูลเหรียญตราล้มเหลว</p>`;
