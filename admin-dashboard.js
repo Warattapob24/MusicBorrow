@@ -23,9 +23,10 @@ const state = {
     instruments:    [],
     knowledgeLinks: [],
     bosses:         [],   
-    activeLobby: null,    
-    raidParticipants: [], 
+    activeLobby: null,
+    raidParticipants: [],
     unsubscribeRaid: null,
+    pollInterval: null,
     bossRequests:   [],   
     clubRankings:   [],   
     classRankings:  [],   
@@ -53,6 +54,7 @@ const STATUS_BADGE = {
     returned:     { label: 'คืนแล้ว',   cls: 'oad-badge-gray'   },
     overdue:      { label: 'เกินกำหนด', cls: 'oad-badge-red'    },
     'แจ้งซ่อม':  { label: 'แจ้งซ่อม',   cls: 'oad-badge-amber'  },
+    'รอซ่อม':    { label: 'รอซ่อม',     cls: 'oad-badge-orange' },
     'กำลังซ่อม': { label: 'กำลังซ่อม',  cls: 'oad-badge-blue'   },
     'ซ่อมเสร็จสิ้น': { label: 'ซ่อมเสร็จ', cls: 'oad-badge-green' },
     'ไม่สามารถซ่อมได้': { label: 'ซ่อมไม่ได้', cls: 'oad-badge-red' },
@@ -317,6 +319,11 @@ function injectStyles() {
 .oad-btn-ghost    { background: transparent; border: 1px solid var(--oad-border); color: var(--oad-text); }
 .oad-btn-ghost:hover { background: var(--oad-surface2); }
 .oad-btn-icon { padding: 0.4rem; width: 2rem; height: 2rem; justify-content: center; }
+.oad-btn-approve { background: #059669; color: #fff; border: none; }
+.oad-btn-approve:hover { background: #047857; }
+.oad-btn-reject-outline { background: transparent; color: #ef4444; border: 1.5px solid #ef4444; }
+.oad-btn-reject-outline:hover { background: rgba(239,68,68,0.07); }
+.oad-approval-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 
 /* ── Badges ─────────────────────────────────────── */
 .oad-badge {
@@ -330,6 +337,7 @@ function injectStyles() {
 .oad-badge-green  { background: rgba(16,185,129,0.15); color: #10b981; }
 .oad-badge-red    { background: rgba(239,68,68,0.15);  color: #ef4444; }
 .oad-badge-amber  { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.oad-badge-orange { background: rgba(249,115,22,0.15); color: #f97316; }
 .oad-badge-blue   { background: rgba(59,130,246,0.15); color: #60a5fa; }
 .oad-badge-gray   { background: rgba(124,132,156,0.12);color: var(--oad-muted); }
 .oad-badge-purple { background: rgba(99,102,241,0.15); color: var(--oad-accent2); }
@@ -579,8 +587,10 @@ function buildShell() {
                 <div class="oad-toolbar">
                     <input class="oad-search" id="oad-repair-search" placeholder="ค้นหาเครื่องดนตรี / ผู้แจ้ง...">
                     <select class="oad-select" id="oad-repair-status-filter">
-                        <option value="all">ทุกสถานะ</option>
+                        <option value="active" selected>รายการที่ยังไม่เสร็จ</option>
+                        <option value="all">ทุกสถานะ (รวมประวัติ)</option>
                         <option value="แจ้งซ่อม">แจ้งซ่อม</option>
+                        <option value="รอซ่อม">รอซ่อม (ยืมได้)</option>
                         <option value="กำลังซ่อม">กำลังซ่อม</option>
                         <option value="ซ่อมเสร็จสิ้น">ซ่อมเสร็จ</option>
                         <option value="ไม่สามารถซ่อมได้">ซ่อมไม่ได้</option>
@@ -767,12 +777,13 @@ function buildShell() {
         </div>
 
         <div class="oad-tab-panel" id="oad-panel-bosses">
+            <div id="oad-boss-video-reviews" style="display:none;"></div>
             <div class="oad-panel">
                 <div class="oad-panel-title">
                     🐉 บริหารจัดการบอส & ห้องสอบ (Boss Raids)
                     <button class="oad-btn oad-btn-primary" onclick="window.__oadAddBoss()" style="margin-left:auto;">+ สร้างบอสใหม่</button>
                 </div>
-                
+
                 <div id="oad-boss-lobby-area" style="margin-bottom: 1.5rem; display: none; background: var(--oad-surface2); padding: 1.5rem; border-radius: var(--oad-radius); border: 2px dashed var(--oad-accent);"></div>
 
                 <div class="oad-table-wrap" id="oad-boss-table-wrap"></div>
@@ -811,8 +822,10 @@ async function loadAll() {
         state.pendingBorrows = pendingRes.value.data;
     if (activeRes.status === 'fulfilled' && !activeRes.value.error)
         state.borrows = activeRes.value.data;
-    if (repairRes.status === 'fulfilled' && !repairRes.value.error)
+    if (repairRes.status === 'fulfilled' && !repairRes.value.error) {
         state.repairs = repairRes.value.data || [];
+        state.repairHistory = []; // reset cache so repair tab reloads fresh on next render
+    }
     if (usersRes.status === 'fulfilled' && !usersRes.value.error)
         state.users = usersRes.value.data;
     if (instRes.status === 'fulfilled' && !instRes.value.error)
@@ -894,7 +907,8 @@ function registerWindowActions() {
             return;
         }
 
-        const r = state.repairs.find(x => (x.id || x.repair_id || x.log_id) == repairId);
+        const allRepairs = [...(state.repairs || []), ...(state.repairHistory || [])];
+        const r = allRepairs.find(x => (x.id || x.repair_id || x.log_id) == repairId);
         if (!r) {
             toast('ผิดพลาด: ไม่พบข้อมูลรายการซ่อมนี้', 'error');
             return;
@@ -915,7 +929,7 @@ function registerWindowActions() {
                 <div style="text-align:left;">
                     <label>สถานะกระบวนการ</label>
                     <select id="s-status" class="swal2-input" style="margin-bottom:1rem; background: var(--input-bg); color: var(--text-main);">
-                        ${['แจ้งซ่อม','กำลังซ่อม','ซ่อมเสร็จสิ้น','ไม่สามารถซ่อมได้'].map(
+                        ${['แจ้งซ่อม','รอซ่อม','กำลังซ่อม','ซ่อมเสร็จสิ้น','ไม่สามารถซ่อมได้'].map(
                             s => `<option value="${s}" ${s===curStatus?'selected':''}>${s}</option>`
                         ).join('')}
                     </select>
@@ -927,7 +941,7 @@ function registerWindowActions() {
                         ).join('')}
                     </select>
                     <div style="font-size: 0.8rem; color: var(--oad-muted); margin-bottom: 1rem; line-height: 1.2;">
-                        * ระบบจะปรับสภาพเครื่องอัตโนมัติตามกฎใหม่<br>เช่น ซ่อมเสร็จ/กำลังซ่อม จะปรับเป็น "ดี" (ถ้าไม่ใช่ "ใหม่")
+                        * ระบบจะปรับสภาพเครื่องอัตโนมัติ<br>"รอซ่อม" = พอใช้ ยืมได้ระหว่างรอ | "ซ่อมเสร็จ" = ปรับเป็น "ดี"
                     </div>
 
                     <label>หมายเหตุ</label>
@@ -944,14 +958,13 @@ function registerWindowActions() {
 
                 // --- 🛡️ LOGIC RULES: Strict Condition Management ---
                 if (newStatus === 'แจ้งซ่อม') {
-                    newInstStatus = 'ชำรุด'; 
-                    // เปิดซ่อมใหม่จากเครื่องชำรุด => เปลี่ยนเป็น พอใช้
-                    if (curCondition === 'ชำรุด') {
-                        newCondition = 'พอใช้';
-                    } else {
-                        // ห้ามเปลี่ยน condition ตอนนักเรียนแจ้งซ่อม 
-                        newCondition = curCondition;
-                    }
+                    // เครื่องอยู่ในกระบวนการแจ้งซ่อมใหม่ => ต้องบล็อกไว้ก่อนจนกว่าจะตรวจสอบ
+                    newInstStatus = 'ชำรุด';
+                    newCondition = curCondition;
+                } else if (newStatus === 'รอซ่อม') {
+                    // ประเมินแล้ว: ยังใช้งานได้ระหว่างรอซ่อม → ไม่บล็อก
+                    newInstStatus = 'พร้อมใช้งาน';
+                    newCondition = 'พอใช้';
                 } else if (newStatus === 'กำลังซ่อม') {
                     newInstStatus = 'ส่งซ่อม';
                     // ถ้าไม่ใช่ ใหม่/ดี => เปลี่ยนเป็น ดี
@@ -997,7 +1010,9 @@ function registerWindowActions() {
         // 🔔 Notification Sync
         if (vals.repair_status !== curStatus && reporterId) {
             let notifBody = '';
-            if (vals.repair_status === 'กำลังซ่อม') {
+            if (vals.repair_status === 'รอซ่อม') {
+                notifBody = 'เครื่องดนตรียังใช้งานได้ระหว่างรอซ่อม';
+            } else if (vals.repair_status === 'กำลังซ่อม') {
                 notifBody = 'เครื่องดนตรีของคุณกำลังอยู่ระหว่างการซ่อม';
             } else if (vals.repair_status === 'ซ่อมเสร็จสิ้น') {
                 notifBody = 'ซ่อมเสร็จแล้ว เครื่องพร้อมใช้งาน';
@@ -2387,25 +2402,120 @@ function registerWindowActions() {
     window.__oadUserHistory = async (userId, userName) => {
         Swal.fire({ title: 'กำลังโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         try {
-            const { data, error } = await adminExt.getUserBorrowLogs(userId);
+            const [
+                { data: borrows, error: borrowError },
+                { data: games, error: gameError },
+                { data: learning, error: learningError },
+                { data: repairs }
+            ] = await Promise.all([
+                adminExt.getUserBorrowLogs(userId),
+                adminExt.getUserGameSessions(userId),
+                adminExt.getUserLearningSessions(userId),
+                adminExt.getUserRepairLogs(userId)
+            ]);
 
-            if (error) throw error;
+            if (borrowError || gameError || learningError)
+                throw borrowError || gameError || learningError;
 
-            let historyHtml = !data.length ? '<p style="text-align:center; padding:2rem;">ไม่พบประวัติการใช้งาน</p>' : `
+            const totalBorrows = borrows?.length || 0;
+            const totalReturned = borrows?.filter(h => h.return_timestamp).length || 0;
+            const totalForced = borrows?.filter(h => h.is_force_returned).length || 0;
+            const totalNormalReturned = totalReturned - totalForced;
+            const stillOut = totalBorrows - totalReturned;
+            const totalRepairs = repairs?.length || 0;
+
+            const allActivities = [];
+
+            borrows?.forEach(b => {
+                allActivities.push({ type: 'borrow', timestamp: b.borrow_timestamp, data: b });
+            });
+
+            repairs?.forEach(r => {
+                allActivities.push({ type: 'repair', timestamp: r.created_at || r.report_date, data: r });
+            });
+
+            games?.forEach(g => {
+                allActivities.push({ type: 'game', timestamp: g.start_time, data: g });
+            });
+
+            learning?.forEach(l => {
+                allActivities.push({ type: 'learning', timestamp: l.created_at || l.start_time, data: l });
+            });
+
+            allActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            let historyHtml = !allActivities.length ? '<p style="text-align:center; padding:2rem;">ไม่พบประวัติใดๆ</p>' : `
+                <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap; font-size:0.78rem;">
+                    <span style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); border-radius:99px; padding:2px 10px; color:#a5b4fc;">
+                        📦 ยืม ${totalBorrows}
+                    </span>
+                    <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:99px; padding:2px 10px; color:#6ee7b7;">
+                        ✅ คืน ${totalNormalReturned}
+                    </span>
+                    ${stillOut > 0 ? `<span style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); border-radius:99px; padding:2px 10px; color:#fcd34d;">
+                        ⏳ ค้างคืน ${stillOut}
+                    </span>` : ''}
+                    ${totalForced > 0 ? `<span style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:99px; padding:2px 10px; color:#fca5a5;">
+                        🔴 บังคับคืน ${totalForced}
+                    </span>` : ''}
+                    ${totalRepairs > 0 ? `<span style="background:rgba(251,146,60,0.15); border:1px solid rgba(251,146,60,0.3); border-radius:99px; padding:2px 10px; color:#fdba74;">
+                        🔧 แจ้งซ่อม ${totalRepairs}
+                    </span>` : ''}
+                    <span style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); border-radius:99px; padding:2px 10px; color:#c4b5fd;">
+                        🎮 เกม ${games?.length || 0}
+                    </span>
+                    <span style="background:rgba(236,72,153,0.15); border:1px solid rgba(236,72,153,0.3); border-radius:99px; padding:2px 10px; color:#f9a8d4;">
+                        🎬 ดูคลิป ${learning?.length || 0}
+                    </span>
+                </div>
                 <div style="overflow-x:auto;">
-                    <table class="oad-table" style="font-size:0.8rem;">
-                        <thead><tr><th>วันที่</th><th>เครื่องดนตรี</th><th>สถานะ</th></tr></thead>
+                    <table class="oad-table" style="font-size:0.75rem;">
+                        <thead><tr><th>วันเวลา</th><th>ประเภท</th><th>รายละเอียด</th></tr></thead>
                         <tbody>
-                            ${data.map(h => `<tr>
-                                <td>${new Date(h.borrow_timestamp).toLocaleDateString('th-TH')}</td>
-                                <td><strong>${escapeHtml(h.instrument_name || '—')}</strong></td>
-                                <td>${h.return_timestamp ? '✅ คืนแล้ว' : '📦 ยังไม่คืน'}</td>
-                            </tr>`).join('')}
+                            ${allActivities.map(act => {
+                                const date = new Date(act.timestamp);
+                                const dateStr = isNaN(date) ? '—' : date.toLocaleDateString('th-TH');
+                                const timeStr = isNaN(date) ? '' : date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                                let row = '';
+
+                                if (act.type === 'borrow') {
+                                    const h = act.data;
+                                    const instName = h.instruments?.name || '—';
+                                    let returnStr = '';
+                                    if (h.is_force_returned) {
+                                        const retDate = h.return_timestamp ? new Date(h.return_timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+                                        returnStr = ` <span style="color:#fca5a5; font-size:0.72rem;">🔴 บังคับคืน ${retDate}</span>`;
+                                    } else if (h.return_timestamp) {
+                                        const retDate = new Date(h.return_timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+                                        returnStr = ` <span style="color:#6ee7b7; font-size:0.72rem;">✅ คืน ${retDate}</span>`;
+                                    } else {
+                                        returnStr = ` <span style="color:#fcd34d; font-size:0.72rem;">⏳ ยังไม่คืน</span>`;
+                                    }
+                                    row = `<tr><td style="white-space:nowrap;">${dateStr} ${timeStr}</td><td>📦 ยืม</td><td><strong>${escapeHtml(instName)}</strong>${returnStr}</td></tr>`;
+                                } else if (act.type === 'repair') {
+                                    const r = act.data;
+                                    const instName = r.instruments?.name || '—';
+                                    const status = r.repair_status || 'แจ้งซ่อมแล้ว';
+                                    const problem = r.problem_description ? escapeHtml(r.problem_description) : '';
+                                    row = `<tr><td style="white-space:nowrap;">${dateStr} ${timeStr}</td><td>🔧 ซ่อม</td><td><strong>${escapeHtml(instName)}</strong> [${status}]${problem ? ` — ${problem}` : ''}</td></tr>`;
+                                } else if (act.type === 'game') {
+                                    const g = act.data;
+                                    const duration = g.duration_minutes ? ` (${g.duration_minutes} นาที)` : '';
+                                    const score = g.score ? ` • ${g.score} คะแนน` : '';
+                                    row = `<tr><td style="white-space:nowrap;">${dateStr} ${timeStr}</td><td>🎮 เกม</td><td>${escapeHtml(g.game_name || '—')}${duration}${score}</td></tr>`;
+                                } else if (act.type === 'learning') {
+                                    const l = act.data;
+                                    const title = l.knowledge_links?.title ? escapeHtml(l.knowledge_links.title) : 'ดูคลิป';
+                                    const duration = l.minutes_added ? ` (${l.minutes_added} นาที)` : '';
+                                    row = `<tr><td style="white-space:nowrap;">${dateStr} ${timeStr}</td><td>🎬 ดูคลิป</td><td>${title}${duration}</td></tr>`;
+                                }
+                                return row;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>`;
 
-            Swal.fire({ title: `ประวัติ: ${userName}`, width: '600px', html: historyHtml, showCloseButton: true, showConfirmButton: false });
+            Swal.fire({ title: `ประวัติ: ${userName}`, width: '750px', html: historyHtml, showCloseButton: true, showConfirmButton: false });
         } catch (err) { toast('ผิดพลาด: ' + err.message, 'error'); }
     };
 
@@ -2797,6 +2907,51 @@ function registerWindowActions() {
         }
     };
     
+    // ── ตรวจคลิปล่าบอส (Video Raid Review) ────────────────────────────────────
+    window.__oadReviewBossRequest = async (requestId, isApproved) => {
+        const req = (state.bossRequests || []).find(r => String(r.id) === String(requestId));
+        const bossTitle  = req?.bosses?.title       || 'บอสนี้';
+        const rewardXp   = req?.bosses?.reward_xp   ?? 0;
+        const rewardStars= req?.bosses?.reward_stars ?? 0;
+        const studentId  = req?.student_id;
+        const studentName = req?.users
+            ? `${req.users.prefix || ''} ${req.users.first_name || ''} ${req.users.last_name || ''}`.trim()
+            : 'นักเรียน';
+
+        const confirmResult = await Swal.fire({
+            title: isApproved ? '✅ ยืนยันว่าผ่าน?' : '❌ ยืนยันว่าตก?',
+            html: `<b>${escapeHtml(studentName)}</b> — ${escapeHtml(bossTitle)}`,
+            icon: isApproved ? 'success' : 'warning',
+            showCancelButton: true,
+            confirmButtonText: isApproved ? 'ผ่าน + ให้รางวัล' : 'ตก ไม่ให้รางวัล',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: isApproved ? '#22c55e' : '#ef4444',
+        });
+        if (!confirmResult.isConfirmed) return;
+
+        Swal.showLoading();
+        const { error } = await bossesApi.reviewRequest(
+            requestId, isApproved, studentId, rewardXp, rewardStars
+        );
+        if (error) { Swal.fire('ผิดพลาด', error.message, 'error'); return; }
+
+        // ส่ง notification ให้นักเรียน
+        const notifTitle = isApproved ? '🎉 ผ่านการทดสอบบอสแล้ว!' : '😢 ไม่ผ่านการทดสอบบอส';
+        const notifBody  = isApproved
+            ? `ผ่าน "${bossTitle}" ได้รับ +${rewardXp} XP และ +${rewardStars} ⭐️`
+            : `ยังไม่ผ่าน "${bossTitle}" ลองส่งคลิปใหม่ได้เลย`;
+        if (studentId) {
+            await notifications.save(studentId, notifTitle, notifBody);
+        }
+
+        // อัปเดต state แล้ว re-render
+        state.bossRequests = (state.bossRequests || []).filter(r => String(r.id) !== String(requestId));
+        Swal.close();
+        toast(isApproved ? '✅ อนุมัติแล้ว รางวัลถูกมอบให้' : '❌ บันทึกว่าตกแล้ว', isApproved ? 'success' : 'info');
+        renderBossVideoReviews();
+        updateBadges();
+    };
+
     window.__oadOpenLobby = async (bossId, bossTitle) => {
         try {
             Swal.showLoading();
@@ -2808,10 +2963,16 @@ function registerWindowActions() {
             state.raidParticipants = [];
             
             state.unsubscribeRaid = raidApi.subscribeToLobby(
-                lobby.id, 
-                (participantPayload) => {
+                lobby.id,
+                async (participantPayload) => {
                     if (participantPayload.eventType === 'INSERT') {
-                        state.raidParticipants.push(participantPayload.new);
+                        const raw = participantPayload.new;
+                        // Realtime payload ไม่มี join data — ต้อง fetch ชื่อแยก
+                        const userData = await raidApi.getParticipantUser(raw.user_id);
+                        raw.user_name = userData
+                            ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || raw.user_id
+                            : raw.user_id;
+                        state.raidParticipants.push(raw);
                         renderBossLobby();
                         toast('มีนักเรียนเข้าร่วมปาร์ตี้!', 'info');
                     }
@@ -2821,7 +2982,34 @@ function registerWindowActions() {
                     renderBossLobby();
                 }
             );
-            
+
+            // Poll fallback — กรณี Realtime ไม่ทำงาน (publication ยังไม่เปิด)
+            if (state.pollInterval) {
+                clearInterval(state.pollInterval);
+                state.pollInterval = null;
+            }
+            state.pollInterval = setInterval(async () => {
+                if (!state.activeLobby || state.activeLobby.status !== 'waiting') {
+                    clearInterval(state.pollInterval);
+                    state.pollInterval = null;
+                    return;
+                }
+                try {
+                    const fresh = await raidApi.getParticipantsWithUsers(state.activeLobby.id);
+                    const enriched = fresh.map(p => ({
+                        ...p,
+                        user_name: p.users
+                            ? `${p.users.first_name || ''} ${p.users.last_name || ''}`.trim() || p.user_id
+                            : p.user_name || p.user_id
+                    }));
+                    // อัปเดตเฉพาะถ้า count เปลี่ยน (ลด re-render)
+                    if (enriched.length !== state.raidParticipants.length) {
+                        state.raidParticipants = enriched;
+                        renderBossLobby();
+                    }
+                } catch (_) { /* silently ignore */ }
+            }, 5000);
+
             Swal.close();
             renderBossLobby();
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2831,18 +3019,33 @@ function registerWindowActions() {
     };
 
     window.__oadCloseLobby = async () => {
-        if (state.unsubscribeRaid) state.unsubscribeRaid(); 
+        if (state.unsubscribeRaid) state.unsubscribeRaid();
+        if (state.pollInterval) { clearInterval(state.pollInterval); state.pollInterval = null; }
         state.activeLobby = null;
         state.raidParticipants = [];
+        state.bossStatsMap = null; // invalidate cache → renderBossesTable จะ fetch ใหม่
         renderBossLobby();
+        renderBossesTable(); // re-render ตารางบอสพร้อมสถิติล่าสุด
     };
 
     window.__oadStartRaid = async () => {
         try {
+            Swal.showLoading();
             const updatedLobby = await raidApi.updateLobbyStatus(state.activeLobby.id, 'raiding');
             state.activeLobby = updatedLobby;
+            // Re-fetch ผู้เข้าร่วมพร้อมชื่อจาก DB เพื่อให้ชื่อครบถ้วน
+            // (Realtime INSERT payload ไม่มี join data — นี่คือ source of truth)
+            const participants = await raidApi.getParticipantsWithUsers(state.activeLobby.id);
+            state.raidParticipants = participants.map(p => ({
+                ...p,
+                user_name: p.users
+                    ? `${p.users.first_name || ''} ${p.users.last_name || ''}`.trim() || p.user_id
+                    : p.user_name || p.user_id
+            }));
+            Swal.close();
             renderBossLobby();
         } catch (err) {
+            Swal.close();
             Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
         }
     };
@@ -2863,8 +3066,45 @@ function registerWindowActions() {
             }
 
             await raidApi.submitRaidResults(state.activeLobby.id, results);
-            
-            await Swal.fire('สำเร็จ!', 'บันทึกผลสอบล่าบอสเรียบร้อยแล้ว แจกรางวัล/หักหัวใจ เรียบร้อย!', 'success');
+
+            // สร้างรายชื่อผ่าน/ตก จาก results + state.raidParticipants (ที่มีชื่อ)
+            const passedList = results
+                .filter(r => r.status === 'passed')
+                .map(r => escapeHtml(state.raidParticipants.find(p => p.user_id === r.user_id)?.user_name || r.user_id));
+            const failedList = results
+                .filter(r => r.status === 'failed')
+                .map(r => escapeHtml(state.raidParticipants.find(p => p.user_id === r.user_id)?.user_name || r.user_id));
+
+            await Swal.fire({
+                title: '✅ บันทึกผลสอบสำเร็จ!',
+                html: `
+                    <div style="text-align:left;">
+                        <p style="text-align:center; margin-bottom:1rem; font-size:1.05rem;">
+                            <strong>ผลสรุป: ${results.length} คน</strong>
+                        </p>
+                        ${passedList.length ? `
+                            <div style="background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.4);
+                                        border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.6rem;">
+                                <div style="color:#22c55e; font-weight:700; margin-bottom:0.35rem;">
+                                    ✅ ผ่าน (${passedList.length} คน)
+                                </div>
+                                <div style="font-size:0.9rem;">${passedList.join(' · ')}</div>
+                            </div>
+                        ` : ''}
+                        ${failedList.length ? `
+                            <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.4);
+                                        border-radius:10px; padding:0.75rem 1rem;">
+                                <div style="color:#ef4444; font-weight:700; margin-bottom:0.35rem;">
+                                    ❌ ตก (${failedList.length} คน)
+                                </div>
+                                <div style="font-size:0.9rem;">${failedList.join(' · ')}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `,
+                icon: 'success',
+                confirmButtonText: 'รับทราบ'
+            });
             window.__oadCloseLobby();
         } catch (err) {
             Swal.fire('ผิดพลาด', err.message, 'error');
@@ -2978,9 +3218,9 @@ function renderOverviewPanels() {
                 <strong>${escapeHtml(r.student_name || '—')}</strong>
                 <div style="color:var(--oad-muted); font-size:0.75rem;">ยืม ${escapeHtml(r.instrument_name || '—')} <span style="color: var(--oad-accent); margin-left: 4px;">• ${fmtDate(r.borrow_timestamp)}</span></div>
             </div>
-            <div style="display:flex;gap:0.3rem;">
-                <button class="oad-btn oad-btn-green" style="font-size:0.75rem;padding:0.2rem 0.5rem;" onclick="window.__oadApprove(${r.log_id}, true)">✅</button>
-                <button class="oad-btn oad-btn-red" style="font-size:0.75rem;padding:0.2rem 0.5rem;" onclick="window.__oadApprove(${r.log_id}, false)">❌</button>
+            <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+                <button class="oad-btn oad-btn-approve" style="font-size:0.75rem;padding:0.25rem 0.6rem;" onclick="window.__oadApprove(${r.log_id}, true)">✅ อนุมัติ</button>
+                <button class="oad-btn oad-btn-reject-outline" style="font-size:0.75rem;padding:0.25rem 0.6rem;" onclick="window.__oadApprove(${r.log_id}, false)">❌ ปฏิเสธ</button>
             </div>
         </div>`).join('') + `</div>`;
 
@@ -3146,6 +3386,7 @@ function renderBorrowsTable() {
                     <th>ผู้ยืม</th>
                     <th>เครื่องดนตรี</th>
                     <th>วันกำหนดคืน</th>
+                    <th>สถานะ</th>
                     <th>จัดการ</th>
                 </tr></thead>
                 <tbody>
@@ -3153,9 +3394,10 @@ function renderBorrowsTable() {
                     <td>${escapeHtml(r.student_name || '—')}</td>
                     <td>${escapeHtml(r.instrument_name || '—')}</td>
                     <td class="nowrap">${fmtDateShort(r.due_date)}</td>
-                    <td><div class="actions">
-                        <button class="oad-btn oad-btn-green" onclick="window.__oadApprove(${r.log_id}, true)">✅ อนุมัติ</button>
-                        <button class="oad-btn oad-btn-red"   onclick="window.__oadApprove(${r.log_id}, false)">❌ ปฏิเสธ</button>
+                    <td><span class="oad-badge oad-badge-amber">⏳ รออนุมัติ</span></td>
+                    <td><div class="oad-approval-actions">
+                        <button class="oad-btn oad-btn-approve" onclick="window.__oadApprove(${r.log_id}, true)">✅ อนุมัติ</button>
+                        <button class="oad-btn oad-btn-reject-outline" onclick="window.__oadApprove(${r.log_id}, false)">❌ ปฏิเสธ</button>
                     </div></td>
                 </tr>`).join('')}
                 </tbody>
@@ -3229,7 +3471,12 @@ async function renderRepairsTable() {
         (r.instrument_name || '').toLowerCase().includes(search) ||
         (r.reporter_name || '').toLowerCase().includes(search)
     );
-    if (statF !== 'all') rows = rows.filter(r => r.repair_status === statF);
+    const DONE_STATUSES = ['ซ่อมเสร็จสิ้น', 'ไม่สามารถซ่อมได้'];
+    if (statF === 'active') {
+        rows = rows.filter(r => !DONE_STATUSES.includes(r.repair_status));
+    } else if (statF !== 'all') {
+        rows = rows.filter(r => r.repair_status === statF);
+    }
 
     if (!rows.length) {
         wrap.innerHTML = `<div class="oad-empty"><span class="oad-empty-icon">🛠️</span>ไม่มีรายการแจ้งซ่อม</div>`;
@@ -3256,7 +3503,9 @@ async function renderRepairsTable() {
                     <td>${badge(r.repair_status)}</td>
                     <td class="nowrap">${r.repair_cost ? `฿${Number(r.repair_cost).toLocaleString()}` : '—'}</td>
                     <td><div class="actions">
-                        <button class="oad-btn oad-btn-ghost" onclick="window.__oadEditRepair(${repId})">✏️ อัปเดต</button>
+                        ${repId && !['ซ่อมเสร็จสิ้น','ไม่สามารถซ่อมได้'].includes(r.repair_status)
+                            ? `<button class="oad-btn oad-btn-ghost" onclick="window.__oadEditRepair(${repId})">✏️ อัปเดต</button>`
+                            : '—'}
                     </div></td>
                 </tr>`;
             }).join('')}
@@ -3615,9 +3864,75 @@ function renderKnowledgeTable() {
         </table>`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Render: Boss Video Review Panel (คลิปที่นักเรียนส่งรอตรวจ)
+// ─────────────────────────────────────────────────────────────────────────────
+function renderBossVideoReviews() {
+    const panel = document.getElementById('oad-boss-video-reviews');
+    if (!panel) return;
+
+    const pending = state.bossRequests || [];
+    if (!pending.length) {
+        panel.style.display = 'none';
+        return;
+    }
+    panel.style.display = '';
+
+    // helper: ตรวจว่าเป็น URL จริงไหม
+    const isValidUrl = (str) => {
+        try { const u = new URL(str); return ['http:','https:'].includes(u.protocol); }
+        catch { return false; }
+    };
+
+    panel.innerHTML = `
+        <div class="oad-panel" style="margin-bottom:1.5rem; border: 2px solid var(--oad-amber);">
+            <div class="oad-panel-title" style="color:var(--oad-amber);">
+                🎬 คลิปรอตรวจ
+                <span class="oad-badge oad-badge-amber" style="margin-left:0.5rem;">${pending.length} รายการ</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+            ${pending.map(r => {
+                const name = r.users
+                    ? `${r.users.prefix || ''} ${r.users.first_name || ''} ${r.users.last_name || ''}`.trim()
+                    : '—';
+                const bossTitle = r.bosses?.title || '—';
+                const xp    = r.bosses?.reward_xp    ?? 0;
+                const stars = r.bosses?.reward_stars ?? 0;
+                const validUrl = isValidUrl(r.video_url || '');
+                const clipHtml = validUrl
+                    ? `<a href="${escapeHtml(r.video_url)}" target="_blank" rel="noopener"
+                           class="oad-btn oad-btn-ghost" style="font-size:0.8rem; width:100%; text-align:center;">▶️ เปิดดูคลิป</a>`
+                    : `<span style="font-size:0.8rem; color:var(--oad-red); word-break:break-all;">⚠️ ลิงก์ไม่ถูกต้อง:<br>${escapeHtml(r.video_url || '(ว่าง)')}</span>`;
+                return `
+                <div style="background:var(--oad-surface2); border-radius:var(--oad-radius); padding:0.85rem; display:flex; flex-direction:column; gap:0.5rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.4rem;">
+                        <div>
+                            <strong>${escapeHtml(name)}</strong>
+                            <div style="font-size:0.82rem; color:var(--oad-muted);">📋 ${escapeHtml(bossTitle)}</div>
+                        </div>
+                        <div style="display:flex; gap:0.3rem; flex-shrink:0;">
+                            <span class="oad-badge oad-badge-purple">+${xp} XP</span>
+                            <span class="oad-badge oad-badge-amber">+${stars} ⭐️</span>
+                        </div>
+                    </div>
+                    ${clipHtml}
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="oad-btn oad-btn-green" style="flex:1;"
+                            onclick="window.__oadReviewBossRequest('${r.id}', true)">✅ ผ่าน</button>
+                        <button class="oad-btn oad-btn-red" style="flex:1;"
+                            onclick="window.__oadReviewBossRequest('${r.id}', false)">❌ ตก</button>
+                    </div>
+                </div>`;
+            }).join('')}
+            </div>
+        </div>`;
+}
+
 async function renderBossesTable() {
     const wrap = document.getElementById('oad-boss-table-wrap');
     if (!wrap) return;
+
+    renderBossVideoReviews();
 
     if (!state.bosses || state.bosses.length === 0) {
         const { data, error } = await bossesApi.getAllBosses();
@@ -3649,6 +3964,10 @@ async function renderBossesTable() {
         if (!s || !s.total) return `<div style="font-size:0.72rem; color:var(--oad-muted); margin-top:2px;">ยังไม่มีสถิติ</div>`;
         return `<div style="font-size:0.72rem; color:var(--oad-muted); margin-top:2px;">
             🗡️ ${s.total} ครั้ง · ✅ ${s.passed} · ❌ ${s.failed}
+            <button onclick="window.__oadShowBossHistory('${b.id}', '${escapeHtml(b.title || '')}')"
+                style="margin-left:0.5rem; font-size:0.7rem; padding:1px 7px; border-radius:99px;
+                       background:rgba(99,102,241,0.2); border:1px solid rgba(99,102,241,0.4);
+                       color:#a5b4fc; cursor:pointer;">📋 ดูรายละเอียด</button>
         </div>`;
     };
 
@@ -3660,12 +3979,19 @@ async function renderBossesTable() {
                 <th style="text-align:center;">รางวัล (XP / ⭐️)</th>
                 <th style="text-align:center;">ซ้อมแก้ตัว</th>
                 <th style="text-align:center;">สถานะ</th>
-                <th style="text-align:center; min-width:280px;">จัดการ</th>
+                <th style="text-align:center; min-width:180px;">จัดการ</th>
             </tr></thead>
             <tbody>
             ${state.bosses.map(b => {
                 const safeTitle = escapeHtml(b.title || '');
                 const isActive  = b.is_active !== false;
+                const toggleBtn = isActive
+                    ? `<button class="oad-btn oad-btn-icon" title="ปิดใช้งาน (ซ่อนจากนักเรียน)"
+                           style="background:rgba(245,158,11,0.15); border:1px solid var(--oad-amber); color:var(--oad-amber);"
+                           onclick="window.__oadToggleBossActive('${b.id}', false)">⚫</button>`
+                    : `<button class="oad-btn oad-btn-icon" title="เปิดใช้งาน"
+                           style="background:rgba(34,197,94,0.15); border:1px solid var(--oad-green); color:var(--oad-green);"
+                           onclick="window.__oadToggleBossActive('${b.id}', true)">🟢</button>`;
                 return `
                 <tr style="${isActive ? '' : 'opacity:0.6;'}">
                     <td>
@@ -3680,21 +4006,22 @@ async function renderBossesTable() {
                     <td style="text-align:center; color:var(--oad-red);">${b.required_practice_mins ?? 0} นาที</td>
                     <td style="text-align:center;">${renderActiveBadge(b)}</td>
                     <td style="text-align:center;">
-                        <div class="actions" style="justify-content:center; flex-wrap:wrap; gap:0.35rem;">
+                        <div style="display:flex; flex-direction:column; gap:0.35rem; align-items:stretch;">
                             <button class="oad-btn oad-btn-green" title="เปิดห้องสอบ"
+                                style="width:100%;"
                                 onclick="window.__oadOpenLobby('${b.id}', '${safeTitle}')"
-                                ${isActive ? '' : 'disabled'}>⚔️ เปิดห้อง</button>
-                            <button class="oad-btn oad-btn-ghost" title="แก้ไข"
-                                onclick="window.__oadEditBoss('${b.id}')">✏️</button>
-                            <button class="oad-btn oad-btn-ghost" title="คัดลอก"
-                                onclick="window.__oadDuplicateBoss('${b.id}')">📋</button>
-                            ${isActive
-                                ? `<button class="oad-btn oad-btn-amber" title="ปิดใช้งาน (ซ่อนจากนักเรียน)"
-                                       onclick="window.__oadToggleBossActive('${b.id}', false)">⚫ ปิด</button>`
-                                : `<button class="oad-btn oad-btn-green" title="เปิดใช้งาน"
-                                       onclick="window.__oadToggleBossActive('${b.id}', true)">🟢 เปิด</button>`}
-                            <button class="oad-btn oad-btn-red" title="ลบถาวร"
-                                onclick="window.__oadDeleteBoss('${b.id}')">🗑️</button>
+                                ${isActive ? '' : 'disabled'}>⚔️ เปิดห้องสอบ</button>
+                            <div style="display:flex; gap:0.25rem; justify-content:center; align-items:center;">
+                                <button class="oad-btn oad-btn-ghost oad-btn-icon" title="แก้ไขบอส"
+                                    onclick="window.__oadEditBoss('${b.id}')">✏️</button>
+                                <button class="oad-btn oad-btn-ghost oad-btn-icon" title="คัดลอกบอส"
+                                    onclick="window.__oadDuplicateBoss('${b.id}')">📋</button>
+                                <span style="width:1px; height:1.4rem; background:var(--oad-border); display:inline-block; margin:0 0.1rem;"></span>
+                                ${toggleBtn}
+                                <span style="width:1px; height:1.4rem; background:var(--oad-border); display:inline-block; margin:0 0.1rem;"></span>
+                                <button class="oad-btn oad-btn-red oad-btn-icon" title="ลบถาวร"
+                                    onclick="window.__oadDeleteBoss('${b.id}')">🗑️</button>
+                            </div>
                         </div>
                     </td>
                 </tr>`;
@@ -3702,6 +4029,66 @@ async function renderBossesTable() {
             </tbody>
         </table>`;
 }
+
+window.__oadShowBossHistory = async (bossId, bossTitle) => {
+    Swal.showLoading();
+    try {
+        const { data, error } = await raidApi.getBossExamHistory(bossId);
+        if (error) throw error;
+
+        if (!data.length) {
+            return Swal.fire('ประวัติการสอบ', 'ยังไม่มีข้อมูลการสอบ', 'info');
+        }
+
+        const isValidUrl = (s) => { try { const u = new URL(s); return ['http:','https:'].includes(u.protocol); } catch { return false; } };
+
+        const rows = data.map(r => {
+            const date = r.date
+                ? new Date(r.date).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
+                : '—';
+            const resultBadge = r.result_status === 'passed'
+                ? `<span style="color:#4ade80; font-weight:700;">✅ ผ่าน</span>`
+                : `<span style="color:#f87171; font-weight:700;">❌ ตก</span>`;
+            const typeBadge = r.type === 'video'
+                ? `<span style="font-size:0.72rem; background:rgba(99,102,241,0.2); color:#a5b4fc; padding:1px 6px; border-radius:99px;">🎬 คลิป</span>`
+                : `<span style="font-size:0.72rem; background:rgba(34,197,94,0.15); color:#4ade80; padding:1px 6px; border-radius:99px;">⚔️ ออฟไลน์</span>`;
+            const clipLink = r.type === 'video' && r.video_url && isValidUrl(r.video_url)
+                ? `<br><a href="${escapeHtml(r.video_url)}" target="_blank" rel="noopener"
+                       style="font-size:0.75rem; color:#60a5fa;">▶️ ดูคลิป</a>`
+                : (r.type === 'video' && r.video_url
+                    ? `<br><span style="font-size:0.72rem; color:#f87171;">⚠️ ลิงก์ไม่ถูกต้อง</span>`
+                    : '');
+            return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                <td style="padding:0.45rem 0.6rem;">
+                    ${escapeHtml(r.name || '—')}
+                    ${clipLink}
+                </td>
+                <td style="text-align:center; padding:0.45rem 0.4rem;">${resultBadge}</td>
+                <td style="text-align:center; padding:0.45rem 0.4rem;">${typeBadge}</td>
+                <td style="text-align:center; font-size:0.78rem; color:#94a3b8; padding:0.45rem 0.4rem;">${date}</td>
+            </tr>`;
+        }).join('');
+
+        Swal.fire({
+            title: `📋 ประวัติการสอบ: ${escapeHtml(bossTitle)}`,
+            html: `<div style="max-height:420px; overflow-y:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+                    <thead><tr style="border-bottom:2px solid rgba(255,255,255,0.1); font-size:0.8rem; color:#94a3b8;">
+                        <th style="padding:0.4rem 0.6rem; text-align:left;">ชื่อนักเรียน</th>
+                        <th style="text-align:center;">ผล</th>
+                        <th style="text-align:center;">วิธี</th>
+                        <th style="text-align:center;">วันที่</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`,
+            width: '640px',
+            confirmButtonText: 'ปิด',
+        });
+    } catch (err) {
+        Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
+    }
+};
 
 function renderBossLobby() {
     const lobbyArea = document.getElementById('oad-boss-lobby-area');
@@ -3727,13 +4114,23 @@ function renderBossLobby() {
                 </div>
                 
                 <div style="margin-bottom:1.5rem; font-size:1.1rem;">
-                    <strong>ผู้เข้าร่วมปาร์ตี้ (${state.raidParticipants.length} คน):</strong> 
+                    <strong>ผู้เข้าร่วมปาร์ตี้ (${state.raidParticipants.length} คน):</strong>
                     <span style="color:${state.raidParticipants.length ? 'var(--oad-green)' : 'var(--oad-muted)'}; font-weight:bold;">
                         ${state.raidParticipants.length ? 'พร้อมลุย!' : 'กำลังรอสมาชิก...'}
                     </span>
+                    ${state.raidParticipants.length ? `
+                        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:center; margin-top:0.75rem;">
+                            ${state.raidParticipants.map(p => `
+                                <span style="background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.3);
+                                             color:var(--oad-green); padding:0.3rem 0.75rem; border-radius:999px; font-size:0.9rem;">
+                                    ${escapeHtml(p.user_name || p.user_id)}
+                                </span>
+                            `).join('')}
+                        </div>
+                    ` : ''}
                 </div>
                 
-                <div style="display:flex; justify-content:center; gap:1rem;">
+                <div style="display:flex; justify-content:center; gap:1rem; flex-wrap:wrap;">
                     <button class="oad-btn oad-btn-red" onclick="window.__oadCloseLobby()" style="padding:0.75rem 1.5rem; font-size:1rem;">❌ ปิดห้อง (ยกเลิก)</button>
                     <button class="oad-btn oad-btn-primary" onclick="window.__oadStartRaid()" ${state.raidParticipants.length === 0 ? 'disabled' : ''} style="padding:0.75rem 1.5rem; font-size:1rem;">🚀 เริ่มสอบเลย!</button>
                 </div>
@@ -3750,7 +4147,7 @@ function renderBossLobby() {
                         ${state.raidParticipants.map(p => `
                             <tr>
                                 <td>
-                                    <strong>${escapeHtml(p.users?.first_name || p.user_id)}</strong> 
+                                    <strong>${escapeHtml(p.user_name || p.user_id)}</strong>
                                 </td>
                                 <td style="text-align:center; display:flex; justify-content:center; gap:1.5rem;">
                                     <label style="cursor:pointer; font-size:1.1rem; font-weight:bold; color:var(--oad-green);">
@@ -4639,7 +5036,7 @@ function updateBadges() {
         pendEl.classList.toggle('hidden', pending === 0);
     }
 
-    const repairs = state.repairs.filter(r => r.repair_status === 'แจ้งซ่อม').length;
+    const repairs = state.repairs.filter(r => r.repair_status === 'แจ้งซ่อม' || r.repair_status === 'รอซ่อม').length;
     const repEl   = document.getElementById('oad-repair-badge');
     if (repEl) {
         repEl.textContent = repairs;
