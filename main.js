@@ -101,6 +101,12 @@ async function initApp() {
 
             console.log(`[AUTH] Launching dashboard from ${source}`);
 
+            // 🟢 แคช Google Provider Token สำหรับฟังก์ชันเซฟไฟล์ลง Google Drive
+            if (session.provider_token) {
+                localStorage.setItem('google_provider_token', session.provider_token);
+                console.log('[AUTH] Cached Google Provider Token successfully');
+            }
+
             // 🟢 บันทึก last_seen_at — fire & forget (ไม่รอผล)
             supabase.rpc('touch_user_last_seen').then(() => {}, (err) => {
                 console.warn('[AUTH] touch_user_last_seen failed:', err?.message);

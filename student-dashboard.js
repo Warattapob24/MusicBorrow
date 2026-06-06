@@ -10,7 +10,7 @@
 // นำ supabase ออกและ import api เข้ามาแทน
 import { authApi, notificationsExt, borrowExt, usersExt, repair,
          instrumentsExt, realtimeApi, gamesExt, knowledgeExt, statsApi,
-         badgesExt, rankingsExt, bossesApi, raidApi } from './api.js';
+         badgesExt, rankingsExt, bossesApi, raidApi, studentLoopsApi } from './api.js';
 import { currentUser, setCurrentUser, getCurrentUser } from './auth.js';
 import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
 import { buildPlayerCardHTML, triggerLevelUp, sharePlayerCard  } from './player-card.js';
@@ -1008,6 +1008,15 @@ const VIEWS = {
                     @media (max-width: 768px) {
                         .lf-wrap { margin: -1rem -1rem 0 -1rem; height: calc(100vh - 120px); border-radius: 0; }
                     }
+
+                    /* Vinyl Disc styles for Launchpad beats */
+                    @keyframes spinVinyl {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                    .vinyl-disc.playing {
+                        animation: spinVinyl 3s linear infinite;
+                    }
                 </style>
                 <div class="lf-wrap" id="learning-feed-wrap">
                     <div class="lf-filters" id="lf-filters"></div>
@@ -1035,7 +1044,7 @@ const VIEWS = {
         render() {
             return `
                 ${renderUnifiedCard({ emoji: '🎮', title: 'ศูนย์ฝึกทักษะ', subtitle: 'เล่นเกมเพื่อพัฒนาทักษะการอ่านโน้ตและจังหวะ' })}
-                <div class="sd-grid-2" style="margin-bottom: 2.5rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 2.5rem;">
                     <button id="launch-game-btn" class="sd-app-btn">
                         <span class="icon">🎼</span>
                         <span>ห้องโน้ต<br>(Staff Wars)</span>
@@ -1043,6 +1052,10 @@ const VIEWS = {
                     <button id="launch-rhythm-core-btn" class="sd-app-btn">
                         <span class="icon">🥁</span>
                         <span>ห้องจังหวะ<br>(Rhythm Core)</span>
+                    </button>
+                    <button id="launch-music-creator-btn" class="sd-app-btn">
+                        <span class="icon">🎛️</span>
+                        <span>เครื่องสร้างเพลง<br>(DJ Studio)</span>
                     </button>
                 </div>
                 <div>
@@ -1065,6 +1078,13 @@ const VIEWS = {
                 // ฝากข้อมูล User ไว้ในเครื่องก่อนเปิดเกม
                 localStorage.setItem('sd_game_user', JSON.stringify(user));
                 window.open('rhythmcore.html', '_blank'); // เปิดแท็บใหม่
+            });
+
+            // ตั้งค่าปุ่ม DJ Studio
+            document.getElementById('launch-music-creator-btn')?.addEventListener('click', () => {
+                // ฝากข้อมูล User ไว้ในเครื่องก่อนเปิดเกม
+                localStorage.setItem('sd_game_user', JSON.stringify(user));
+                window.open('musiccreator.html', '_blank'); // เปิดแท็บใหม่
             });
 
             await renderGameLeaderboards();
@@ -4009,6 +4029,20 @@ function _lfActivateCard(card) {
     if (prev) {
         const ifr = prev.querySelector('iframe');
         if (ifr) ifr.src = '';
+        
+        // Also pause active loop audios in previous card
+        const audio = prev.querySelector('audio');
+        if (audio) {
+            audio.pause();
+            const prevIdx = prev.dataset.index;
+            const icon = document.getElementById(`play-icon-${prevIdx}`);
+            const vinyl = document.getElementById(`vinyl-${prevIdx}`);
+            if (icon) {
+                icon.className = "fa-solid fa-play";
+                icon.style.marginLeft = "4px";
+            }
+            if (vinyl) vinyl.classList.remove('playing');
+        }
     }
     _lf.activeIndex = idx;
     // Reset pause state for the new video — new active card starts as "playing"
@@ -4037,6 +4071,165 @@ function _lfActivateCard(card) {
     }
 }
 
+function _lfRenderLoopCard(loop, index) {
+    const isOwner = getCurrentUser() && loop.user_id === getCurrentUser().id;
+    const authorName = `${loop.users?.prefix || ''} ${loop.users?.first_name || 'นักเรียน'} ${loop.users?.last_name || ''}`.trim();
+    const formattedDate = new Date(loop.created_at).toLocaleDateString('th-TH', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+    
+    return `
+        <article class="lf-card loop-card" data-index="${index}" data-loop-id="${loop.id}" data-drive-id="${loop.google_drive_id}">
+            <!-- Spinning Vinyl Visualizer -->
+            <div class="vinyl-container" style="width: 100%; height: 100%; position: relative; background: radial-gradient(circle, #2e1065 0%, #090514 100%); display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <div class="vinyl-disc" id="vinyl-${index}" style="width: 200px; height: 200px; border-radius: 50%; background: #111; border: 8px solid #222; box-shadow: 0 0 30px rgba(168, 85, 247, 0.4), inset 0 0 20px #000; display: flex; align-items: center; justify-content: center; position: relative; transition: transform 0.5s;">
+                    <!-- Vinyl Groves -->
+                    <div style="position: absolute; inset: 20px; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.05);"></div>
+                    <div style="position: absolute; inset: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.03);"></div>
+                    <div style="position: absolute; inset: 60px; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.05);"></div>
+                    <div style="position: absolute; inset: 80px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.03);"></div>
+                    <!-- Center Label -->
+                    <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #a855f7 0%, #06b6d4 100%); display: flex; align-items: center; justify-content: center; position: absolute; top: calc(50% - 30px); left: calc(50% - 30px); border: 2px solid #222;">
+                        <!-- Spindle hole -->
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #000;"></div>
+                    </div>
+                </div>
+                
+                <!-- Play controls overlaying center -->
+                <button class="loop-play-btn icon-button-circle primary" data-index="${index}" style="position: absolute; top: calc(50% - 30px); left: calc(50% - 30px); z-index: 5; background-color: #a855f7 !important; border: 3px solid #fff !important; width: 60px; height: 60px; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; color: white;">
+                    <i class="fa-solid fa-play" id="play-icon-${index}" style="margin-left: 4px;"></i>
+                </button>
+                
+                <!-- Audio Tag (Lazy Loaded) -->
+                <audio id="audio-${index}" loop></audio>
+            </div>
+            
+            <div class="lf-overlay" style="z-index: 10;">
+                <div class="lf-tag-row">
+                    <span class="lf-tag" style="background: linear-gradient(135deg, #a855f7 0%, #06b6d4 100%); color: #fff;">🎛️ DJ Launchpad</span>
+                    <span class="lf-tag instrument">⚡ BPM: ${loop.bpm}</span>
+                </div>
+                <h3 class="lf-title">${escapeHtml(loop.title || 'เพลงไม่มีชื่อ')}</h3>
+                <p class="lf-caption" style="font-size: 0.8rem; margin-bottom: 0.75rem; color: #cbd5e1;">
+                    ผู้แต่ง: <b>${escapeHtml(authorName)}</b><br>
+                    แชร์เมื่อ: ${formattedDate}
+                </p>
+                <div class="flex gap-2" style="display: flex; gap: 0.5rem; pointer-events: auto;">
+                    <button class="loop-remix-btn lf-open-app" data-loop-id="${loop.id}" style="background: rgba(168, 85, 247, 0.25); border-color: rgba(168, 85, 247, 0.5); font-weight: bold; cursor: pointer;">
+                        🚀 Remix บอร์ดเพลงนี้
+                    </button>
+                    ${isOwner ? `
+                        <button class="loop-delete-btn" data-loop-id="${loop.id}" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 0.75rem; border-radius: 999px; padding: 0.4rem 0.85rem; cursor: pointer;">
+                            🗑️ ลบเพลง
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        </article>
+    `;
+}
+
+function _lfBindLoopPlayers(feedEl) {
+    const playBtns = feedEl.querySelectorAll('.loop-play-btn');
+    playBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = btn.dataset.index;
+            const audio = document.getElementById(`audio-${idx}`);
+            const vinyl = document.getElementById(`vinyl-${idx}`);
+            const icon = document.getElementById(`play-icon-${idx}`);
+            const driveId = btn.closest('.loop-card').dataset.driveId;
+            
+            // Stop other playing audios
+            feedEl.querySelectorAll('audio').forEach(aud => {
+                if (aud.id !== `audio-${idx}`) {
+                    aud.pause();
+                    const otherIdx = aud.id.split('-')[1];
+                    const otherIcon = document.getElementById(`play-icon-${otherIdx}`);
+                    const otherVinyl = document.getElementById(`vinyl-${otherIdx}`);
+                    if (otherIcon) {
+                        otherIcon.className = "fa-solid fa-play";
+                        otherIcon.style.marginLeft = "4px";
+                    }
+                    if (otherVinyl) otherVinyl.classList.remove('playing');
+                }
+            });
+            
+            if (!audio.src) {
+                audio.src = `https://docs.google.com/uc?export=download&id=${driveId}`;
+            }
+            
+            if (audio.paused) {
+                audio.play().then(() => {
+                    icon.className = "fa-solid fa-pause";
+                    icon.style.marginLeft = "0px";
+                    vinyl.classList.add('playing');
+                }).catch(err => {
+                    console.error("Audio playback error", err);
+                    Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถเล่นไฟล์เสียงได้ กรุณาลองใหม่อีกครั้ง', 'error');
+                });
+            } else {
+                audio.pause();
+                icon.className = "fa-solid fa-play";
+                icon.style.marginLeft = "4px";
+                vinyl.classList.remove('playing');
+            }
+        });
+    });
+
+    const remixBtns = feedEl.querySelectorAll('.loop-remix-btn');
+    remixBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const loopId = btn.dataset.loopId;
+            const cu = getCurrentUser();
+            localStorage.setItem('sd_game_user', JSON.stringify(cu));
+            window.open(`musiccreator.html?remix=${loopId}`, '_blank');
+        });
+    });
+
+    const deleteBtns = feedEl.querySelectorAll('.loop-delete-btn');
+    deleteBtns.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const loopId = btn.dataset.loopId;
+            
+            const confirm = await Swal.fire({
+                title: 'ยืนยันการลบเพลง?',
+                text: 'เมื่อลบแล้วผลงานเพลงนี้จะหายไปจากรายการแชร์',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'ลบเลย',
+                cancelButtonText: 'ยกเลิก'
+            });
+            
+            if (confirm.isConfirmed) {
+                try {
+                    const { error } = await studentLoopsApi.deleteLoop(loopId);
+                    if (error) throw error;
+                    
+                    Swal.fire({
+                        title: 'ลบสำเร็จ!',
+                        text: 'ลบเพลงเรียบร้อยแล้ว',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    
+                    // Reload feed
+                    await _lfLoadFeed();
+                } catch (e) {
+                    Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถลบเพลงได้: ' + e.message, 'error');
+                }
+            }
+        });
+    });
+}
+
 function _lfAppendLoopBatch() {
     const feedEl = document.getElementById('lf-feed');
     if (!feedEl || !_lf.feed.length) return;
@@ -4047,7 +4240,10 @@ function _lfAppendLoopBatch() {
 
     // Append next batch with continuous indices
     const fragment = document.createElement('div');
-    fragment.innerHTML = _lf.feed.map((link, i) => _lfRenderCard(link, baseIdx + i)).join('');
+    const isLoopFeed = _lf.activeType === 'ผลงานเพลง (Launchpad)';
+    fragment.innerHTML = _lf.feed.map((link, i) => 
+        isLoopFeed ? _lfRenderLoopCard(link, baseIdx + i) : _lfRenderCard(link, baseIdx + i)
+    ).join('');
     while (fragment.firstChild) {
         feedEl.appendChild(fragment.firstChild);
     }
@@ -4058,6 +4254,10 @@ function _lfAppendLoopBatch() {
         const cIdx = parseInt(c.dataset.index || '-1', 10);
         if (cIdx >= baseIdx) _lf.inObserver?.observe(c);
     });
+
+    if (isLoopFeed) {
+        _lfBindLoopPlayers(feedEl);
+    }
 
     // Trim oldest cards if total exceeds cap (keep currently active + nearby)
     const totalNow = newCards.length;
@@ -4249,21 +4449,41 @@ async function _lfLoadFeed() {
     if (!feedEl) return;
     feedEl.innerHTML = `<div class="lf-loading"><span aria-busy="true">กำลังโหลดคลิป...</span></div>`;
     try {
-        const { data, error } = await knowledgeExt.getVisibleLinks(_lf.activeType || null);
-        if (error) throw error;
+        let data;
+        let isLoopFeed = _lf.activeType === 'ผลงานเพลง (Launchpad)';
+        if (isLoopFeed) {
+            const res = await studentLoopsApi.getFeed();
+            if (res.error) throw res.error;
+            data = res.data;
+        } else {
+            const res = await knowledgeExt.getVisibleLinks(_lf.activeType || null);
+            if (res.error) throw res.error;
+            data = res.data;
+        }
+        
         _lf.feed = data || [];
         if (!_lf.feed.length) {
             feedEl.innerHTML = `
                 <div class="lf-empty">
                     <div style="font-size:3rem;">🎬</div>
                     <p>ยังไม่มีคลิปสำหรับ${_lf.activeType ? `เครื่อง "${escapeHtml(_lf.activeType)}"` : 'หมวดนี้'}</p>
-                    <button class="sd-btn-primary" id="lf-empty-submit">📤 แชร์คลิปแรก</button>
+                    ${isLoopFeed ? '' : `<button class="sd-btn-primary" id="lf-empty-submit">📤 แชร์คลิปแรก</button>`}
                 </div>`;
-            document.getElementById('lf-empty-submit')?.addEventListener('click', handleSubmitClip);
+            if (!isLoopFeed) {
+                document.getElementById('lf-empty-submit')?.addEventListener('click', handleSubmitClip);
+            }
             return;
         }
-        feedEl.innerHTML = _lf.feed.map((link, i) => _lfRenderCard(link, i)).join('');
-        _lfSetupObserver(feedEl);
+        
+        if (isLoopFeed) {
+            feedEl.innerHTML = _lf.feed.map((loop, i) => _lfRenderLoopCard(loop, i)).join('');
+            _lfSetupObserver(feedEl);
+            _lfBindLoopPlayers(feedEl);
+        } else {
+            feedEl.innerHTML = _lf.feed.map((link, i) => _lfRenderCard(link, i)).join('');
+            _lfSetupObserver(feedEl);
+        }
+        
         // Auto-play first card
         const firstCard = feedEl.querySelector('.lf-card');
         if (firstCard) _lfActivateCard(firstCard);
@@ -4289,6 +4509,9 @@ async function _lfLoadTypes() {
         const { data, error } = await knowledgeExt.getTypes();
         if (error) throw error;
         const types = [...new Set((data || []).map(i => i.instrument_type).filter(Boolean))].sort();
+        
+        // Add Launchpad category to the filter chips
+        types.push('ผลงานเพลง (Launchpad)');
         _lf.types = types;
 
         // Ensure activeType is one of the available types; if not, pick first.
@@ -4299,9 +4522,11 @@ async function _lfLoadTypes() {
         const filterEl = document.getElementById('lf-filters');
         if (!filterEl) return;
         // No "ทั้งหมด" chip — feed must always show a single instrument type at a time.
-        filterEl.innerHTML = types.map(t =>
-            `<button class="lf-chip ${_lf.activeType === t ? 'active' : ''}" data-type="${escapeHtml(t)}">${escapeHtml(t)}</button>`
-        ).join('');
+        filterEl.innerHTML = types.map(t => {
+            const displayTitle = t === 'ผลงานเพลง (Launchpad)' ? '🎛️ ผลงานเพลง (Launchpad)' : escapeHtml(t);
+            return `<button class="lf-chip ${_lf.activeType === t ? 'active' : ''}" data-type="${escapeHtml(t)}">${displayTitle}</button>`;
+        }).join('');
+        
         filterEl.querySelectorAll('.lf-chip').forEach(btn => {
             btn.addEventListener('click', async () => {
                 _lf.activeType = btn.dataset.type || '';

@@ -1,0 +1,9 @@
+{
+  "buildCommand": "cd student-groups && npm install && npm run build && mv index.html _src.html",
+  "outputDirectory": ".",
+  "rewrites": [
+    { "source": "/student-groups/assets/(.*)", "destination": "/student-groups/dist/assets/$1" },
+    { "source": "/student-groups/favicon.svg", "destination": "/student-groups/dist/favicon.svg" },
+    { "source": "/student-groups(.*)", "destination": "/student-groups/dist/index.html" }
+  ]
+}

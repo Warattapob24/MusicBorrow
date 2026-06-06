@@ -1,0 +1,8 @@
+node_modules/
+student-groups/node_modules/
+.claude/
+.vercel/
+deploy.log
+deploy_output.txt
+styles.css.bak
+supabase/.temp/

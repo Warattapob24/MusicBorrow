@@ -129,13 +129,37 @@ export const bossesApi = {
         try {
             const { data, error } = await supabase
                 .from('boss_requests')
-                .select('*, users (first_name, last_name, prefix), bosses (title)')
+                .select('*, users (first_name, last_name, prefix), bosses (title, reward_xp, reward_stars)')
                 .eq('status', 'pending')
                 .order('id', { ascending: true });
             if (error) throw error;
             return { data: data || [], error: null };
         } catch (error) {
             return { data: [], error };
+        }
+    },
+    async reviewRequest(requestId, isApproved, studentId, rewardXp, rewardStars) {
+        try {
+            // 1. อัปเดตสถานะคำขอโดยตรง (RLS อนุญาต admin UPDATE)
+            const newStatus = isApproved ? 'passed' : 'failed';
+            const { error: upErr } = await supabase
+                .from('boss_requests')
+                .update({ status: newStatus })
+                .eq('id', requestId);
+            if (upErr) throw upErr;
+
+            // 2. ถ้าผ่าน: ให้รางวัล XP+Stars ผ่าน SECURITY DEFINER function
+            if (isApproved && studentId) {
+                const { error: rewErr } = await supabase.rpc('award_boss_video_reward', {
+                    p_student_id: studentId,
+                    p_xp:         rewardXp   ?? 0,
+                    p_stars:      rewardStars ?? 0
+                });
+                if (rewErr) throw rewErr;
+            }
+            return { error: null };
+        } catch (error) {
+            return { error };
         }
     },
 
@@ -434,30 +458,75 @@ export const raidApi = {
      * ดึงประวัติการสอบบอส (ผ่าน/ตก) ทั้งหมดของบอสตัวนั้น สำหรับแสดงใน admin
      */
     async getBossExamHistory(bossId) {
+        // รวมประวัติจาก 2 แหล่ง: offline exam (raid_participants) + video submission (boss_requests)
+        const [raidRes, videoRes] = await Promise.all([
+            supabase.from('raid_participants')
+                .select('result_status, joined_at, users(first_name, last_name), raid_lobbies!inner(boss_id, status)')
+                .eq('raid_lobbies.boss_id', bossId)
+                .eq('raid_lobbies.status', 'closed')
+                .in('result_status', ['passed', 'failed'])
+                .order('joined_at', { ascending: false })
+                .limit(50),
+            supabase.from('boss_requests')
+                .select('id, status, video_url, submitted_at, users(first_name, last_name)')
+                .eq('boss_id', bossId)
+                .in('status', ['passed', 'failed'])
+                .order('submitted_at', { ascending: false })
+                .limit(50)
+        ]);
+        const offline = (raidRes.data || []).map(r => ({
+            type: 'offline',
+            result_status: r.result_status,
+            date: r.joined_at,
+            name: r.users ? `${r.users.first_name || ''} ${r.users.last_name || ''}`.trim() : '—',
+            video_url: null
+        }));
+        const video = (videoRes.data || []).map(r => ({
+            type: 'video',
+            result_status: r.status,
+            date: r.submitted_at,
+            name: r.users ? `${r.users.first_name || ''} ${r.users.last_name || ''}`.trim() : '—',
+            video_url: r.video_url
+        }));
+        const merged = [...offline, ...video]
+            .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        return { data: merged, error: raidRes.error || videoRes.error };
+    },
+    /**
+     * ดึงคลิปที่นักเรียนส่งสำหรับบอสตัวนั้น (ทุกสถานะ: pending/passed/failed)
+     */
+    async getMyVideoSubmissions(userId, bossId) {
         const { data, error } = await supabase
-            .from('raid_participants')
-            .select('result_status, joined_at, users(first_name, last_name), raid_lobbies!inner(boss_id, status)')
-            .eq('raid_lobbies.boss_id', bossId)
-            .eq('raid_lobbies.status', 'closed')
-            .in('result_status', ['passed', 'failed'])
-            .order('joined_at', { ascending: false })
-            .limit(50);
+            .from('boss_requests')
+            .select('id, status, video_url, submitted_at')
+            .eq('student_id', userId)
+            .eq('boss_id', bossId)
+            .order('submitted_at', { ascending: false });
         return { data: data || [], error };
     },
     /**
-     * ดึงสถิติส่วนตัวของนักเรียนสำหรับบอสตัวนั้น (สอบกี่ครั้ง ผ่าน/ตก)
+     * ดึงสถิติส่วนตัวของนักเรียนสำหรับบอสตัวนั้น (รวมทั้ง offline + video)
      */
     async getMyBossStats(userId, bossId) {
-        const { data } = await supabase
-            .from('raid_participants')
-            .select('result_status, raid_lobbies!inner(boss_id)')
-            .eq('user_id', userId)
-            .eq('raid_lobbies.boss_id', bossId)
-            .in('result_status', ['passed', 'failed']);
-        if (!data) return { total: 0, passed: 0, failed: 0 };
-        const passed = data.filter(r => r.result_status === 'passed').length;
-        const failed = data.filter(r => r.result_status === 'failed').length;
-        return { total: data.length, passed, failed };
+        const [raidRes, videoRes] = await Promise.all([
+            supabase.from('raid_participants')
+                .select('result_status, raid_lobbies!inner(boss_id)')
+                .eq('user_id', userId)
+                .eq('raid_lobbies.boss_id', bossId)
+                .in('result_status', ['passed', 'failed']),
+            supabase.from('boss_requests')
+                .select('status')
+                .eq('student_id', userId)
+                .eq('boss_id', bossId)
+                .in('status', ['passed', 'failed'])
+        ]);
+        const raidPassed  = (raidRes.data  || []).filter(r => r.result_status === 'passed').length;
+        const raidFailed  = (raidRes.data  || []).filter(r => r.result_status === 'failed').length;
+        const videoPassed = (videoRes.data || []).filter(r => r.status === 'passed').length;
+        const videoFailed = (videoRes.data || []).filter(r => r.status === 'failed').length;
+        const passed = raidPassed + videoPassed;
+        const failed = raidFailed + videoFailed;
+        return { total: passed + failed, passed, failed };
     }
 };
 
@@ -1203,7 +1272,7 @@ export const adminDashboard = {
                     users!reported_by_user_id ( first_name, last_name )
                 `)
                 // เลือกเฉพาะรายการที่ยังซ่อมไม่เสร็จเพื่อแสดงในหน้า Overview
-                .in('repair_status', ['แจ้งซ่อม', 'กำลังซ่อม']) 
+                .in('repair_status', ['แจ้งซ่อม', 'รอซ่อม', 'กำลังซ่อม'])
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -1465,5 +1534,58 @@ export const realtimeApi = {
     },
     unsubscribe(channel) {
         if (channel) supabase.removeChannel(channel);
+    }
+};
+
+export const studentLoopsApi = {
+    async saveLoop(title, bpm, padSequence, googleDriveId) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('ไม่ได้เข้าสู่ระบบ');
+            const { data, error } = await supabase.from('student_loops').insert({
+                user_id: user.id,
+                title,
+                bpm,
+                pad_sequence: padSequence,
+                google_drive_id: googleDriveId
+            }).select().single();
+            if (error) throw error;
+            return { data, error: null };
+        } catch (error) {
+            return { data: null, error };
+        }
+    },
+    async getFeed(limit = 30) {
+        try {
+            const { data, error } = await supabase.from('student_loops')
+                .select('*, users(first_name, last_name, prefix)')
+                .order('created_at', { ascending: false })
+                .limit(limit);
+            if (error) throw error;
+            return { data: data || [], error: null };
+        } catch (error) {
+            return { data: [], error };
+        }
+    },
+    async getLoopById(loopId) {
+        try {
+            const { data, error } = await supabase.from('student_loops')
+                .select('*, users(first_name, last_name, prefix)')
+                .eq('id', loopId)
+                .single();
+            if (error) throw error;
+            return { data, error: null };
+        } catch (error) {
+            return { data: null, error };
+        }
+    },
+    async deleteLoop(loopId) {
+        try {
+            const { error } = await supabase.from('student_loops').delete().eq('id', loopId);
+            if (error) throw error;
+            return { error: null };
+        } catch (error) {
+            return { error };
+        }
     }
 };

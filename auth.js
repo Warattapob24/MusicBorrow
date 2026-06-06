@@ -211,7 +211,8 @@ export async function loginWithGoogle() {
             provider: 'google',
             options: {
                 // กำหนด redirectTo ให้กลับมาที่ URL ปัจจุบันเสมอ
-                redirectTo: window.location.origin + window.location.pathname
+                redirectTo: window.location.origin + window.location.pathname,
+                scopes: 'https://www.googleapis.com/auth/drive.file'
             }
         });
         if (error) throw error;

@@ -4,7 +4,7 @@
  * เรียกใช้ฟังก์ชันทั้งหมดผ่าน api.js แทน
  */
 
-import { adminDashboard as api, adminExt, authApi, bossesApi, raidApi, instrumentsExt, notifications, adminKnowledgeApi, scheduledNotificationsApi, adminNotifications, recoveryApi } from './api.js';
+import { adminDashboard as api, adminExt, authApi, bossesApi, raidApi, instrumentsExt, notifications, adminKnowledgeApi, scheduledNotificationsApi, adminNotifications, recoveryApi, studentLoopsApi } from './api.js';
 import { escapeHtml, translateGroup } from './utils.js';
 import { getCurrentUser } from './auth.js';
 
@@ -483,6 +483,7 @@ function buildShell() {
         <button class="oad-tab" data-tab="notifications">🔔 แจ้งเตือน</button>
         <button class="oad-tab" data-tab="bosses">🐉 ล่าบอส <span class="oad-tab-badge hidden" id="oad-boss-badge">0</span></button>
         <button class="oad-tab" data-tab="history">📜 ประวัติ</button>
+        <button class="oad-tab" data-tab="loops">🎛️ เพลง Launchpad</button>
     </div>
 
     <div class="oad-body">
@@ -787,6 +788,31 @@ function buildShell() {
                 <div id="oad-boss-lobby-area" style="margin-bottom: 1.5rem; display: none; background: var(--oad-surface2); padding: 1.5rem; border-radius: var(--oad-radius); border: 2px dashed var(--oad-accent);"></div>
 
                 <div class="oad-table-wrap" id="oad-boss-table-wrap"></div>
+            </div>
+        </div>
+
+        <div class="oad-tab-panel" id="oad-panel-loops">
+            <div class="oad-panel">
+                <div class="oad-panel-title">🎛️ รายการเพลง Launchpad ของนักเรียน</div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1.5rem;">
+                    ผู้ดูแลสามารถรับฟังและตรวจสอบเพลงลูปที่นักเรียนสร้างและแชร์ได้ผ่านหน้านี้ ไฟล์เสียงทั้งหมดจะถูกดึงมาจาก Google Drive ของนักเรียนโดยตรง
+                </p>
+                <div class="oad-table-wrap">
+                    <table class="oad-table">
+                        <thead>
+                            <tr>
+                                <th>ชื่อเพลง</th>
+                                <th>ผู้แต่ง</th>
+                                <th>BPM</th>
+                                <th>เครื่องมือเล่นเสียง</th>
+                                <th>การจัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="oad-loops-table-body">
+                            <tr><td colspan="5" style="text-align:center;">กำลังโหลดข้อมูล...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -4254,6 +4280,76 @@ function _formatThaiDate(iso) {
     return `${date} ${time}`;
 }
 
+async function renderLoopsTable() {
+    const tbody = document.getElementById('oad-loops-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">กำลังโหลดข้อมูล...</td></tr>`;
+    try {
+        const { data, error } = await studentLoopsApi.getFeed();
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--oad-muted);">ยังไม่มีใครอัปโหลดและแชร์เพลง</td></tr>`;
+            return;
+        }
+        
+        tbody.innerHTML = data.map((loop) => {
+            const userName = `${loop.users?.prefix || ''} ${loop.users?.first_name || 'ไม่ระบุ'} ${loop.users?.last_name || ''}`.trim();
+            const groupName = translateGroup(loop.users?.student_group);
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(loop.title || 'เพลงไม่มีชื่อ')}</strong></td>
+                    <td>${escapeHtml(userName)} <br><small style="color:var(--oad-muted);">${escapeHtml(groupName)}</small></td>
+                    <td>${loop.bpm}</td>
+                    <td>
+                        <audio controls src="https://docs.google.com/uc?export=download&id=${loop.google_drive_id}" style="height: 35px; width: 220px;"></audio>
+                    </td>
+                    <td>
+                        <button class="oad-btn oad-btn-red" style="padding: 0.25rem 0.6rem; font-size: 0.8rem;" onclick="window.__oadDeleteStudentLoop(${loop.id})">
+                            🗑️ ลบเพลง
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--pico-del-color);">โหลดไม่สำเร็จ: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+window.__oadDeleteStudentLoop = async (loopId) => {
+    const confirm = await Swal.fire({
+        title: 'ยืนยันการลบเพลง?',
+        text: 'คุณต้องการลบเพลงนี้ของนักเรียนออกจากระบบหรือไม่? (ไฟล์ใน Google Drive ของนักเรียนจะไม่ถูกลบ แต่ลิงก์ที่แชร์บนระบบจะถูกลบออก)',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'ลบเลย',
+        cancelButtonText: 'ยกเลิก'
+    });
+    
+    if (confirm.isConfirmed) {
+        try {
+            const { error } = await studentLoopsApi.deleteLoop(loopId);
+            if (error) throw error;
+            
+            Swal.fire({
+                title: 'ลบสำเร็จ!',
+                text: 'ลบเพลงลูปของนักเรียนเรียบร้อยแล้ว',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            });
+            
+            // Reload loops table
+            renderLoopsTable();
+        } catch (e) {
+            Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถลบเพลงได้: ' + e.message, 'error');
+        }
+    }
+};
+
 async function renderScheduledNotifications() {
     const wrap = document.getElementById('oad-sched-notif-wrap');
     if (!wrap) return;
@@ -5129,6 +5225,7 @@ function renderActiveTab() {
         case 'knowledge':    renderKnowledgeTable(); break;
         case 'notifications': renderScheduledNotifications(); break;
         case 'bosses':       renderBossesTable(); break;
+        case 'loops':        renderLoopsTable(); break;
     }
 }
 
