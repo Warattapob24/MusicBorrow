@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Music Creator - DJ Launchpad Looper</title>
+    <title>Beat Maker Pro & Step Sequencer</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SweetAlert2 -->
@@ -16,12 +16,16 @@
         
         body {
             font-family: 'Kanit', sans-serif;
-            background: radial-gradient(circle at center, #1e1b4b 0%, #09090b 100%);
+            background: radial-gradient(circle at center, #11102b 0%, #030308 100%);
             -webkit-tap-highlight-color: transparent;
         }
         
         .font-orbitron {
             font-family: 'Orbitron', sans-serif;
+        }
+
+        .grid-cols-16 {
+            grid-template-columns: repeat(16, minmax(0, 1fr));
         }
         
         /* Neon Glow Utility */
@@ -29,140 +33,104 @@
             box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
             border: 1px solid rgba(6, 182, 212, 0.8);
         }
+
+        .neon-glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
+        .neon-glow-orange { box-shadow: 0 0 20px rgba(249, 115, 22, 0.6); }
+        .neon-glow-cyan { box-shadow: 0 0 20px rgba(6, 182, 212, 0.6); }
+        .neon-glow-sky { box-shadow: 0 0 20px rgba(14, 165, 233, 0.6); }
+        .neon-glow-pink { box-shadow: 0 0 20px rgba(236, 72, 153, 0.6); }
+        .neon-glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+        .neon-glow-purple { box-shadow: 0 0 20px rgba(168, 85, 247, 0.6); }
+        .neon-glow-emerald { box-shadow: 0 0 20px rgba(16, 185, 129, 0.6); }
         
-        /* Launchpad Pad styling */
-        .pad {
-            aspect-ratio: 1;
-            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        /* MPC Pad custom hover/active effects */
+        .mpc-pad {
+            aspect-ratio: 1.2 / 1;
+            transition: all 0.08s ease-out;
             position: relative;
             overflow: hidden;
+            border-width: 2px;
         }
         
-        .pad::before {
-            content: '';
-            position: absolute;
-            inset: 2px;
-            border-radius: inherit;
-            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.01) 100%);
-            z-index: 1;
-        }
-
-        /* Pad colors and glow classes */
-        .pad-drum {
-            border: 2px solid #ef4444;
-            background-color: rgba(239, 68, 68, 0.05);
-            color: #ef4444;
-        }
-        .pad-drum.active {
-            background-color: #ef4444;
-            color: #ffffff;
-            box-shadow: 0 0 25px #ef4444, inset 0 0 10px rgba(255,255,255,0.5);
-        }
-        .pad-drum.playing-tick {
-            transform: scale(0.97);
+        .mpc-pad:active, .mpc-pad.active {
+            transform: scale(0.95);
             filter: brightness(1.3);
-        }
-
-        .pad-bass {
-            border: 2px solid #3b82f6;
-            background-color: rgba(59, 130, 246, 0.05);
-            color: #3b82f6;
-        }
-        .pad-bass.active {
-            background-color: #3b82f6;
-            color: #ffffff;
-            box-shadow: 0 0 25px #3b82f6, inset 0 0 10px rgba(255,255,255,0.5);
-        }
-        .pad-bass.playing-tick {
-            transform: scale(0.97);
-            filter: brightness(1.3);
-        }
-
-        .pad-synth {
-            border: 2px solid #a855f7;
-            background-color: rgba(168, 85, 247, 0.05);
-            color: #a855f7;
-        }
-        .pad-synth.active {
-            background-color: #a855f7;
-            color: #ffffff;
-            box-shadow: 0 0 25px #a855f7, inset 0 0 10px rgba(255,255,255,0.5);
-        }
-        .pad-synth.playing-tick {
-            transform: scale(0.97);
-            filter: brightness(1.3);
-        }
-
-        .pad-mic {
-            border: 2px solid #10b981;
-            background-color: rgba(16, 185, 129, 0.05);
-            color: #10b981;
-        }
-        .pad-mic.active {
-            background-color: #10b981;
-            color: #ffffff;
-            box-shadow: 0 0 25px #10b981, inset 0 0 10px rgba(255,255,255,0.5);
-        }
-        .pad-mic.recording {
-            animation: pulse-red 1s infinite alternate;
-            border-color: #ef4444;
-            color: #ef4444;
-        }
-        .pad-mic.playing-tick {
-            transform: scale(0.97);
-            filter: brightness(1.3);
-        }
-
-        @keyframes pulse-red {
-            from { box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); background-color: rgba(239, 68, 68, 0.1); }
-            to { box-shadow: 0 0 30px rgba(239, 68, 68, 0.9); background-color: rgba(239, 68, 68, 0.4); }
         }
 
         /* Glassmorphism containers */
         .glass-panel {
-            background: rgba(15, 23, 42, 0.45);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(10, 15, 30, 0.65);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
-        /* Progress ring custom animation */
-        .circle-progress {
-            transform: rotate(-90deg);
-            transform-origin: 50% 50%;
-            transition: stroke-dashoffset 0.1s linear;
+        /* Custom Scrollbar for horizontal sequencer scroll */
+        .sequencer-container::-webkit-scrollbar {
+            height: 6px;
+        }
+        .sequencer-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 99px;
+        }
+        .sequencer-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 99px;
+        }
+        .sequencer-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
 
-        /* Responsive height fix */
-        .app-height {
-            min-height: 100vh;
-            min-height: -webkit-fill-available;
+        /* Beat pulse visual animation */
+        @keyframes pulse-red {
+            from { box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); background-color: rgba(239, 68, 68, 0.15); }
+            to { box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); background-color: rgba(239, 68, 68, 0.45); }
+        }
+        .recording-pulse {
+            animation: pulse-red 0.8s infinite alternate;
+            border-color: #ef4444 !important;
         }
     </style>
 </head>
-<body class="text-slate-100 flex items-center justify-center p-2 sm:p-4 app-height overflow-x-hidden select-none">
+<body class="text-slate-100 flex items-center justify-center p-2 sm:p-4 min-h-screen overflow-x-hidden select-none">
 
-    <div class="w-full max-w-4xl glass-panel rounded-3xl p-4 sm:p-6 shadow-2xl relative flex flex-col justify-between overflow-hidden">
+    <div class="w-full max-w-5xl glass-panel rounded-3xl p-4 sm:p-6 shadow-2xl relative flex flex-col justify-between overflow-hidden">
         
         <!-- Header -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-700/50 pb-4 mb-4 sm:mb-6">
-            <div class="flex items-center space-x-3">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-700/50 pb-4 mb-5">
+            <div class="flex items-center space-x-3 w-full md:w-auto">
                 <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
-                    <i class="fa-solid fa-compact-disc text-xl animate-spin" style="animation-duration: 4s;"></i>
+                    <i class="fa-solid fa-square-poll-vertical text-xl animate-pulse"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl sm:text-2xl font-bold tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">DJ Studio Looper</h1>
-                    <p class="text-xs text-slate-400">แต่งบีท ครีเอททำนอง และอัดเสียงตัวเองเป็นลูปอย่างง่าย</p>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Beat Maker Pro - DJ Studio</h1>
+                    <p class="text-xs text-slate-400">ออกแบบลูปกลอง เปอร์คัสชัน และบีทดนตรีสร้างสรรค์ด้วยตัวเอง</p>
                 </div>
             </div>
             
-            <!-- Global Tempo & Play Controls -->
-            <div class="flex items-center gap-3">
+            <!-- Global Tempo, Play, REC and Kit Selection Controls -->
+            <div class="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
+                <!-- Sound Kit Selector -->
+                <div class="flex items-center bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 text-xs">
+                    <span class="text-slate-400 mr-2 font-semibold"><i class="fa-solid fa-sliders"></i> KIT:</span>
+                    <select id="kit-select" class="bg-transparent text-cyan-400 font-bold focus:outline-none cursor-pointer">
+                        <option value="808" class="bg-slate-900 text-cyan-400">808 Hip-Hop / Trap</option>
+                        <option value="rock" class="bg-slate-900 text-cyan-400">Acoustic Drum Kit</option>
+                        <option value="latin" class="bg-slate-900 text-cyan-400">Latin Percussion</option>
+                    </select>
+                </div>
+
                 <!-- Tempo BPM Control -->
                 <div class="flex items-center bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
-                    <span class="text-xs text-slate-400 mr-2 uppercase tracking-widest font-semibold">BPM</span>
+                    <span class="text-[10px] text-slate-400 mr-2 uppercase tracking-widest font-semibold">BPM</span>
                     <input id="bpm-number" type="number" min="60" max="180" value="120" class="bg-transparent font-orbitron font-bold text-cyan-400 text-lg w-12 text-center focus:outline-none">
                     <input id="bpm-slider" type="range" min="60" max="180" value="120" class="w-16 sm:w-20 ml-2 accent-cyan-500 cursor-pointer">
                 </div>
+
+                <!-- Live Record (REC) Toggle Button -->
+                <button id="rec-live-btn" class="px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-red-500 flex items-center gap-1.5 transition-all text-sm font-semibold active:scale-95 shadow">
+                    <i class="fa-solid fa-circle text-xs animate-ping duration-1000"></i>
+                    <span>อัดเคาะสด (REC)</span>
+                </button>
 
                 <!-- Play/Stop button -->
                 <button id="play-btn" class="w-12 h-12 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white flex items-center justify-center text-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95">
@@ -171,142 +139,124 @@
             </div>
         </div>
 
-        <!-- Main workspace: Looper Grid & Control Deck -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            
-            <!-- Left & Middle: The 4x4 Launchpad -->
-            <div class="lg:col-span-2 flex flex-col justify-center">
-                
-                <!-- Beat sweep progress bar -->
-                <div class="w-full bg-slate-800/80 h-3 rounded-full mb-3 p-[2px] border border-slate-700/50 flex relative overflow-hidden">
-                    <div id="sweep-bar" class="h-full bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full transition-all duration-75" style="width: 0%;"></div>
-                    <!-- 4 Beat indicators -->
-                    <div class="absolute inset-0 flex justify-between px-2 text-[8px] font-orbitron text-slate-500 pointer-events-none items-center">
-                        <span>BEAT 1</span><span>BEAT 2</span><span>BEAT 3</span><span>BEAT 4</span>
-                    </div>
-                </div>
-                
-                <!-- The 4x4 Pad Grid -->
-                <div class="grid grid-cols-4 gap-2 sm:gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
-                    <!-- Row 1: Drums (Red) -->
-                    <button class="pad pad-drum rounded-xl flex flex-col items-center justify-center p-2" data-row="0" data-col="0">
-                        <i class="fa-solid fa-drum text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Simple Rock</span>
-                    </button>
-                    <button class="pad pad-drum rounded-xl flex flex-col items-center justify-center p-2" data-row="0" data-col="1">
-                        <i class="fa-solid fa-fire text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Hip Hop</span>
-                    </button>
-                    <button class="pad pad-drum rounded-xl flex flex-col items-center justify-center p-2" data-row="0" data-col="2">
-                        <i class="fa-solid fa-bolt text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">House Beat</span>
-                    </button>
-                    <button class="pad pad-drum rounded-xl flex flex-col items-center justify-center p-2" data-row="0" data-col="3">
-                        <i class="fa-solid fa-guitar text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Trap Roll</span>
-                    </button>
+        <!-- MPC Drum Pads Area (8 tactile buttons in 4x2 grid) -->
+        <div class="mb-5">
+            <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-cubes text-cyan-400"></i> แป้นกดเสียงกลองสด (MPC Drum Pads)
+            </h2>
+            <div class="grid grid-cols-4 md:grid-cols-8 gap-2 bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80">
+                <!-- Pad 0: Kick -->
+                <button class="mpc-pad rounded-xl flex flex-col items-center justify-between p-2 border-red-500/40 bg-red-500/5 text-red-400 hover:bg-red-500/20" data-index="0">
+                    <span class="text-[9px] font-bold text-red-500/60 self-start">[ 1 ]</span>
+                    <i class="fa-solid fa-bullseye text-xl md:text-2xl my-1"></i>
+                    <span class="text-[10px] font-semibold tracking-wider">KICK</span>
+                </button>
+                <!-- Pad 1: Snare -->
+                <button class="mpc-pad rounded-xl flex flex-col items-center justify-between p-2 border-orange-500/40 bg-orange-500/5 text-orange-400 hover:bg-orange-500/20" data-index="1">
+                    <span class="text-[9px] font-bold text-orange-500/60 self-start">[ 2 ]</span>
+                    <i class="fa-solid fa-bolt text-xl md:text-2xl my-1"></i>
+                    <span class="text-[10px] font-semibold tracking-wider">SNARE</span>
+                </button>
+                <!-- Pad 2: Closed Hat -->
+                <button class="mpc-pad rounded-xl flex flex-col items-center justify-between p-2 border-cyan-500/40 bg-cyan-500/5 text-cyan-400 hover:bg-cyan-500/20" data-index="2">
+                    <span class="text-[9px] font-bold text-cyan-500/60 self-start">[ 3 ]</span>
+                    <i class="fa-solid fa-circle-notch text-xl md:text-2xl my-1"></i>
+                    <span class="text-[10px] font-semibold tracking-wider">CL HAT</span>
+                </button>
+                <!-- Pad 3: Open Hat -->
+                <button class="mpc-pad rounded-xl flex flex-col items-center justify-between p-2 border-sky-500/40 bg-sky-500/5 text-sky-400 hover:bg-sky-500/20" data-index="3">
+                    <span class="text-[9px] font-bold text-sky-500/60 self-start">[ 4 ]</span>
+                    <i class="fa-solid fa-circle-dot text-xl md:text-2xl my-1"></i>
+                    <span class="text-[10px] font-semibold tracking-wider">OP HAT</span>
+                </button>
+                <!-- Pad 4: Clap / Perc -->
+                <button class="mpc-pad rounded-xl flex flex-col items-center justify-between p-2 border-pink-500/40 bg-pink-500/5 text-pink-400 hover:bg-pink-500/20" data-index="4">
+                    <span class="text-[9px] font-bold text-pink-500/60 self-start">[ Q ]</span>
+                    <i class="fa-solid fa-hands-clapping text-xl md:text-2xl my-1"></i>
+                    <span class="text-[10px] font-semibold tracking-wider">CLAP/PERC</span>
+                </button>
+                <!-- Pad 5: Bass Synth -->
+                <button class="mpc-pad rounded-xl flex flex-col items-center justify-between p-2 border-blue-500/40 bg-blue-500/5 text-blue-400 hover:bg-blue-500/20" data-index="5">
+                    <span class="text-[9px] font-bold text-blue-500/60 self-start">[ W ]</span>
+                    <i class="fa-solid fa-wave-square text-xl md:text-2xl my-1"></i>
+                    <span class="text-[10px] font-semibold tracking-wider">BASS SYNTH</span>
+                </button>
+                <!-- Pad 6: Lead Synth -->
+                <button class="mpc-pad rounded-xl flex flex-col items-center justify-between p-2 border-purple-500/40 bg-purple-500/5 text-purple-400 hover:bg-purple-500/20" data-index="6">
+                    <span class="text-[9px] font-bold text-purple-500/60 self-start">[ E ]</span>
+                    <i class="fa-solid fa-guitar text-xl md:text-2xl my-1"></i>
+                    <span class="text-[10px] font-semibold tracking-wider">LEAD SYNTH</span>
+                </button>
+                <!-- Pad 7: Mic Sample -->
+                <button class="mpc-pad rounded-xl flex flex-col items-center justify-between p-2 border-emerald-500/40 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/20 opacity-40" data-index="7" id="mic-mpc-pad">
+                    <span class="text-[9px] font-bold text-emerald-500/60 self-start">[ R ]</span>
+                    <i class="fa-solid fa-microphone text-xl md:text-2xl my-1"></i>
+                    <span class="text-[10px] font-semibold tracking-wider" id="mic-pad-label">ไมค์แร่ด (ว่าง)</span>
+                </button>
+            </div>
+        </div>
 
-                    <!-- Row 2: Bass (Blue) -->
-                    <button class="pad pad-bass rounded-xl flex flex-col items-center justify-center p-2" data-row="1" data-col="0">
-                        <i class="fa-solid fa-wave-square text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Chill Bass</span>
-                    </button>
-                    <button class="pad pad-bass rounded-xl flex flex-col items-center justify-center p-2" data-row="1" data-col="1">
-                        <i class="fa-solid fa-arrows-spin text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Arp Bass</span>
-                    </button>
-                    <button class="pad pad-bass rounded-xl flex flex-col items-center justify-center p-2" data-row="1" data-col="2">
-                        <i class="fa-solid fa-water text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Dub Wobble</span>
-                    </button>
-                    <button class="pad pad-bass rounded-xl flex flex-col items-center justify-center p-2" data-row="1" data-col="3">
-                        <i class="fa-solid fa-record-vinyl text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Bouncy Slap</span>
-                    </button>
-
-                    <!-- Row 3: Synths (Purple) -->
-                    <button class="pad pad-synth rounded-xl flex flex-col items-center justify-center p-2" data-row="2" data-col="0">
-                        <i class="fa-solid fa-music text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Lofi Chords</span>
-                    </button>
-                    <button class="pad pad-synth rounded-xl flex flex-col items-center justify-center p-2" data-row="2" data-col="1">
-                        <i class="fa-solid fa-star text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Retro Lead</span>
-                    </button>
-                    <button class="pad pad-synth rounded-xl flex flex-col items-center justify-center p-2" data-row="2" data-col="2">
-                        <i class="fa-solid fa-snowflake text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Dream Pluck</span>
-                    </button>
-                    <button class="pad pad-synth rounded-xl flex flex-col items-center justify-center p-2" data-row="2" data-col="3">
-                        <i class="fa-solid fa-cloud text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">Ambient Pad</span>
-                    </button>
-
-                    <!-- Row 4: Mic / Custom Loops (Green) -->
-                    <button class="pad pad-mic rounded-xl flex flex-col items-center justify-center p-2" data-row="3" data-col="0">
-                        <i class="fa-solid fa-microphone-lines text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">อัดไมค์ 1</span>
-                    </button>
-                    <button class="pad pad-mic rounded-xl flex flex-col items-center justify-center p-2" data-row="3" data-col="1">
-                        <i class="fa-solid fa-microphone-lines text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">อัดไมค์ 2</span>
-                    </button>
-                    <button class="pad pad-mic rounded-xl flex flex-col items-center justify-center p-2" data-row="3" data-col="2">
-                        <i class="fa-solid fa-microphone-lines text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">อัดไมค์ 3</span>
-                    </button>
-                    <button class="pad pad-mic rounded-xl flex flex-col items-center justify-center p-2" data-row="3" data-col="3">
-                        <i class="fa-solid fa-microphone-lines text-lg sm:text-xl mb-1"></i>
-                        <span class="text-[9px] font-semibold uppercase tracking-wider">อัดไมค์ 4</span>
-                    </button>
-                </div>
+        <!-- Step Sequencer (8 tracks x 16 steps grid) -->
+        <div class="mb-5 flex flex-col">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-list-check text-cyan-400"></i> ตารางจัดจังหวะกลอง (Step Sequencer 16 ช่อง)
+                </h2>
+                <span class="text-[10px] text-slate-500 bg-slate-900/60 px-2 py-0.5 rounded border border-slate-800"><i class="fa-solid fa-mobile-screen-button"></i> บนมือถือปัดซ้าย-ขวาเพื่อเลื่อนดูตาราง</span>
             </div>
             
-            <!-- Right: Control Deck (AI, Rec, Share) -->
-            <div class="flex flex-col gap-4">
-                <!-- Circular Beat Progress and Status -->
-                <div class="glass-panel rounded-2xl p-4 flex flex-col items-center justify-center flex-1 border border-slate-800">
-                    <div class="relative w-32 h-32 flex items-center justify-center">
-                        <svg class="w-full h-full" viewBox="0 0 100 100">
-                            <!-- Background Circle -->
-                            <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" stroke-width="8" fill="transparent" />
-                            <!-- Active Beat Circle -->
-                            <circle id="radial-progress" class="circle-progress" cx="50" cy="50" r="40" stroke="#06b6d4" stroke-width="8" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="251.2" />
-                        </svg>
-                        <div class="absolute flex flex-col items-center justify-center">
-                            <span class="text-xs uppercase tracking-widest text-slate-400 font-semibold">BEAT</span>
-                            <span id="current-beat-label" class="text-4xl font-orbitron font-extrabold text-cyan-400">1</span>
-                        </div>
-                    </div>
-                    
-                    <div class="text-center mt-3">
-                        <p id="rec-status-text" class="text-xs text-slate-400">กด Play เพื่อเริ่มต้นทำงาน</p>
-                    </div>
+            <div class="w-full overflow-x-auto sequencer-container bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80">
+                <!-- The grid container -->
+                <div class="min-w-[680px] flex flex-col gap-2" id="sequencer-grid">
+                    <!-- Javascript generates rows here -->
                 </div>
+            </div>
+        </div>
 
-                <!-- Action Deck (AI Helper + Save/Upload) -->
-                <div class="flex flex-col gap-2">
-                    <!-- AI Assistant -->
-                    <button id="ai-btn" class="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20 active:scale-98 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-brain"></i>
-                        <span>AI ช่วยสุ่มจังหวะและคอร์ด</span>
+        <!-- Tools / AI Help / Voice Recorder Deck -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+            <!-- Left: Mic Voice sampler recorder -->
+            <div class="glass-panel rounded-2xl p-4 border border-slate-800 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold mb-1 flex items-center gap-1.5 text-emerald-400">
+                        <i class="fa-solid fa-microphone-lines"></i> แซมเปิลไมโครโฟน
+                    </h3>
+                    <p class="text-[11px] text-slate-400 leading-normal">
+                        อัดเสียงของคุณเอง (1.5 วินาที) แล้วนำมาเคาะสดหรือจัดสเต็ปบนแถว "ไมโครโฟน" (แถวล่างสุด)
+                    </p>
+                </div>
+                <button id="record-mic-btn" class="mt-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-microphone"></i>
+                    <span id="mic-btn-text">เริ่มอัดเสียงพูด/เสียงร้อง</span>
+                </button>
+            </div>
+
+            <!-- Middle & Right: AI Rhythmic Presets and Editor Commands -->
+            <div class="lg:col-span-2 glass-panel rounded-2xl p-4 border border-slate-800">
+                <h3 class="text-sm font-semibold mb-2 flex items-center gap-1.5 text-purple-400">
+                    <i class="fa-solid fa-brain"></i> AI ช่วยคีย์เขียนจังหวะและทำนอง (Rhythm Creator AI)
+                </h3>
+                <p class="text-[11px] text-slate-400 mb-3 leading-normal">
+                    คลิกแนวเพลงด้านล่างเพื่อให้ AI ร่างโครงสร้างจังหวะลงตารางซีเควนเซอร์อัตโนมัติ สำหรับเป็นจุดเริ่มต้นศึกษาและสร้างบีท
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button class="ai-preset-btn px-3 py-2 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-500/40 hover:border-purple-400 text-purple-300 font-semibold rounded-xl text-xs transition-all flex items-center gap-1" data-preset="trap">
+                        <i class="fa-solid fa-fire text-[10px]"></i> Trap Roll 808
                     </button>
-                    
-                    <!-- Mic recording buttons / instructions -->
-                    <div class="glass-panel rounded-xl p-3 text-center border border-slate-800 text-xs">
-                        <div class="text-slate-400 font-semibold mb-1"><i class="fa-solid fa-circle-question text-cyan-400 mr-1"></i>วิธีการอัดเสียงปุ่มของตัวเอง:</div>
-                        <p class="text-[11px] text-slate-500 leading-relaxed">
-                            คลิกเลือกช่องแถวล่างสุด (อัดไมค์) จากนั้นกดปุ่ม "เริ่มอัดเสียง" และเล่นเครื่องดนตรี ระบบจะอัดเสียงให้ตรงบีทโดยอัตโนมัติ!
-                        </p>
-                        <button id="record-mic-trigger-btn" class="mt-2 w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1">
-                            <i class="fa-solid fa-microphone"></i>
-                            <span id="mic-btn-text">เริ่มบันทึกเสียงใส่ปุ่มที่เลือก</span>
-                        </button>
-                    </div>
-
-                    <!-- Reset Board Button -->
-                    <button id="clear-btn" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition-colors border border-slate-700/60 active:scale-98">
-                        <i class="fa-solid fa-trash-can mr-1"></i>เคลียร์ปุ่มทั้งหมด
+                    <button class="ai-preset-btn px-3 py-2 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-500/40 hover:border-purple-400 text-purple-300 font-semibold rounded-xl text-xs transition-all flex items-center gap-1" data-preset="lofi">
+                        <i class="fa-solid fa-mug-saucer text-[10px]"></i> Lofi Chill
+                    </button>
+                    <button class="ai-preset-btn px-3 py-2 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-500/40 hover:border-purple-400 text-purple-300 font-semibold rounded-xl text-xs transition-all flex items-center gap-1" data-preset="house">
+                        <i class="fa-solid fa-bolt text-[10px]"></i> House Beat
+                    </button>
+                    <button class="ai-preset-btn px-3 py-2 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-500/40 hover:border-purple-400 text-purple-300 font-semibold rounded-xl text-xs transition-all flex items-center gap-1" data-preset="latin">
+                        <i class="fa-solid fa-drum text-[10px]"></i> Latin Shaker
+                    </button>
+                    <button class="ai-preset-btn px-3 py-2 bg-purple-900/30 hover:bg-purple-900/60 border border-slate-700/60 text-purple-400 font-semibold rounded-xl text-xs transition-all flex items-center gap-1" data-preset="random">
+                        <i class="fa-solid fa-dice text-[10px]"></i> สุ่มจังหวะมั่วๆ (Chaos)
+                    </button>
+                    <button id="clear-btn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors ml-auto">
+                        <i class="fa-solid fa-trash-can mr-1 text-slate-400"></i>ล้างตารางทั้งหมด
                     </button>
                 </div>
             </div>
@@ -314,21 +264,21 @@
 
         <!-- Share Desk -->
         <div class="glass-panel rounded-2xl p-4 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-3 w-full sm:w-auto">
                 <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                     <i class="fa-solid fa-cloud-arrow-up"></i>
                 </div>
                 <div>
-                    <h3 class="text-sm font-semibold">ส่งออกและแชร์ผลงานเพลง</h3>
-                    <p class="text-xs text-slate-400 leading-normal">
-                        อัปโหลดผลงานเสียงตรงเข้า Google Drive ของคุณอัตโนมัติ พร้อมแชร์หน้าฟีดของแอป
+                    <h3 class="text-sm font-semibold">ส่งออกและแชร์ผลงานบีทเพลง</h3>
+                    <p class="text-[11px] text-slate-400 leading-normal">
+                        อัปโหลดผลงานบีทดนตรีมิกซ์ตรงเข้า Google Drive ของคุณ พร้อมแชร์หน้าฟีด Learning Feed
                     </p>
                 </div>
             </div>
             
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <input id="song-title" type="text" placeholder="ตั้งชื่อผลงานเพลงของคุณ..." class="flex-1 sm:w-60 bg-slate-900 border border-slate-700 focus:border-cyan-500 focus:outline-none px-3 py-2 rounded-xl text-sm placeholder-slate-500">
-                <button id="share-btn" class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-sm px-4 py-2 rounded-xl transition-all flex items-center gap-1 shadow-lg shadow-emerald-600/20">
+                <button id="share-btn" class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 whitespace-nowrap">
                     <i class="fa-solid fa-share-nodes"></i>
                     <span>แชร์เพลง</span>
                 </button>
@@ -336,9 +286,9 @@
         </div>
         
         <!-- Footer / Home navigation -->
-        <div class="flex items-center justify-between mt-6 pt-3 border-t border-slate-700/30 text-xs text-slate-500">
+        <div class="flex items-center justify-between mt-5 pt-3 border-t border-slate-700/30 text-xs text-slate-500">
             <div>ผู้ใช้งาน: <span id="user-display-name" class="text-slate-400 font-semibold font-orbitron">GUEST</span></div>
-            <button id="back-home-btn" class="hover:text-cyan-400 transition-colors flex items-center gap-1 py-1 px-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700/30">
+            <button id="back-home-btn" class="hover:text-cyan-400 transition-colors flex items-center gap-1 py-1.5 px-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700/30">
                 <i class="fa-solid fa-house"></i> กลับหน้าหลักแอป
             </button>
         </div>
@@ -348,26 +298,40 @@
     <script type="module">
         import { studentLoopsApi } from './api.js';
 
+        // Instrument details (8 Tracks)
+        const instruments = [
+            { name: "Kick (กระเดื่อง)", icon: "fa-bullseye", color: "red", colorClass: "bg-red-500 shadow-[0_0_8px_#ef4444] border-red-400" },
+            { name: "Snare (กลองแต็ก)", icon: "fa-bolt", color: "orange", colorClass: "bg-orange-500 shadow-[0_0_8px_#f97316] border-orange-400" },
+            { name: "Cl. Hat (ไฮแฮทปิด)", icon: "fa-circle-notch", color: "cyan", colorClass: "bg-cyan-500 shadow-[0_0_8px_#06b6d4] border-cyan-400" },
+            { name: "Op. Hat (ไฮแฮทเปิด)", icon: "fa-circle-dot", color: "sky", colorClass: "bg-sky-500 shadow-[0_0_8px_#0ea5e9] border-sky-400" },
+            { name: "Perc/Clap (เคาะสด)", icon: "fa-hands-clapping", color: "pink", colorClass: "bg-pink-500 shadow-[0_0_8px_#ec4899] border-pink-400" },
+            { name: "Bass Synth (คอร์ดเบส)", icon: "fa-wave-square", color: "blue", colorClass: "bg-blue-500 shadow-[0_0_8px_#3b82f6] border-blue-400" },
+            { name: "Lead Synth (ทำนอง)", icon: "fa-guitar", color: "purple", colorClass: "bg-purple-500 shadow-[0_0_8px_#a855f7] border-purple-400" },
+            { name: "Voice (ไมโครโฟน)", icon: "fa-microphone", color: "emerald", colorClass: "bg-emerald-500 shadow-[0_0_8px_#10b981] border-emerald-400" }
+        ];
+
         // State management
         const state = {
             isPlaying: false,
             bpm: 120,
             currentBeat: 0,
-            activePads: Array(4).fill(null).map(() => Array(4).fill(false)),
+            grid: Array(8).fill(null).map(() => Array(16).fill(false)),
+            mutes: Array(8).fill(false),
             user: null,
             googleAccessToken: null,
-            micRecordedBuffers: Array(4).fill(null), // Holds AudioBuffers for the mic channels
-            selectedMicPadIndex: null, // Tracks which pad (0-3 in row 3) is selected for mic recording
+            micSampleBuffer: null,
             isRecordingMic: false,
             audioContext: null,
-            sounds: {}, // Pre-synthesized/loaded sound templates
+            masterGain: null,
             timerId: null,
             nextNoteTime: 0.0,
             scheduleAheadTime: 0.1, // How far ahead to schedule audio (sec)
             lookahead: 25.0, // How frequently to call scheduling function (ms)
-            beatsInBar: 16, // 16 steps total for looper grid
-            
-            // Master recording state fields
+            beatsInBar: 16,
+            currentKit: '808', // '808', 'rock', 'latin'
+            isRecordingLive: false, // quantized real-time record state
+
+            // Master recording variables
             recordMasterOnNextBeatZero: false,
             isRecordingMaster: false,
             masterRecorder: null,
@@ -383,7 +347,6 @@
                 document.getElementById('user-display-name').textContent = 
                     ((state.user.prefix || '') + ' ' + (state.user.first_name || 'STUDENT')).trim().toUpperCase();
             }
-            // Fetch cached Google Access Token if stored
             state.googleAccessToken = localStorage.getItem('google_provider_token');
         } catch(e) {
             console.warn("Auth parse failed, running in guest mode.", e);
@@ -394,145 +357,485 @@
         const playIcon = document.getElementById('play-icon');
         const bpmSlider = document.getElementById('bpm-slider');
         const bpmNumber = document.getElementById('bpm-number');
-        const sweepBar = document.getElementById('sweep-bar');
-        const radialProgress = document.getElementById('radial-progress');
-        const beatLabel = document.getElementById('current-beat-label');
-        const statusText = document.getElementById('rec-status-text');
-        const aiBtn = document.getElementById('ai-btn');
+        const recLiveBtn = document.getElementById('rec-live-btn');
+        const kitSelect = document.getElementById('kit-select');
+        const mpcPads = document.querySelectorAll('.mpc-pad');
+        const recordMicBtn = document.getElementById('record-mic-btn');
+        const micBtnText = document.getElementById('mic-btn-text');
         const clearBtn = document.getElementById('clear-btn');
+        const aiPresetBtns = document.querySelectorAll('.ai-preset-btn');
         const shareBtn = document.getElementById('share-btn');
         const songTitleInput = document.getElementById('song-title');
-        const recordMicTriggerBtn = document.getElementById('record-mic-trigger-btn');
-        const micBtnText = document.getElementById('mic-btn-text');
         const backHomeBtn = document.getElementById('back-home-btn');
-        
-        const padElements = document.querySelectorAll('.pad');
+        const sequencerGridEl = document.getElementById('sequencer-grid');
 
         // Init Web Audio API
         function initAudio() {
             if (!state.audioContext) {
                 state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                // Create master gain node
                 state.masterGain = state.audioContext.createGain();
-                state.masterGain.gain.setValueAtTime(0.8, state.audioContext.currentTime); // Prevent clipping
+                state.masterGain.gain.setValueAtTime(0.7, state.audioContext.currentTime); // Prevent clipping
                 state.masterGain.connect(state.audioContext.destination);
-                
-                buildSynthSounds();
             }
             if (state.audioContext.state === 'suspended') {
                 state.audioContext.resume();
             }
         }
 
-        // Web Audio Synthesized Drum/Lead sound templates
-        function buildSynthSounds() {
-            // Kick Synthesizer
-            state.sounds.kick = (time) => {
-                const osc = state.audioContext.createOscillator();
-                const gain = state.audioContext.createGain();
-                osc.connect(gain);
-                gain.connect(state.masterGain);
+        // Play specific instrument synthesized sound
+        function playInstrumentSound(trackIndex, time) {
+            if (state.mutes[trackIndex]) return;
 
-                osc.frequency.setValueAtTime(120, time);
-                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.3);
-                gain.gain.setValueAtTime(1.0, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
+            const ctx = state.audioContext;
+            const kit = state.currentKit;
+            const dest = state.masterGain;
 
-                osc.start(time);
-                osc.stop(time + 0.3);
-            };
-
-            // Snare Synthesizer
-            state.sounds.snare = (time) => {
-                const bufferSize = state.audioContext.sampleRate * 0.2;
-                const buffer = state.audioContext.createBuffer(1, bufferSize, state.audioContext.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = Math.random() * 2 - 1;
+            // Handle custom voice sampler track
+            if (trackIndex === 7) {
+                if (state.micSampleBuffer) {
+                    const source = ctx.createBufferSource();
+                    source.buffer = state.micSampleBuffer;
+                    source.connect(dest);
+                    source.start(time);
                 }
+                return;
+            }
 
-                const noise = state.audioContext.createBufferSource();
-                noise.buffer = buffer;
-
-                const filter = state.audioContext.createBiquadFilter();
-                filter.type = 'highpass';
-                filter.frequency.value = 1000;
-
-                const gain = state.audioContext.createGain();
-                gain.gain.setValueAtTime(0.7, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
-
-                noise.connect(filter);
-                filter.connect(gain);
-                gain.connect(state.masterGain);
-
-                noise.start(time);
-                noise.stop(time + 0.25);
-            };
-
-            // Hi-Hat Synthesizer
-            state.sounds.hihat = (time) => {
-                const osc = state.audioContext.createOscillator();
-                const gain = state.audioContext.createGain();
-                const filter = state.audioContext.createBiquadFilter();
-                
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(10000, time);
-                
-                filter.type = 'bandpass';
-                filter.frequency.value = 8000;
-                
-                gain.gain.setValueAtTime(0.3, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
-                
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(state.masterGain);
-                
-                osc.start(time);
-                osc.stop(time + 0.06);
-            };
-
-            // Synthesize Synth Pluck Sound
-            state.sounds.playSynthPluck = (freq, time, duration = 0.2) => {
-                const osc = state.audioContext.createOscillator();
-                const gain = state.audioContext.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(freq, time);
-                
-                gain.gain.setValueAtTime(0.4, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
-                
-                osc.connect(gain);
-                gain.connect(state.masterGain);
-                osc.start(time);
-                osc.stop(time + duration);
-            };
-
-            // Synthesize Synth Bass Sound
-            state.sounds.playSynthBass = (freq, time, duration = 0.3) => {
-                const osc = state.audioContext.createOscillator();
-                const gain = state.audioContext.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(freq, time);
-                
-                const filter = state.audioContext.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(600, time);
-                filter.frequency.exponentialRampToValueAtTime(100, time + duration);
-
-                gain.gain.setValueAtTime(0.5, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
-                
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(state.masterGain);
-                osc.start(time);
-                osc.stop(time + duration);
-            };
+            switch(kit) {
+                case '808':
+                    play808Sound(trackIndex, time, ctx, dest);
+                    break;
+                case 'rock':
+                    playRockSound(trackIndex, time, ctx, dest);
+                    break;
+                case 'latin':
+                    playLatinSound(trackIndex, time, ctx, dest);
+                    break;
+            }
         }
 
-        // Loop engine Scheduler
+        // Web Audio Synthesizers: 808 Kit
+        function play808Sound(trackIndex, time, ctx, dest) {
+            if (trackIndex === 0) { // Kick (Boomy 808 Sine sweep)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.frequency.setValueAtTime(140, time);
+                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.45);
+                gain.gain.setValueAtTime(1.0, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.45);
+                osc.start(time);
+                osc.stop(time + 0.45);
+            }
+            else if (trackIndex === 1) { // Snare (Noise + low-pitch pop)
+                const osc = ctx.createOscillator();
+                const oscGain = ctx.createGain();
+                osc.connect(oscGain);
+                oscGain.connect(dest);
+                osc.frequency.setValueAtTime(180, time);
+                oscGain.gain.setValueAtTime(0.3, time);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                osc.start(time);
+                osc.stop(time + 0.1);
+
+                const bufferSize = ctx.sampleRate * 0.22;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 1000;
+                const noiseGain = ctx.createGain();
+                noiseGain.gain.setValueAtTime(0.6, time);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+                noise.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(dest);
+                noise.start(time);
+                noise.stop(time + 0.22);
+            }
+            else if (trackIndex === 2) { // Closed Hat
+                const bufferSize = ctx.sampleRate * 0.04;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 10000;
+                filter.Q.value = 8;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.35, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                noise.start(time);
+                noise.stop(time + 0.04);
+            }
+            else if (trackIndex === 3) { // Open Hat
+                const bufferSize = ctx.sampleRate * 0.25;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 9000;
+                filter.Q.value = 6;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.25, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                noise.start(time);
+                noise.stop(time + 0.22);
+            }
+            else if (trackIndex === 4) { // Clap (Multiple noise impulses)
+                const bufferSize = ctx.sampleRate * 0.18;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 1600;
+                filter.Q.value = 3;
+
+                for (let j = 0; j < 3; j++) {
+                    const tapTime = time + j * 0.012;
+                    const noise = ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const gain = ctx.createGain();
+                    gain.gain.setValueAtTime(0.45 - j * 0.1, tapTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, tapTime + 0.025);
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(dest);
+                    noise.start(tapTime);
+                    noise.stop(tapTime + 0.025);
+                }
+
+                const tail = ctx.createBufferSource();
+                tail.buffer = buffer;
+                const tailGain = ctx.createGain();
+                tailGain.gain.setValueAtTime(0.35, time + 0.04);
+                tailGain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+                tail.connect(filter);
+                filter.connect(tailGain);
+                tailGain.connect(dest);
+                tail.start(time + 0.04);
+                tail.stop(time + 0.18);
+            }
+            else if (trackIndex === 5) { // Bass (Deep Sub sawtooth lowpass)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                osc.type = 'sawtooth';
+
+                const pitches = [65.41, 55.00, 43.65, 49.00]; // C2, A1, F1, G1
+                const chordIdx = Math.floor(state.currentBeat / 4) % 4;
+                osc.frequency.setValueAtTime(pitches[chordIdx], time);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(350, time);
+                filter.frequency.exponentialRampToValueAtTime(80, time + 0.35);
+
+                gain.gain.setValueAtTime(0.6, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+                osc.start(time);
+                osc.stop(time + 0.35);
+            }
+            else if (trackIndex === 6) { // Lead (Chiptune square pluck)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.type = 'square';
+
+                const melodyChords = [
+                    [261.63, 329.63, 392.00, 523.25], // C Major
+                    [220.00, 261.63, 329.63, 440.00], // A Minor
+                    [174.61, 220.00, 261.63, 349.23], // F Major
+                    [196.00, 246.94, 293.66, 392.00]  // G Major
+                ];
+                const chordIdx = Math.floor(state.currentBeat / 4) % 4;
+                const notes = melodyChords[chordIdx];
+                const noteIdx = state.currentBeat % 4;
+                osc.frequency.setValueAtTime(notes[noteIdx], time);
+
+                gain.gain.setValueAtTime(0.2, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+                osc.start(time);
+                osc.stop(time + 0.12);
+            }
+        }
+
+        // Web Audio Synthesizers: Acoustic Rock Kit
+        function playRockSound(trackIndex, time, ctx, dest) {
+            if (trackIndex === 0) { // Kick (Organic punch thud)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.frequency.setValueAtTime(170, time);
+                osc.frequency.exponentialRampToValueAtTime(45, time + 0.13);
+                gain.gain.setValueAtTime(0.9, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.13);
+                osc.start(time);
+                osc.stop(time + 0.13);
+            }
+            else if (trackIndex === 1) { // Snare (Woodblock body pop + short highpass noise)
+                const osc = ctx.createOscillator();
+                const oscGain = ctx.createGain();
+                osc.connect(oscGain);
+                oscGain.connect(dest);
+                osc.frequency.setValueAtTime(210, time);
+                osc.frequency.exponentialRampToValueAtTime(120, time + 0.08);
+                oscGain.gain.setValueAtTime(0.35, time);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.08);
+                osc.start(time);
+                osc.stop(time + 0.08);
+
+                const bufferSize = ctx.sampleRate * 0.15;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 1600;
+                const noiseGain = ctx.createGain();
+                noiseGain.gain.setValueAtTime(0.5, time);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+                noise.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(dest);
+                noise.start(time);
+                noise.stop(time + 0.15);
+            }
+            else if (trackIndex === 2) { // Closed Hat (High triangle click)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(13000, time);
+                gain.gain.setValueAtTime(0.18, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+                osc.start(time);
+                osc.stop(time + 0.03);
+            }
+            else if (trackIndex === 3) { // Open Hat (Longer high triangle)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(12000, time);
+                gain.gain.setValueAtTime(0.16, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+                osc.start(time);
+                osc.stop(time + 0.25);
+            }
+            else if (trackIndex === 4) { // Rimshot / Sidestick (Wood click)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.frequency.setValueAtTime(800, time);
+                osc.frequency.exponentialRampToValueAtTime(450, time + 0.03);
+                gain.gain.setValueAtTime(0.5, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+                osc.start(time);
+                osc.stop(time + 0.03);
+            }
+            else if (trackIndex === 5) { // Bass (Warm organic bass pluck)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.type = 'triangle';
+                const pitches = [65.41, 55.00, 43.65, 49.00];
+                const chordIdx = Math.floor(state.currentBeat / 4) % 4;
+                osc.frequency.setValueAtTime(pitches[chordIdx], time);
+                gain.gain.setValueAtTime(0.45, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
+                osc.start(time);
+                osc.stop(time + 0.28);
+            }
+            else if (trackIndex === 6) { // Lead (Flute pluck)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.type = 'sine';
+                const melodyChords = [
+                    [261.63, 329.63, 392.00, 523.25],
+                    [220.00, 261.63, 329.63, 440.00],
+                    [174.61, 220.00, 261.63, 349.23],
+                    [196.00, 246.94, 293.66, 392.00]
+                ];
+                const chordIdx = Math.floor(state.currentBeat / 4) % 4;
+                const notes = melodyChords[chordIdx];
+                const noteIdx = (state.currentBeat * 2) % 4;
+                osc.frequency.setValueAtTime(notes[noteIdx], time);
+                gain.gain.setValueAtTime(0.25, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+                osc.start(time);
+                osc.stop(time + 0.18);
+            }
+        }
+
+        // Web Audio Synthesizers: Latin Percussion Kit
+        function playLatinSound(trackIndex, time, ctx, dest) {
+            if (trackIndex === 0) { // Kick (Low CongaStrike)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                osc.frequency.setValueAtTime(210, time);
+                osc.frequency.exponentialRampToValueAtTime(65, time + 0.16);
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(220, time);
+                filter.Q.value = 4;
+                gain.gain.setValueAtTime(0.75, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
+                osc.start(time);
+                osc.stop(time + 0.16);
+            }
+            else if (trackIndex === 1) { // Snare (Timbale ring pop)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(380, time);
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(400, time);
+                filter.Q.value = 10;
+                gain.gain.setValueAtTime(0.35, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+                osc.start(time);
+                osc.stop(time + 0.12);
+            }
+            else if (trackIndex === 2) { // Closed Hat (Shaker soft brush)
+                const bufferSize = ctx.sampleRate * 0.07;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 7500;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.01, time);
+                gain.gain.linearRampToValueAtTime(0.25, time + 0.015);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                noise.start(time);
+                noise.stop(time + 0.07);
+            }
+            else if (trackIndex === 3) { // Open Hat (Longer shaker brush)
+                const bufferSize = ctx.sampleRate * 0.18;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 7000;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.01, time);
+                gain.gain.linearRampToValueAtTime(0.2, time + 0.035);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                noise.start(time);
+                noise.stop(time + 0.18);
+            }
+            else if (trackIndex === 4) { // Woodblock (High click)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(dest);
+                osc.frequency.setValueAtTime(1050, time);
+                gain.gain.setValueAtTime(0.45, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+                osc.start(time);
+                osc.stop(time + 0.04);
+            }
+            else if (trackIndex === 5) { // Bass (Latin Bass Conga-like line)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                osc.type = 'sawtooth';
+
+                const pitches = [130.81, 110.00, 87.31, 98.00];
+                const chordIdx = Math.floor(state.currentBeat / 4) % 4;
+                osc.frequency.setValueAtTime(pitches[chordIdx] * 0.8, time);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(240, time);
+
+                gain.gain.setValueAtTime(0.45, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+                osc.start(time);
+                osc.stop(time + 0.22);
+            }
+            else if (trackIndex === 6) { // Lead (Spanish Guitar Pluck)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(dest);
+                osc.type = 'sawtooth';
+
+                const melodyChords = [
+                    [261.63, 329.63, 392.00, 523.25],
+                    [220.00, 261.63, 329.63, 440.00],
+                    [174.61, 220.00, 261.63, 349.23],
+                    [196.00, 246.94, 293.66, 392.00]
+                ];
+                const chordIdx = Math.floor(state.currentBeat / 4) % 4;
+                const notes = melodyChords[chordIdx];
+                const noteIdx = (state.currentBeat * 3) % 4;
+                osc.frequency.setValueAtTime(notes[noteIdx], time);
+
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(1000, time);
+                filter.Q.value = 1.2;
+
+                gain.gain.setValueAtTime(0.35, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+                osc.start(time);
+                osc.stop(time + 0.1);
+            }
+        }
+
+        // Loop engine scheduler
         function scheduler() {
             while (state.nextNoteTime < state.audioContext.currentTime + state.scheduleAheadTime) {
                 scheduleNote(state.currentBeat, state.nextNoteTime);
@@ -544,29 +847,11 @@
         function nextNote() {
             const secondsPerBeat = 60.0 / state.bpm / 4; // 16th note subdivisions
             state.nextNoteTime += secondsPerBeat;
-            
-            // Advance beat
             state.currentBeat = (state.currentBeat + 1) % state.beatsInBar;
         }
 
-        // Pre-defined musical loops/notes
-        // Chords C - Am - F - G progression frequencies
-        const melodyPitches = [
-            // Pluck pitches (Row 2 active notes)
-            [261.63, 329.63, 392.00, 523.25], // C Major notes
-            [220.00, 261.63, 329.63, 440.00], // A Minor notes
-            [174.61, 220.00, 261.63, 349.23], // F Major notes
-            [196.00, 246.94, 293.66, 392.00]  // G Major notes
-        ];
-
-        function getChordGroup(step) {
-            // Rotate chords every 4 beats (4 steps of 16th notes = 1 beat; so 16 steps total)
-            const beatGroup = Math.floor(step / 4);
-            return beatGroup % 4; // 0: C, 1: Am, 2: F, 3: G
-        }
-
         function scheduleNote(beatNumber, time) {
-            // Handle master loop recording for export
+            // Master loop recording logic for export
             if (beatNumber === 0) {
                 if (state.recordMasterOnNextBeatZero) {
                     state.recordMasterOnNextBeatZero = false;
@@ -583,7 +868,6 @@
                     
                     state.masterRecorder.onstop = async () => {
                         const audioBlob = new Blob(state.masterRecordedChunks, { type: 'audio/webm' });
-                        // Disconnect to clean up
                         state.masterGain.disconnect(state.masterDestNode);
                         state.masterDestNode = null;
                         
@@ -591,164 +875,43 @@
                     };
                     
                     state.masterRecorder.start();
-                    console.log("Master loop recording started on beat 0");
+                    console.log("Master loop recording started on step 0");
                 } else if (state.isRecordingMaster) {
-                    // Stop recording exactly at the next beat 0 (1 full loop completed)
                     state.isRecordingMaster = false;
                     state.masterRecorder.stop();
-                    console.log("Master loop recording stopped on beat 0");
+                    console.log("Master loop recording stopped on step 0 (1 full bar)");
                 }
             }
 
-            // Trigger UI updates safely back on the main thread
-            const progressPercent = (beatNumber / 16) * 100;
-            const radialOffset = 251.2 - (251.2 * (beatNumber + 1)) / 16;
-            const currentQuarterBeat = Math.floor(beatNumber / 4) + 1;
-            
-            // UI Thread callback dispatcher
+            // Sync with UI loop
             setTimeout(() => {
-                sweepBar.style.width = `${progressPercent}%`;
-                radialProgress.style.strokeDashoffset = radialOffset;
-                beatLabel.textContent = currentQuarterBeat;
-
-                // Visual flash of the tick sweep
-                padElements.forEach(pad => {
-                    const row = parseInt(pad.dataset.row, 10);
-                    const col = parseInt(pad.dataset.col, 10);
-                    if (state.activePads[row][col]) {
-                        // Flashing behavior based on sixteenth beat index matching specific rows' rhythms
-                        const isHit = checkRhythmStepHit(row, col, beatNumber);
-                        if (isHit) {
-                            pad.classList.add('playing-tick');
-                            setTimeout(() => pad.classList.remove('playing-tick'), 80);
-                        }
-                    }
-                });
+                updatePlayheadUI(beatNumber);
             }, 0);
 
-            // Audio Nodes scheduling
-            // --- Row 0: Drums ---
-            if (state.activePads[0][0]) { // Pad 0: Simple Rock
-                if (beatNumber === 0 || beatNumber === 8) state.sounds.kick(time);
-                if (beatNumber === 4 || beatNumber === 12) state.sounds.snare(time);
-                if (beatNumber % 2 === 0) state.sounds.hihat(time);
-            }
-            if (state.activePads[0][1]) { // Pad 1: Hip Hop
-                if (beatNumber === 0 || beatNumber === 6 || beatNumber === 10) state.sounds.kick(time);
-                if (beatNumber === 4 || beatNumber === 12) state.sounds.snare(time);
-                if (beatNumber % 2 === 0) state.sounds.hihat(time);
-            }
-            if (state.activePads[0][2]) { // Pad 2: House Beat
-                if (beatNumber % 4 === 0) state.sounds.kick(time);
-                if (beatNumber === 4 || beatNumber === 12) state.sounds.snare(time);
-                if (beatNumber % 2 === 1) state.sounds.hihat(time);
-            }
-            if (state.activePads[0][3]) { // Pad 3: Trap Roll
-                if (beatNumber === 0 || beatNumber === 2 || beatNumber === 8 || beatNumber === 10) state.sounds.kick(time);
-                if (beatNumber === 4 || beatNumber === 12) state.sounds.snare(time);
-                // Fast trap high hats
-                if (beatNumber % 2 === 0 || beatNumber === 7 || beatNumber === 15) state.sounds.hihat(time);
-            }
-
-            // --- Row 1: Bass ---
-            const chordIdx = getChordGroup(beatNumber);
-            if (state.activePads[1][0] && beatNumber % 4 === 0) { // Chill Bass
-                const notes = [130.81, 110.00, 87.31, 98.00]; // C2, A1, F1, G1
-                state.sounds.playSynthBass(notes[chordIdx], time, 0.4);
-            }
-            if (state.activePads[1][1] && beatNumber % 2 === 0) { // Arp Bass
-                const baseNote = [65.41, 55.00, 43.65, 49.00][chordIdx]; // C1, A0, F0, G0
-                const octaveOffset = (beatNumber % 4 === 0) ? 1 : 2;
-                state.sounds.playSynthBass(baseNote * octaveOffset, time, 0.15);
-            }
-            if (state.activePads[1][2] && (beatNumber === 0 || beatNumber === 8 || beatNumber === 10)) { // Wobble Bass
-                const note = [65.41, 55.00, 43.65, 49.00][chordIdx] * 2;
-                state.sounds.playSynthBass(note, time, 0.4);
-            }
-            if (state.activePads[1][3] && beatNumber % 4 !== 3) { // Bouncy Slap
-                if (beatNumber % 2 === 0) {
-                    const note = [130.81, 110.00, 87.31, 98.00][chordIdx];
-                    state.sounds.playSynthBass(note, time, 0.1);
-                }
-            }
-
-            // --- Row 2: Synths (Melodies) ---
-            if (state.activePads[2][0] && beatNumber % 8 === 0) { // Lofi Chords
-                // Play warm chords (3 pitches at once)
-                const pitches = melodyPitches[chordIdx];
-                state.sounds.playSynthPluck(pitches[0], time, 0.8);
-                state.sounds.playSynthPluck(pitches[1], time, 0.8);
-                state.sounds.playSynthPluck(pitches[2], time, 0.8);
-            }
-            if (state.activePads[2][1]) { // Retro Lead
-                // Standard melodic pattern
-                const melodyPattern = [0, 4, 7, 11, 7, 4, 0, 4, 7, 9, 12, 9, 7, 4, 2, 0];
-                const noteOffset = melodyPattern[beatNumber];
-                const baseFreq = [261.63, 220.00, 174.61, 196.00][chordIdx];
-                state.sounds.playSynthPluck(baseFreq * (1 + noteOffset/12), time, 0.15);
-            }
-            if (state.activePads[2][2]) { // Dream Pluck
-                const pluckSteps = [0, 2, 4, 6, 8, 10, 12, 14];
-                if (pluckSteps.includes(beatNumber)) {
-                    const stepInPattern = pluckSteps.indexOf(beatNumber);
-                    const chordsGroup = melodyPitches[chordIdx];
-                    const note = chordsGroup[stepInPattern % 4] * 2;
-                    state.sounds.playSynthPluck(note, time, 0.12);
-                }
-            }
-            if (state.activePads[2][3] && beatNumber === 0) { // Ambient Pad
-                const base = [130.81, 110.00, 87.31, 98.00][chordIdx] * 2;
-                state.sounds.playSynthPluck(base, time, 1.8);
-                state.sounds.playSynthPluck(base * 1.5, time, 1.8);
-                state.sounds.playSynthPluck(base * 2.0, time, 1.8);
-            }
-
-            // --- Row 3: Microphone recorded loops ---
-            for (let i = 0; i < 4; i++) {
-                if (state.activePads[3][i] && beatNumber === 0) {
-                    // Triggers the stored microphone AudioBuffer right on beat 0
-                    if (state.micRecordedBuffers[i]) {
-                        playAudioBuffer(state.micRecordedBuffers[i], time);
-                    }
+            // Trigger active grid step sounds
+            for (let trackIndex = 0; trackIndex < 8; trackIndex++) {
+                if (state.grid[trackIndex][beatNumber]) {
+                    playInstrumentSound(trackIndex, time);
                 }
             }
         }
 
-        // Helper to check if a specific pad's rhythm matches a sixteenth beat number
-        function checkRhythmStepHit(row, col, beatNumber) {
-            if (row === 0) {
-                if (col === 0) return (beatNumber === 0 || beatNumber === 8 || beatNumber === 4 || beatNumber === 12 || beatNumber % 2 === 0);
-                if (col === 1) return (beatNumber === 0 || beatNumber === 6 || beatNumber === 10 || beatNumber === 4 || beatNumber === 12 || beatNumber % 2 === 0);
-                if (col === 2) return (beatNumber % 4 === 0 || beatNumber === 4 || beatNumber === 12 || beatNumber % 2 === 1);
-                if (col === 3) return (beatNumber === 0 || beatNumber === 2 || beatNumber === 8 || beatNumber === 10 || beatNumber === 4 || beatNumber === 12 || beatNumber % 2 === 0 || beatNumber === 7 || beatNumber === 15);
-            }
-            if (row === 1) {
-                if (col === 0) return beatNumber % 4 === 0;
-                if (col === 1) return beatNumber % 2 === 0;
-                if (col === 2) return (beatNumber === 0 || beatNumber === 8 || beatNumber === 10);
-                if (col === 3) return beatNumber % 4 !== 3 && beatNumber % 2 === 0;
-            }
-            if (row === 2) {
-                if (col === 0) return beatNumber % 8 === 0;
-                if (col === 1) return true; // Retro lead has notes on every sixteenth beat
-                if (col === 2) return beatNumber % 2 === 0;
-                if (col === 3) return beatNumber === 0;
-            }
-            if (row === 3) {
-                return beatNumber === 0; // Recorded loops start exactly on beat 0
-            }
-            return false;
+        // Highlight playhead step columns
+        function updatePlayheadUI(currentStep) {
+            // Remove highlighting
+            const steps = document.querySelectorAll('.seq-step');
+            steps.forEach(s => {
+                s.classList.remove('border-slate-300', 'scale-105', 'brightness-125');
+            });
+            
+            // Add highlights to active columns
+            const colSteps = document.querySelectorAll(`.seq-step[data-step="${currentStep}"]`);
+            colSteps.forEach(s => {
+                s.classList.add('border-slate-300', 'scale-105', 'brightness-125');
+            });
         }
 
-        // Play recorded AudioBuffer using AudioContext
-        function playAudioBuffer(buffer, time) {
-            const source = state.audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(state.masterGain);
-            source.start(time);
-        }
-
-        // Playback toggle
+        // Toggle Playback
         function togglePlayback() {
             initAudio();
             if (state.isPlaying) {
@@ -758,10 +921,10 @@
                 playBtn.className = "w-12 h-12 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white flex items-center justify-center text-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95";
                 clearTimeout(state.timerId);
                 state.currentBeat = 0;
-                sweepBar.style.width = "0%";
-                radialProgress.style.strokeDashoffset = 251.2;
-                beatLabel.textContent = "1";
-                statusText.textContent = "หยุดเล่นเสียงลูปเรียบร้อย";
+                
+                // Reset playhead styling
+                const steps = document.querySelectorAll('.seq-step');
+                steps.forEach(s => s.classList.remove('border-slate-300', 'scale-105', 'brightness-125'));
             } else {
                 // PLAY
                 state.isPlaying = true;
@@ -769,402 +932,166 @@
                 playBtn.className = "w-12 h-12 rounded-xl bg-red-500 hover:bg-red-400 text-white flex items-center justify-center text-xl transition-all shadow-lg shadow-red-500/20 active:scale-95";
                 state.nextNoteTime = state.audioContext.currentTime;
                 scheduler();
-                statusText.textContent = "กำลังเล่นเสียงลูปดนตรีประสานจังหวะ...";
             }
         }
 
-        // --- Mic Loop Recording Functionality ---
-        let mediaRecorder = null;
-        let recordedChunks = [];
-
-        async function triggerMicRecording() {
-            // Requires a target mic pad to be selected first
-            if (state.selectedMicPadIndex === null) {
-                Swal.fire({
-                    title: 'กรุณาเลือกช่องบันทึกเสียง',
-                    text: 'กรุณาแตะเลือกช่อง "อัดไมค์" (ช่องแถวล่างสีเขียว) ช่องใดช่องหนึ่งก่อน จากนั้นจึงกดเริ่มอัดครับ',
-                    icon: 'warning',
-                    confirmButtonColor: '#3b82f6',
-                    confirmButtonText: 'ตกลง'
-                });
-                return;
-            }
-
-            if (state.isRecordingMic) return;
-
-            initAudio();
-            state.isRecordingMic = true;
-            recordMicTriggerBtn.disabled = true;
-            statusText.textContent = "เตรียมไมโครโฟน...";
+        // Build HTML table step sequencer rows programmatically
+        function renderSequencerGrid() {
+            sequencerGridEl.innerHTML = '';
             
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                recordedChunks = [];
-
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) recordedChunks.push(e.data);
-                };
-
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
-                    const arrayBuffer = await audioBlob.arrayBuffer();
+            instruments.forEach((inst, rIndex) => {
+                const rowEl = document.createElement('div');
+                rowEl.className = "flex items-center gap-3 w-full py-1.5 border-b border-slate-800/40";
+                
+                // Track control block (Icon, name, mute toggle)
+                const controlBlock = document.createElement('div');
+                controlBlock.className = "w-44 flex items-center justify-between text-xs font-semibold select-none pr-2";
+                controlBlock.innerHTML = `
+                    <div class="flex items-center gap-1.5 text-slate-300">
+                        <span class="w-5 h-5 rounded flex items-center justify-center bg-slate-800 border border-slate-700/60 text-[10px] text-${inst.color}-400">
+                            <i class="fa-solid ${inst.icon}"></i>
+                        </span>
+                        <span class="truncate max-w-[105px]">${inst.name}</span>
+                    </div>
+                    <button class="mute-btn text-slate-500 hover:text-${inst.color}-400 transition-colors" data-track="${rIndex}" title="Mute Track">
+                        <i class="fa-solid fa-volume-high" id="mute-icon-${rIndex}"></i>
+                    </button>
+                `;
+                
+                // Step sequence buttons
+                const stepsWrapper = document.createElement('div');
+                stepsWrapper.className = "flex-1 grid grid-cols-16 gap-1 sm:gap-1.5";
+                
+                for (let cIndex = 0; cIndex < 16; cIndex++) {
+                    const stepBtn = document.createElement('button');
+                    // alternate visual grouping backgrounds every 4 steps
+                    const groupClass = Math.floor(cIndex / 4) % 2 === 0 ? 'bg-slate-800/30' : 'bg-slate-900/60';
+                    stepBtn.className = `seq-step h-8 w-full border border-slate-800 rounded-md transition-all ${groupClass} hover:border-slate-600 focus:outline-none`;
+                    stepBtn.dataset.row = rIndex;
+                    stepBtn.dataset.step = cIndex;
                     
-                    state.audioContext.decodeAudioData(arrayBuffer, (decodedBuffer) => {
-                        state.micRecordedBuffers[state.selectedMicPadIndex] = decodedBuffer;
-                        
-                        // Set the pad as active and styled
-                        const padEl = document.querySelector(`.pad[data-row="3"][data-col="${state.selectedMicPadIndex}"]`);
-                        padEl.classList.remove('recording');
-                        state.activePads[3][state.selectedMicPadIndex] = true;
-                        padEl.classList.add('active');
-
-                        Swal.fire({
-                            title: 'อัดเสียงเสร็จสิ้น! 🎉',
-                            text: 'ระบบบันทึกเสียงลงปุ่มเรียบร้อยแล้ว ลองเปิดเล่นดูได้เลยครับ',
-                            icon: 'success',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-
-                        resetMicUI();
-                    }, (err) => {
-                        console.error("Decode failed", err);
-                        Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกเสียงได้สำเร็จ กรุณาลองอีกครั้ง', 'error');
-                        resetMicUI();
-                    });
-
-                    // Stop mic input stream
-                    stream.getTracks().forEach(track => track.stop());
-                };
-
-                // Sync start of recording with the next beat 0 (start of bar)
-                statusText.textContent = "รอเริ่มห้องบีทถัดไป...";
-                let countdown = 3;
-                
-                const countdownInterval = setInterval(() => {
-                    micBtnText.textContent = `เตรียมตัว... (${countdown})`;
-                    if (countdown <= 0) {
-                        clearInterval(countdownInterval);
-                        
-                        // Start recording exactly for the duration of 1 full bar (4 beats)
-                        // Duration = 60 / BPM * 4 seconds
-                        const recordingDurationMs = (60.0 / state.bpm) * 4 * 1000;
-                        
-                        // Visual cues for recording
-                        const targetPadEl = document.querySelector(`.pad[data-row="3"][data-col="${state.selectedMicPadIndex}"]`);
-                        targetPadEl.classList.add('recording');
-                        
-                        mediaRecorder.start();
-                        statusText.textContent = "🔴 กำลังอัดเสียง...";
-                        micBtnText.textContent = "🔴 กำลังอัดเสียง...";
-
-                        // Auto stop after 1 bar
-                        setTimeout(() => {
-                            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                                mediaRecorder.stop();
-                            }
-                        }, recordingDurationMs);
+                    // Render border markers on step 0, 4, 8, 12 to identify primary beats
+                    if (cIndex % 4 === 0) {
+                        stepBtn.classList.add('border-slate-700/80');
                     }
-                    countdown--;
-                }, 700);
-
-            } catch (err) {
-                console.error("Mic access failed", err);
-                Swal.fire('ไม่สามารถเข้าถึงไมค์ได้', 'กรุณาอนุญาตสิทธิ์เข้าถึงไมโครโฟนในการตั้งค่าบราวเซอร์ของคุณเพื่อใช้งานฟังก์ชันนี้', 'error');
-                resetMicUI();
-            }
-        }
-
-        function resetMicUI() {
-            state.isRecordingMic = false;
-            recordMicTriggerBtn.disabled = false;
-            micBtnText.textContent = "เริ่มบันทึกเสียงใส่ปุ่มที่เลือก";
-            statusText.textContent = state.isPlaying ? "กำลังเล่นเสียงลูปดนตรี..." : "พร้อมทำงาน";
-        }
-
-        // --- AI Helper Algorithm ---
-        function triggerAIComposition() {
-            initAudio();
-            // Clear current board first
-            clearBoard(false);
-
-            // Genres sets
-            const genres = [
-                {
-                    name: "Lofi Chill Groove",
-                    pads: [[0, 1], [1, 0], [2, 0]] // BoomBap drum + Chill Bass + Lofi Chords
-                },
-                {
-                    name: "Retro Synth-Wave 80s",
-                    pads: [[0, 0], [1, 1], [2, 1]] // Rock beat + Arp Bass + Retro Lead
-                },
-                {
-                    name: "Ambient Dreamscape",
-                    pads: [[0, 0], [1, 0], [2, 3]] // Slow Rock + Chill Bass + Ambient Pad
-                },
-                {
-                    name: "Electronic Dance Bounce",
-                    pads: [[0, 2], [1, 3], [2, 2]] // House beat + Slap Bass + Dream Pluck
+                    
+                    stepsWrapper.appendChild(stepBtn);
                 }
-            ];
-
-            const selected = genres[Math.floor(Math.random() * genres.length)];
-            selected.pads.forEach(([row, col]) => {
-                state.activePads[row][col] = true;
-                const padEl = document.querySelector(`.pad[data-row="${row}"][data-col="${col}"]`);
-                padEl.classList.add('active');
-            });
-
-            // If not playing, start it
-            if (!state.isPlaying) {
-                togglePlayback();
-            }
-
-            Swal.fire({
-                title: '🤖 AI ช่วยจัดเซ็ตเพลงให้คุณ!',
-                html: `แต่งเพลงแนว <b>"${selected.name}"</b> เรียบร้อย ลองฟังทำนองที่เล่นอยู่ดูได้เลยครับ`,
-                icon: 'info',
-                timer: 3000,
-                showConfirmButton: false
-            });
-        }
-
-        function clearBoard(alert = true) {
-            state.activePads = Array(4).fill(null).map(() => Array(4).fill(false));
-            padElements.forEach(pad => pad.classList.remove('active'));
-            if (alert) {
-                Swal.fire({
-                    title: 'เคลียร์บอร์ดเรียบร้อย',
-                    icon: 'success',
-                    timer: 1000,
-                    showConfirmButton: false
-                });
-            }
-        }
-
-        // --- Quantize Export and Upload to Google Drive / Supabase ---
-        async function publishSong() {
-            const title = songTitleInput.value.trim();
-            if (!title) {
-                Swal.fire({
-                    title: 'กรุณาตั้งชื่อเพลง',
-                    text: 'กรุณากรอกชื่อผลงานดนตรีของคุณก่อนกดแชร์ครับ',
-                    icon: 'warning',
-                    confirmButtonColor: '#3b82f6',
-                    confirmButtonText: 'ตกลง'
-                });
-                return;
-            }
-
-            // Check if there are active loops
-            let hasActive = false;
-            for(let r=0; r<4; r++) {
-                for(let c=0; c<4; c++) {
-                    if (state.activePads[r][c]) hasActive = true;
-                }
-            }
-
-            if (!hasActive) {
-                Swal.fire({
-                    title: 'บอร์ดว่างเปล่า',
-                    text: 'กรุณากดเปิดใช้ปุ่มเสียง Launchpad เพื่อสร้างเพลงอย่างน้อย 1 ช่องก่อนกดแชร์ครับ',
-                    icon: 'warning',
-                    confirmButtonColor: '#3b82f6',
-                    confirmButtonText: 'ตกลง'
-                });
-                return;
-            }
-
-            Swal.fire({
-                title: 'เตรียมการอัดเสียงเพื่อส่งออก...',
-                html: 'กรุณารอสักครู่ ระบบกำลังเริ่มอัดสัญญาณมิกซ์เสียงของบอร์ดแบบตรงบีท...',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-
-            initAudio();
-
-            // Auto play if not playing
-            if (!state.isPlaying) {
-                togglePlayback();
-            }
-
-            // Tell the scheduler to start recording on the next beat 0
-            state.recordMasterOnNextBeatZero = true;
-            statusText.textContent = "เตรียมสัญญาณอัดเสียง Master (บาร์ถัดไป)...";
-
-            // We close the loader swal and show a progress overlay
-            setTimeout(() => {
-                Swal.close();
-                Swal.fire({
-                    title: '🔴 ระบบกำลังบันทึกเสียงเพลง...',
-                    text: 'กรุณาปล่อยให้เพลงเล่นจบ 1 รอบ (4 บีท) เพื่อให้ระบบเก็บสัญญาณเสียงที่สมบูรณ์แบบ',
-                    icon: 'info',
-                    showConfirmButton: false,
-                    allowOutsideClick: false
-                });
-            }, 1000);
-        }
-
-        async function uploadAndShareSong(audioBlob) {
-            const title = songTitleInput.value.trim();
-            const token = state.googleAccessToken || localStorage.getItem('google_provider_token');
-
-            // Close the recording popup
-            Swal.close();
-
-            if (!token) {
-                // If there's no Google Access token, fall back to mock or inform user
-                Swal.fire({
-                    title: 'ไม่พบสิทธิ์ Google Drive',
-                    html: `คุณไม่ได้ล็อกอินด้วย Google หรือสิทธิ์หมดอายุ ระบบจะบันทึกแบบจำลองในเครื่องให้ก่อน<br><br><span class="text-xs text-slate-400">วิธีแก้ไข: กรุณาล็อกอินใหม่ผ่านปุ่ม Google Login ในหน้าหลักแอปเพื่ออัปเดตสิทธิ์ครับ</span>`,
-                    icon: 'warning',
-                    confirmButtonText: 'บันทึกแบบจำลอง'
-                }).then(async () => {
-                    await saveSongMetadataToSupabase(title, "MOCK_DRIVE_ID_" + Date.now());
-                });
-                return;
-            }
-
-            Swal.fire({
-                title: 'กำลังอัปโหลดเพลง...',
-                html: 'กรุณารอสักครู่ กำลังส่งไฟล์เข้า Google Drive ของคุณ...',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-
-            try {
-                statusText.textContent = "กำลังอัปโหลดไฟล์ไปที่ Google Drive ของคุณ...";
                 
-                // 1. Upload file to Google Drive using multipart upload
-                const metadata = {
-                    name: `${title}.webm`,
-                    mimeType: 'audio/webm',
-                    description: 'Created with DJ Studio Looper on Music Borrow App'
-                };
+                rowEl.appendChild(controlBlock);
+                rowEl.appendChild(stepsWrapper);
+                sequencerGridEl.appendChild(rowEl);
+            });
+
+            // Set grid event listeners
+            document.querySelectorAll('.seq-step').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    initAudio();
+                    const r = parseInt(btn.dataset.row, 10);
+                    const c = parseInt(btn.dataset.step, 10);
+                    state.grid[r][c] = !state.grid[r][c];
+                    btn.classList.toggle('active');
+                    updateStepButtonClass(btn, r, state.grid[r][c]);
+                });
+            });
+
+            // Set mute buttons listeners
+            document.querySelectorAll('.mute-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const track = parseInt(btn.dataset.track, 10);
+                    state.mutes[track] = !state.mutes[track];
+                    
+                    const icon = document.getElementById(`mute-icon-${track}`);
+                    if (state.mutes[track]) {
+                        icon.className = "fa-solid fa-volume-xmark text-red-500";
+                        btn.classList.add('text-red-500');
+                    } else {
+                        icon.className = "fa-solid fa-volume-high";
+                        btn.classList.remove('text-red-500');
+                    }
+                });
+            });
+        }
+
+        // Style step button based on active state and instrument color
+        function updateStepButtonClass(btn, rowIdx, isActive) {
+            const inst = instruments[rowIdx];
+            if (isActive) {
+                btn.className = `seq-step h-8 w-full border rounded-md transition-all ${inst.colorClass} focus:outline-none`;
+            } else {
+                const cIndex = parseInt(btn.dataset.step, 10);
+                const groupClass = Math.floor(cIndex / 4) % 2 === 0 ? 'bg-slate-800/30' : 'bg-slate-900/60';
+                btn.className = `seq-step h-8 w-full border border-slate-800 rounded-md transition-all ${groupClass} hover:border-slate-600 focus:outline-none`;
+                if (cIndex % 4 === 0) {
+                    btn.classList.add('border-slate-700/80');
+                }
+            }
+        }
+
+        // Synchronize the whole DOM Sequencer step grid with state.grid array
+        function syncSequencerGridUI() {
+            const steps = document.querySelectorAll('.seq-step');
+            steps.forEach(btn => {
+                const r = parseInt(btn.dataset.row, 10);
+                const c = parseInt(btn.dataset.step, 10);
+                updateStepButtonClass(btn, r, state.grid[r][c]);
+            });
+        }
+
+        // --- MPC Live Drum Pad Triggers ---
+        mpcPads.forEach(pad => {
+            pad.addEventListener('click', () => {
+                initAudio();
+                const index = parseInt(pad.dataset.index, 10);
                 
-                const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', audioBlob);
+                // Flash MPC pad glow on hit
+                const color = instruments[index].color;
+                pad.classList.add(`neon-glow-${color}`);
+                setTimeout(() => pad.classList.remove(`neon-glow-${color}`), 100);
 
-                const uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-                const uploadResponse = await fetch(uploadUrl, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    },
-                    body: form
-                });
+                // Play the sound instantly
+                playInstrumentSound(index, state.audioContext.currentTime);
 
-                if (!uploadResponse.ok) {
-                    const errText = await uploadResponse.text();
-                    throw new Error(`Google Upload Error: ${uploadResponse.status} - ${errText}`);
+                // Quantized live recording
+                if (state.isRecordingLive && state.isPlaying) {
+                    const currentStep = state.currentBeat;
+                    state.grid[index][currentStep] = true;
+                    
+                    // Update grid button UI
+                    const stepBtn = document.querySelector(`.seq-step[data-row="${index}"][data-step="${currentStep}"]`);
+                    if (stepBtn) {
+                        updateStepButtonClass(stepBtn, index, true);
+                    }
                 }
+            });
+        });
 
-                const fileData = await uploadResponse.json();
-                const fileId = fileData.id;
-                console.log("Uploaded successfully, fileId:", fileId);
-
-                // 2. Change file permissions to public viewable ("anyone")
-                statusText.textContent = "กำลังตั้งค่าการแชร์ไฟล์เป็นสาธารณะ...";
-                const permResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        role: 'reader',
-                        type: 'anyone'
-                    })
-                });
-
-                if (!permResponse.ok) {
-                    console.warn("Permission adjustment failed, but file was uploaded.");
-                } else {
-                    console.log("File permissions set to public.");
+        // Trigger Live Record mode
+        recLiveBtn.addEventListener('click', () => {
+            initAudio();
+            state.isRecordingLive = !state.isRecordingLive;
+            if (state.isRecordingLive) {
+                recLiveBtn.classList.remove('bg-slate-800', 'border-slate-700');
+                recLiveBtn.classList.add('bg-red-600', 'border-red-400', 'text-white', 'recording-pulse');
+                
+                // If not playing, start it to allow recording sweeps
+                if (!state.isPlaying) {
+                    togglePlayback();
                 }
-
-                // 3. Save reference to Supabase database
-                await saveSongMetadataToSupabase(title, fileId);
-
-            } catch (err) {
-                console.error("Google Drive flow failed", err);
-                Swal.fire({
-                    title: 'เกิดข้อผิดพลาดในการอัปโหลด',
-                    text: err.message || 'ไม่สามารถบันทึกเสียงดนตรีลง Google Drive ได้สำเร็จ',
-                    icon: 'error',
-                    confirmButtonText: 'ตกลง'
-                }).then(() => {
-                    resetMicUI();
-                });
+            } else {
+                recLiveBtn.classList.add('bg-slate-800', 'border-slate-700');
+                recLiveBtn.classList.remove('bg-red-600', 'border-red-400', 'text-white', 'recording-pulse');
             }
-        }
+        });
 
-        async function saveSongMetadataToSupabase(title, fileId) {
-            statusText.textContent = "กำลังแชร์เพลงลงหน้าฟีดแอป...";
-            try {
-                // Save to real database
-                const { data, error } = await studentLoopsApi.saveLoop(
-                    title,
-                    state.bpm,
-                    state.activePads,
-                    fileId
-                );
+        // Sound Kit selection change listener
+        kitSelect.addEventListener('change', (e) => {
+            initAudio();
+            state.currentKit = e.target.value;
+        });
 
-                if (error) throw error;
-
-                // Also notify local mock just in case for backwards compat
-                const mockSong = {
-                    id: data.id,
-                    title: title,
-                    bpm: state.bpm,
-                    pad_sequence: state.activePads,
-                    google_drive_id: fileId,
-                    creator: state.user ? `${state.user.first_name || 'Guest'} ${state.user.last_name || ''}` : "GUEST PLAYER",
-                    created_at: new Date().toISOString()
-                };
-
-                const cachedSongs = JSON.parse(localStorage.getItem('student_loops_mock') || '[]');
-                cachedSongs.unshift(mockSong);
-                localStorage.setItem('student_loops_mock', JSON.stringify(cachedSongs));
-
-                // Send message to parent/opener
-                const targetWindow = window.opener || window.parent;
-                if (targetWindow) {
-                    targetWindow.postMessage({
-                        type: 'NEW_STUDENT_LOOP',
-                        song: mockSong
-                    }, '*');
-                }
-
-                Swal.fire({
-                    title: 'แชร์ผลงานเพลงสำเร็จ! 🎉',
-                    html: `เพลง <b>"${title}"</b> ได้รับการบันทึกใน Google Drive ของคุณ และแชร์ลงหน้าฟีดเรียบร้อย!`,
-                    icon: 'success',
-                    confirmButtonColor: '#10b981',
-                    confirmButtonText: 'ยอดเยี่ยม!'
-                }).then(() => {
-                    songTitleInput.value = '';
-                    resetMicUI();
-                });
-
-            } catch (err) {
-                console.error("Supabase save failed", err);
-                Swal.fire('แชร์ลงแอปไม่สำเร็จ', 'บันทึกเสียงลง Google Drive ได้แล้ว แต่ไม่สามารถอัปเดตระบบแชร์บนหน้าฟีดได้: ' + err.message, 'warning');
-                resetMicUI();
-            }
-        }
-
-        // Setup DOM Event Listeners
-        playBtn.addEventListener('click', togglePlayback);
-
-        // Sync BPM input fields
+        // Sync BPM slider/number inputs
         bpmSlider.addEventListener('input', (e) => {
             const val = parseInt(e.target.value, 10);
             state.bpm = val;
@@ -1180,105 +1107,447 @@
             bpmNumber.value = val;
         });
 
-        // Toggle Pads on Click
-        padElements.forEach(pad => {
-            pad.addEventListener('click', () => {
-                initAudio();
-                const row = parseInt(pad.dataset.row, 10);
-                const col = parseInt(pad.dataset.col, 10);
+        // --- Microphone Voice Sampler Recording ---
+        let mediaRecorder = null;
+        let recordedChunks = [];
 
-                if (row === 3) {
-                    // For Row 3 (Microphone), clicking selects the slot for recording
-                    // unless it already has a recording and we just toggle playback
-                    if (state.micRecordedBuffers[col]) {
-                        // Has recording, toggle play
-                        state.activePads[row][col] = !state.activePads[row][col];
-                        pad.classList.toggle('active', state.activePads[row][col]);
+        async function triggerMicRecording() {
+            if (state.isRecordingMic) return;
+
+            initAudio();
+            state.isRecordingMic = true;
+            recordMicBtn.disabled = true;
+            micBtnText.textContent = "เตรียมไมโครโฟน...";
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                recordedChunks = [];
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    
+                    state.audioContext.decodeAudioData(arrayBuffer, (decodedBuffer) => {
+                        state.micSampleBuffer = decodedBuffer;
+                        
+                        // Style Voice MPC Pad as active/loaded
+                        const padEl = document.getElementById('mic-mpc-pad');
+                        padEl.classList.remove('opacity-40');
+                        padEl.classList.add('border-emerald-500', 'text-emerald-400', 'bg-emerald-500/10');
+                        document.getElementById('mic-pad-label').textContent = "ไมค์แร่ด (บันทึกแล้ว)";
+
+                        Swal.fire({
+                            title: 'อัดเสียงร้องสำเร็จ! 🎉',
+                            text: 'ระบบเก็บแซมเปิลเสียงลงแถวไมโครโฟนและแป้นที่ 8 เรียบร้อยแล้ว ลองเขียนลงตารางดูนะครับ',
+                            icon: 'success',
+                            timer: 2500,
+                            showConfirmButton: false
+                        });
+
+                        resetMicUI();
+                    }, (err) => {
+                        console.error("Audio Decode failed", err);
+                        Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถแยกประเภทเสียงที่อัดได้ กรุณาลองอีกครั้ง', 'error');
+                        resetMicUI();
+                    });
+
+                    // Stop mic input stream
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                // Visual countdown trigger
+                let countdown = 2;
+                micBtnText.textContent = `เตรียมตัว... (${countdown})`;
+                
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    if (countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        
+                        // Start recording for exactly 1.5s
+                        mediaRecorder.start();
+                        micBtnText.textContent = "🔴 กำลังอัดเสียงพูด/เสียงร้อง...";
+                        
+                        setTimeout(() => {
+                            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                                mediaRecorder.stop();
+                            }
+                        }, 1500);
                     } else {
-                        // No recording, highlight for recording
-                        highlightSelectedMicPad(col);
+                        micBtnText.textContent = `เตรียมตัว... (${countdown})`;
                     }
-                } else {
-                    // Row 0, 1, 2: Standard Toggle behavior
-                    // Turn off other pads in the SAME row to avoid chord clashes 
-                    // (optional, but standard for clip launchers. Let's make it exclusive per row)
-                    for (let c = 0; c < 4; c++) {
-                        if (c !== col && state.activePads[row][c]) {
-                            state.activePads[row][c] = false;
-                            document.querySelector(`.pad[data-row="${row}"][data-col="${c}"]`).classList.remove('active');
-                        }
-                    }
+                }, 600);
 
-                    state.activePads[row][col] = !state.activePads[row][col];
-                    pad.classList.toggle('active', state.activePads[row][col]);
+            } catch (err) {
+                console.error("Mic access failed", err);
+                Swal.fire('ไม่สามารถเข้าถึงไมค์ได้', 'กรุณาเปิดสิทธิ์เข้าถึงไมโครโฟนสำหรับการใช้งานบราวเซอร์นี้', 'error');
+                resetMicUI();
+            }
+        }
+
+        function resetMicUI() {
+            state.isRecordingMic = false;
+            recordMicBtn.disabled = false;
+            micBtnText.textContent = "เริ่มอัดเสียงพูด/เสียงร้อง";
+        }
+
+        recordMicBtn.addEventListener('click', triggerMicRecording);
+
+        // --- AI Rhythm presets generator ---
+        function generateAIPattern(genre) {
+            initAudio();
+            clearSequencer(false);
+            const g = state.grid;
+
+            if (genre === 'trap') {
+                // Trap Kick
+                g[0][0] = true; g[0][8] = true; g[0][10] = true;
+                // Snare
+                g[1][4] = true; g[1][12] = true;
+                // Fast Hats with rolls
+                g[2][0] = true; g[2][2] = true; g[2][4] = true; g[2][6] = true;
+                g[2][8] = true; g[2][10] = true; g[2][12] = true; g[2][14] = true;
+                g[2][7] = true; g[2][15] = true; // rolls
+                // Open Hat
+                g[3][2] = true; g[3][10] = true;
+                // Rimshot perc
+                g[4][11] = true;
+                // Sub Bass notes
+                g[5][0] = true; g[5][8] = true; g[5][10] = true;
+                // Pluck lead melody
+                g[6][0] = true; g[6][3] = true; g[6][6] = true; g[6][8] = true; g[6][11] = true;
+            } 
+            else if (genre === 'lofi') {
+                // Boom bap Kick
+                g[0][0] = true; g[0][9] = true;
+                // Snare on 4, 12
+                g[1][4] = true; g[1][12] = true;
+                // Hats on even steps
+                for (let i = 0; i < 16; i += 2) g[2][i] = true;
+                // Open Hat offbeat
+                g[3][10] = true;
+                // Warm Bass notes
+                g[5][0] = true; g[5][4] = true; g[5][8] = true; g[5][12] = true;
+                // Melody Plucks
+                g[6][0] = true; g[6][8] = true;
+            } 
+            else if (genre === 'house') {
+                // Four on the floor Kick
+                g[0][0] = true; g[0][4] = true; g[0][8] = true; g[0][12] = true;
+                // Snare layering
+                g[1][4] = true; g[1][12] = true;
+                // Offbeat hats
+                g[2][2] = true; g[2][6] = true; g[2][10] = true; g[2][14] = true;
+                g[3][2] = true; g[3][6] = true; g[3][10] = true; g[3][14] = true;
+                // Clap hits
+                g[4][4] = true; g[4][12] = true;
+                // Syncopated Bass
+                g[5][1] = true; g[5][3] = true; g[5][5] = true; g[5][7] = true;
+                g[5][9] = true; g[5][11] = true; g[5][13] = true; g[5][15] = true;
+                // Stabs melody
+                g[6][0] = true; g[6][3] = true; g[6][6] = true; g[6][8] = true; g[6][11] = true;
+            } 
+            else if (genre === 'latin') {
+                // Low Conga Kick
+                g[0][0] = true; g[0][8] = true;
+                // Timbale Snare
+                g[1][4] = true; g[1][7] = true; g[1][12] = true; g[1][15] = true;
+                // Shaker brushes (all steps Closed Hat)
+                for (let i = 0; i < 16; i++) g[2][i] = true;
+                // Open Shaker
+                g[3][3] = true; g[3][11] = true;
+                // Woodblock hits
+                g[4][4] = true; g[4][10] = true; g[4][12] = true;
+                // Latin Bass line
+                g[5][0] = true; g[5][3] = true; g[5][8] = true; g[5][11] = true;
+                // Spanish guitar melody note plucks
+                g[6][0] = true; g[6][2] = true; g[6][4] = true; g[6][6] = true;
+                g[6][8] = true; g[6][10] = true; g[6][12] = true; g[6][14] = true;
+            } 
+            else { // Random Chaos
+                for (let r = 0; r < 7; r++) {
+                    for (let c = 0; c < 16; c++) {
+                        if (Math.random() < 0.22) g[r][c] = true;
+                    }
                 }
+            }
+
+            syncSequencerGridUI();
+
+            // Trigger playback if stopped
+            if (!state.isPlaying) {
+                togglePlayback();
+            }
+
+            Swal.fire({
+                title: '🤖 AI ช่วยเขียนบีทกลองแล้ว!',
+                html: `ระบบประมวลผลเขียนแนวเพลง <b>"${genre.toUpperCase()}"</b> ลงตารางซีเควนเซอร์เรียบร้อย ลองปรับเพิ่มลดดูได้เลยครับ`,
+                icon: 'success',
+                timer: 2500,
+                showConfirmButton: false
+            });
+        }
+
+        aiPresetBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const genre = btn.dataset.preset;
+                generateAIPattern(genre);
             });
         });
 
-        function highlightSelectedMicPad(colIndex) {
-            // Remove selection class from all other mic pads
-            for (let c = 0; c < 4; c++) {
-                const otherPad = document.querySelector(`.pad[data-row="3"][data-col="${c}"]`);
-                otherPad.style.boxShadow = '';
+        // Clear all sequencer steps
+        function clearSequencer(alert = true) {
+            state.grid = Array(8).fill(null).map(() => Array(16).fill(false));
+            syncSequencerGridUI();
+            if (alert) {
+                Swal.fire({
+                    title: 'ล้างตารางจังหวะเรียบร้อย',
+                    icon: 'success',
+                    timer: 1000,
+                    showConfirmButton: false
+                });
             }
-            
-            state.selectedMicPadIndex = colIndex;
-            const targetPad = document.querySelector(`.pad[data-row="3"][data-col="${colIndex}"]`);
-            targetPad.style.boxShadow = '0 0 15px #10b981';
-            statusText.textContent = `เลือกช่องอัดไมค์ ${colIndex + 1} แล้ว กดปุ่ม "เริ่มบันทึกเสียง" ด้านล่างเพื่อบันทึก`;
         }
 
-        // Trigger recording button
-        recordMicTriggerBtn.addEventListener('click', triggerMicRecording);
+        clearBtn.addEventListener('click', () => clearSequencer(true));
 
-        // AI trigger button
-        aiBtn.addEventListener('click', triggerAIComposition);
+        // --- Export Mix WebM & Upload to Google Drive / Supabase ---
+        async function publishSong() {
+            const title = songTitleInput.value.trim();
+            if (!title) {
+                Swal.fire({
+                    title: 'กรุณาตั้งชื่อเพลง',
+                    text: 'กรุณากรอกชื่อผลงานดนตรีสร้างสรรค์ของคุณก่อนกดแชร์ครับ',
+                    icon: 'warning',
+                    confirmButtonColor: '#3b82f6',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
 
-        // Clear board button
-        clearBtn.addEventListener('click', () => clearBoard(true));
+            // Check if there are active notes on grid
+            let hasNotes = false;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 16; c++) {
+                    if (state.grid[r][c]) hasNotes = true;
+                }
+            }
 
-        // Share/Publish button
-        shareBtn.addEventListener('click', publishSong);
+            if (!hasNotes) {
+                Swal.fire({
+                    title: 'ตารางว่างเปล่า',
+                    text: 'กรุณากดเปิดใช้สเต็ปบนแถวซีเควนเซอร์อย่างน้อย 1 ช่องก่อนกดส่งแชร์ครับ',
+                    icon: 'warning',
+                    confirmButtonColor: '#3b82f6',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
 
-        // Exit / Back Home navigation
+            Swal.fire({
+                title: 'เตรียมการอัดบีทเพื่อส่งออก...',
+                html: 'กรุณารอสักครู่ ระบบกำลังจะเริ่มมิกซ์สัญญาณเสียงตามซีเควนซ์ตารางที่ระบุ...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            initAudio();
+
+            // Auto play if not playing
+            if (!state.isPlaying) {
+                togglePlayback();
+            }
+
+            // Set recorder trigger on step 0
+            state.recordMasterOnNextBeatZero = true;
+
+            setTimeout(() => {
+                Swal.close();
+                Swal.fire({
+                    title: '🔴 ระบบกำลังบันทึกบีทดนตรี...',
+                    text: 'กรุณาปล่อยให้จังหวะวนเล่นจบ 1 ห้องบาร์ (16 สเต็ป) เพื่อให้ได้ไฟล์เสียงลูปที่สมบูรณ์',
+                    icon: 'info',
+                    showConfirmButton: false,
+                    allowOutsideClick: false
+                });
+            }, 800);
+        }
+
+        async function uploadAndShareSong(audioBlob) {
+            const title = songTitleInput.value.trim();
+            const token = state.googleAccessToken || localStorage.getItem('google_provider_token');
+
+            Swal.close();
+
+            if (!token) {
+                Swal.fire({
+                    title: 'ไม่พบสิทธิ์ Google Drive',
+                    html: `คุณไม่ได้ล็อกอินผ่าน Google หรือโทเค็นหมดอายุ ระบบจะบันทึกเสียงเป็นบอร์ดจำลองในเครื่องให้ก่อน<br><br><span class="text-xs text-slate-400">วิธีแก้ไข: กรุณาล็อกอินใหม่ผ่านหน้าหลักของแอปเพื่ออัปเดตสิทธิ์ครับ</span>`,
+                    icon: 'warning',
+                    confirmButtonText: 'บันทึกแบบจำลองในเครื่อง'
+                }).then(async () => {
+                    await saveSongMetadataToSupabase(title, "MOCK_DRIVE_ID_" + Date.now());
+                });
+                return;
+            }
+
+            Swal.fire({
+                title: 'กำลังส่งออกบีทดนตรี...',
+                html: 'กรุณารอสักครู่ กำลังนำไฟล์ขึ้น Google Drive ส่วนตัวของคุณ...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            try {
+                // Upload file to Google Drive (Multipart upload)
+                const metadata = {
+                    name: `${title}.webm`,
+                    mimeType: 'audio/webm',
+                    description: 'Created with Custom Beat Maker Pro on Music Borrow App'
+                };
+                
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', audioBlob);
+
+                const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: form
+                });
+
+                if (!uploadResponse.ok) {
+                    const errText = await uploadResponse.text();
+                    throw new Error(`Google Upload Error: ${uploadResponse.status} - ${errText}`);
+                }
+
+                const fileData = await uploadResponse.json();
+                const fileId = fileData.id;
+
+                // Adjust Drive permissions to public reader view
+                await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        role: 'reader',
+                        type: 'anyone'
+                    })
+                });
+
+                await saveSongMetadataToSupabase(title, fileId);
+
+            } catch (err) {
+                console.error("Google Drive upload failed", err);
+                Swal.fire({
+                    title: 'เกิดข้อผิดพลาดในการอัปโหลด',
+                    text: err.message || 'ไม่สามารถบันทึกบีทลง Google Drive ได้สำเร็จ',
+                    icon: 'error',
+                    confirmButtonText: 'ตกลง'
+                });
+            }
+        }
+
+        async function saveSongMetadataToSupabase(title, fileId) {
+            try {
+                const { data, error } = await studentLoopsApi.saveLoop(
+                    title,
+                    state.bpm,
+                    state.grid,
+                    fileId
+                );
+
+                if (error) throw error;
+
+                // Fire parent window callback notifier
+                const mockSong = {
+                    id: data.id,
+                    title: title,
+                    bpm: state.bpm,
+                    pad_sequence: state.grid,
+                    google_drive_id: fileId,
+                    creator: state.user ? `${state.user.first_name || 'Student'} ${state.user.last_name || ''}` : "GUEST PLAYER",
+                    created_at: new Date().toISOString()
+                };
+
+                const targetWindow = window.opener || window.parent;
+                if (targetWindow) {
+                    targetWindow.postMessage({
+                        type: 'NEW_STUDENT_LOOP',
+                        song: mockSong
+                    }, '*');
+                }
+
+                Swal.fire({
+                    title: 'แชร์เพลงสำเร็จ! 🎉',
+                    html: `บีทเพลง <b>"${title}"</b> ได้รับการอัปโหลดลงไดรฟ์และบันทึกขึ้น Learning Feed เรียบร้อยครับ!`,
+                    icon: 'success',
+                    confirmButtonColor: '#10b981',
+                    confirmButtonText: 'ตกลง'
+                }).then(() => {
+                    songTitleInput.value = '';
+                    if (state.isPlaying) togglePlayback();
+                });
+
+            } catch (err) {
+                console.error("Supabase metadata save failed", err);
+                Swal.fire('แชร์ข้อมูลลงฟีดไม่สำเร็จ', 'อัปโหลดเสียงลง Google Drive สำเร็จ แต่ไม่สามารถลงทะเบียนหน้าแอปได้: ' + err.message, 'warning');
+            }
+        }
+
+        // Close page window / Back Home navigation
         backHomeBtn.addEventListener('click', () => {
             const targetWindow = window.opener || window.parent;
             if (targetWindow) {
                 targetWindow.postMessage({ type: 'CLOSE_LOOPER' }, '*');
             }
-            window.close(); // Close tab if opened as popup
+            window.close();
         });
 
-        // Keyboard bindings for fun!
-        // Row 0: 1, 2, 3, 4
-        // Row 1: q, w, e, r
-        // Row 2: a, s, d, f
-        // Row 3: z, x, c, v
+        shareBtn.addEventListener('click', publishSong);
+
+        // Keyboard bindings
+        // Row 1 (pads 0-3): '1', '2', '3', '4'
+        // Row 2 (pads 4-7): 'q', 'w', 'e', 'r'
         const keymap = {
-            '1': [0,0], '2': [0,1], '3': [0,2], '4': [0,3],
-            'q': [1,0], 'w': [1,1], 'e': [1,2], 'r': [1,3],
-            'a': [2,0], 's': [2,1], 'd': [2,2], 'f': [2,3],
-            'z': [3,0], 'x': [3,1], 'c': [3,2], 'v': [3,3]
+            '1': 0, '2': 1, '3': 2, '4': 3,
+            'q': 4, 'w': 5, 'e': 6, 'r': 7
         };
 
         window.addEventListener('keydown', (e) => {
-            const padCoords = keymap[e.key.toLowerCase()];
-            if (padCoords) {
-                const [row, col] = padCoords;
-                // Avoid firing when user is typing in the song title input
-                if (document.activeElement === songTitleInput) return;
-                
-                const padEl = document.querySelector(`.pad[data-row="${row}"][data-col="${col}"]`);
+            if (document.activeElement === songTitleInput) return;
+            
+            const padIndex = keymap[e.key.toLowerCase()];
+            if (padIndex !== undefined) {
+                e.preventDefault();
+                const padEl = document.querySelectorAll('.mpc-pad')[padIndex];
                 if (padEl) padEl.click();
             }
-            if (e.key === ' ' && document.activeElement !== songTitleInput) {
+            
+            if (e.key === ' ') {
                 e.preventDefault();
                 togglePlayback();
             }
         });
 
+        // Initialize UI
+        playBtn.addEventListener('click', togglePlayback);
+        renderSequencerGrid();
+
         // Remix loader integration
-        // Handles landing via redirect with parameters: musiccreator.html?remix=123
         window.addEventListener('DOMContentLoaded', async () => {
             const params = new URLSearchParams(window.location.search);
             const remixId = params.get('remix');
@@ -1301,7 +1570,7 @@
                     console.warn("Could not fetch loop from database, trying local cache...", err);
                 }
                 
-                // Fallback to local storage
+                // Fallback local storage mock loop cache
                 if (!targetSong) {
                     const cachedSongs = JSON.parse(localStorage.getItem('student_loops_mock') || '[]');
                     targetSong = cachedSongs.find(s => s.id == remixId);
@@ -1310,30 +1579,89 @@
                 Swal.close();
                 
                 if (targetSong) {
-                    // Set title and active pads
                     songTitleInput.value = `${targetSong.title} Remix`;
                     state.bpm = targetSong.bpm;
                     bpmNumber.value = targetSong.bpm;
                     bpmSlider.value = targetSong.bpm;
                     
-                    state.activePads = targetSong.pad_sequence;
-                    for(let r=0; r<4; r++) {
-                        for(let c=0; c<4; c++) {
-                            const padEl = document.querySelector(`.pad[data-row="${r}"][data-col="${c}"]`);
-                            if (padEl) {
-                                padEl.classList.toggle('active', state.activePads[r][c]);
+                    const loadedSeq = targetSong.pad_sequence;
+                    
+                    // Backward compatibility parser mapping (4x4 to 8x16 sequencer grid)
+                    if (Array.isArray(loadedSeq) && loadedSeq.length === 4) {
+                        console.log("Detecting legacy 4x4 loop sequence. Translating to 8x16 sequencer grid...");
+                        state.grid = Array(8).fill(null).map(() => Array(16).fill(false));
+                        
+                        // Row 0 (Drums): translate the 4 options to steps
+                        if (loadedSeq[0][0]) { // Simple Rock
+                            state.grid[0][0] = true; state.grid[0][8] = true;
+                            state.grid[1][4] = true; state.grid[1][12] = true;
+                            for (let i = 0; i < 16; i += 2) state.grid[2][i] = true;
+                        }
+                        if (loadedSeq[0][1]) { // Hip Hop
+                            state.grid[0][0] = true; state.grid[0][6] = true; state.grid[0][10] = true;
+                            state.grid[1][4] = true; state.grid[1][12] = true;
+                            for (let i = 0; i < 16; i += 2) state.grid[2][i] = true;
+                        }
+                        if (loadedSeq[0][2]) { // House Beat
+                            state.grid[0][0] = true; state.grid[0][4] = true; state.grid[0][8] = true; state.grid[0][12] = true;
+                            state.grid[1][4] = true; state.grid[1][12] = true;
+                            state.grid[3][2] = true; state.grid[3][6] = true; state.grid[3][10] = true; state.grid[3][14] = true;
+                        }
+                        if (loadedSeq[0][3]) { // Trap Roll
+                            state.grid[0][0] = true; state.grid[0][2] = true; state.grid[0][8] = true; state.grid[0][10] = true;
+                            state.grid[1][4] = true; state.grid[1][12] = true;
+                            for (let i = 0; i < 16; i++) state.grid[2][i] = true;
+                        }
+
+                        // Row 1 (Bass)
+                        if (loadedSeq[1][0]) {
+                            state.grid[5][0] = true; state.grid[5][4] = true; state.grid[5][8] = true; state.grid[5][12] = true;
+                        }
+                        if (loadedSeq[1][1]) {
+                            for (let i = 0; i < 16; i += 2) state.grid[5][i] = true;
+                        }
+                        if (loadedSeq[1][2]) {
+                            state.grid[5][0] = true; state.grid[5][8] = true; state.grid[5][10] = true;
+                        }
+                        if (loadedSeq[1][3]) {
+                            for (let i = 0; i < 16; i += 2) {
+                                if (i % 4 !== 3) state.grid[5][i] = true;
                             }
                         }
+
+                        // Row 2 (Synths)
+                        if (loadedSeq[2][0]) {
+                            state.grid[6][0] = true; state.grid[6][8] = true;
+                        }
+                        if (loadedSeq[2][1]) {
+                            for (let i = 0; i < 16; i += 2) state.grid[6][i] = true;
+                        }
+                        if (loadedSeq[2][2]) {
+                            state.grid[6][0] = true; state.grid[6][4] = true; state.grid[6][8] = true; state.grid[6][12] = true;
+                        }
+                        if (loadedSeq[2][3]) {
+                            state.grid[6][0] = true;
+                        }
+
+                        // Row 3 (Mic)
+                        if (loadedSeq[3][0] || loadedSeq[3][1] || loadedSeq[3][2] || loadedSeq[3][3]) {
+                            state.grid[7][0] = true; // Trigger recorded sample on beat 0
+                        }
+                    } else if (Array.isArray(loadedSeq) && loadedSeq.length === 8) {
+                        state.grid = loadedSeq;
                     }
+                    
+                    syncSequencerGridUI();
+                    
                     Swal.fire({
-                        title: 'โหลดดีไซน์เพลงสำหรับ Remix! 🎛️',
-                        html: `โหลดข้อมูลเพลง <b>"${targetSong.title}"</b> ขึ้นตาราง Launchpad เรียบร้อย แต่งเติมเพลงต่อได้เลยครับ!`,
+                        title: 'โหลดดีไซน์เพลงสำหรับการ Remix! 🎛️',
+                        html: `ข้อมูลเพลง <b>"${targetSong.title}"</b> ถูกแปลงเข้าสู่ซีเควนเซอร์เรียบร้อยแล้ว แต่งเติมจังหวะต่อได้เลยครับ!`,
                         icon: 'success',
-                        timer: 3000,
+                        timer: 2500,
                         showConfirmButton: false
                     });
                 } else {
-                    Swal.fire('ไม่พบข้อมูลเพลง', 'ไม่สามารถโหลดข้อมูลเพลงสำหรับ Remix ได้', 'error');
+                    Swal.fire('ไม่พบข้อมูลเพลง', 'ไม่สามารถดึงข้อมูลเพลงสำหรับการ Remix ได้', 'error');
                 }
             }
         });
