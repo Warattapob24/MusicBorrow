@@ -3254,7 +3254,7 @@ function renderOverviewPanels() {
 
     // ✨ 2. จัดการคิวแจ้งซ่อม (Production UI - พร้อมเปลี่ยนสถานะ & ดูอาการเสีย)
     const activeRepairs = (state.repairs || [])
-        .filter(r => r.repair_status === 'แจ้งซ่อม' || r.repair_status === 'กำลังซ่อม')
+        .filter(r => r.repair_status === 'แจ้งซ่อม' || r.repair_status === 'รอซ่อม' || r.repair_status === 'กำลังซ่อม')
         .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
     let repHtml = !activeRepairs.length 
@@ -3275,10 +3275,11 @@ function renderOverviewPanels() {
                 <select 
                     class="oad-select" 
                     style="font-size: 0.75rem; padding: 0.2rem 1.5rem 0.2rem 0.5rem; height: auto; min-height: 0; min-width: 120px; cursor: pointer; border: 1px solid var(--oad-border);"
-                    onchange="window.__oadQuickUpdateRepairStatus('${r.id}', '${r.instrument_id}', this.value, this)"
+                    onchange="window.__oadQuickUpdateRepairStatus('${r.id}', '${r.instrument_id}', this.value, this, '${r.reported_by_user_id || r.student_id || ''}')"
                     data-old-value="${r.repair_status}"
                 >
                     <option value="แจ้งซ่อม" ${r.repair_status === 'แจ้งซ่อม' ? 'selected' : ''}>🔴 แจ้งซ่อม</option>
+                    <option value="รอซ่อม" ${r.repair_status === 'รอซ่อม' ? 'selected' : ''}>🟠 รอซ่อม (ยืมได้)</option>
                     <option value="กำลังซ่อม" ${r.repair_status === 'กำลังซ่อม' ? 'selected' : ''}>🟡 กำลังซ่อม</option>
                     <option value="ซ่อมเสร็จสิ้น" ${r.repair_status === 'ซ่อมเสร็จสิ้น' ? 'selected' : ''}>🟢 ซ่อมเสร็จสิ้น</option>
                     <option value="ไม่สามารถซ่อมได้" ${r.repair_status === 'ไม่สามารถซ่อมได้' ? 'selected' : ''}>⚫ ไม่สามารถซ่อมได้</option>
@@ -4602,7 +4603,7 @@ window.__oadDispatchNow = async () => {
 // ==========================================
 // 🚀 ฟังก์ชันอัปเดตสถานะการซ่อมแบบด่วน (Inline) - SweetAlert Version
 // ==========================================
-window.__oadQuickUpdateRepairStatus = async (repairId, instrumentId, newStatus, selectElem) => {
+window.__oadQuickUpdateRepairStatus = async (repairId, instrumentId, newStatus, selectElem, reporterId) => {
     const oldStatus = selectElem.getAttribute('data-old-value');
     
     // 1. ถามยืนยันด้วย SweetAlert
@@ -4631,7 +4632,6 @@ window.__oadQuickUpdateRepairStatus = async (repairId, instrumentId, newStatus, 
             }
         });
         
-        // 🛠️ [แก้ไขใหม่] สร้างตัวแปรมารับผลลัพธ์จาก API
         let apiResult;
 
         if (newStatus === 'ซ่อมเสร็จสิ้น' || newStatus === 'ไม่สามารถซ่อมได้') {
@@ -4641,11 +4641,47 @@ window.__oadQuickUpdateRepairStatus = async (repairId, instrumentId, newStatus, 
             });
         } else {
             apiResult = await api.updateRepair(repairId, { repair_status: newStatus });
+            
+            // Sync instrument status/condition
+            let instStatus = null;
+            let instCondition = null;
+            if (newStatus === 'แจ้งซ่อม') {
+                instStatus = 'ชำรุด';
+            } else if (newStatus === 'รอซ่อม') {
+                instStatus = 'พร้อมใช้งาน';
+                instCondition = 'พอใช้';
+            } else if (newStatus === 'กำลังซ่อม') {
+                instStatus = 'ส่งซ่อม';
+                instCondition = 'ดี';
+            }
+            
+            if (instStatus) {
+                const { error: instErr } = await instrumentsExt.updateStatus(Number(instrumentId), instStatus, instCondition || 'ปกติ');
+                if (instErr) console.error('[Quick Repair Status Sync Error]:', instErr);
+            }
         }
         
         // 🚨 เช็คว่าถ้า API ทำงานพลาด ให้โยน Error ออกไปเข้า Catch
         if (apiResult && apiResult.error) {
             throw apiResult.error;
+        }
+
+        // 🔔 Send notification to reporter if present
+        if (reporterId && oldStatus !== newStatus) {
+            let notifBody = '';
+            if (newStatus === 'รอซ่อม') {
+                notifBody = 'เครื่องดนตรียังใช้งานได้ระหว่างรอซ่อม';
+            } else if (newStatus === 'กำลังซ่อม') {
+                notifBody = 'เครื่องดนตรีของคุณกำลังอยู่ระหว่างการซ่อม';
+            } else if (newStatus === 'ซ่อมเสร็จสิ้น') {
+                notifBody = 'ซ่อมเสร็จแล้ว เครื่องพร้อมใช้งาน';
+            } else if (newStatus === 'ไม่สามารถซ่อมได้') {
+                notifBody = 'ไม่สามารถซ่อมได้ เครื่องถูกปรับเป็นชำรุด';
+            }
+            
+            if (notifBody && typeof notifications !== 'undefined' && typeof notifications.save === 'function') {
+                await notifications.save(reporterId, 'อัปเดตสถานะการแจ้งซ่อม', notifBody);
+            }
         }
         
         Swal.fire({ 

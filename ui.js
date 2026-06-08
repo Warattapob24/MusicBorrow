@@ -2163,14 +2163,12 @@ window.__oadShowAdminQrManagement = async function(instrumentId) {
             instrumentsExt.getScanDetails(Number(instrumentId)),
             supabase
                 .from('borrow_logs')
-                .select('*, users(first_name, last_name, prefix, class_level)')
+                .select('*')
                 .eq('instrument_id', Number(instrumentId))
                 .order('borrow_timestamp', { ascending: false }),
             supabase
                 .from('users')
-                .select('id, first_name, last_name, prefix, class_level')
-                .neq('student_group', 'deactivated')
-                .neq('role', 'admin')
+                .select('id, first_name, last_name, prefix, class_level, role, student_group')
                 .order('first_name')
         ]);
 
@@ -2200,6 +2198,24 @@ window.__oadShowAdminQrManagement = async function(instrumentId) {
     }
 };
 
+window.filterAdminBorrowUsers = function(query) {
+    const select = document.getElementById('admin-borrow-user-select');
+    if (!select || !window.__cachedAdminUsers) return;
+    const search = query.toLowerCase().trim();
+    const filtered = window.__cachedAdminUsers.filter(u => {
+        const fullName = `${u.prefix || ''} ${u.first_name} ${u.last_name} ${u.class_level || ''}`.toLowerCase();
+        return fullName.includes(search);
+    });
+    
+    const currentVal = select.value;
+    let html = '<option value="">-- ค้นหา/เลือกนักเรียน --</option>';
+    filtered.forEach(u => {
+        const selected = u.id === currentVal ? 'selected' : '';
+        html += `<option value="${u.id}" ${selected}>${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`;
+    });
+    select.innerHTML = html;
+};
+
 window.renderAdminQrModalContent = function(instrumentId, instrument, logs, users) {
     const container = document.getElementById('admin-qr-modal-content');
     if (!container) return;
@@ -2223,7 +2239,7 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
 
     let borrowerHtml = '';
     if (status === 'ถูกยืมอยู่' && currentBorrowerLog) {
-        const borrower = currentBorrowerLog.users;
+        const borrower = users.find(u => u.id === currentBorrowerLog.student_id);
         const bName = borrower ? `${escapeHtml(borrower.prefix || '')} ${escapeHtml(borrower.first_name)} ${escapeHtml(borrower.last_name)}` : 'ไม่พบข้อมูลผู้ใช้';
         const bClass = borrower?.class_level ? escapeHtml(borrower.class_level) : 'ไม่ระบุ';
         const bDate = new Date(currentBorrowerLog.borrow_timestamp).toLocaleString('th-TH');
@@ -2247,6 +2263,10 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
         `;
     }
 
+    // Filter active students for dropdown
+    const activeStudents = users.filter(u => u.student_group !== 'deactivated' && u.role !== 'admin');
+    window.__cachedAdminUsers = activeStudents;
+
     // Render Quick Actions Buttons
     let actionsHtml = '';
     if (status === 'ถูกยืมอยู่' && currentBorrowerLog) {
@@ -2262,9 +2282,10 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
                 <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color:#0f172a;">📝 ยืมแทนนักเรียน (Quick Borrow)</h6>
                 <div style="display:flex; flex-direction:column; gap:0.5rem;">
                     <div>
+                        <input type="text" id="admin-borrow-user-search" placeholder="🔍 พิมพ์ค้นหารายชื่อ..." style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid #cbd5e1; font-size:0.9em; margin-bottom:0.5rem;" oninput="window.filterAdminBorrowUsers(this.value)">
                         <select id="admin-borrow-user-select" style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid #cbd5e1; font-size:0.9em;">
                             <option value="">-- ค้นหา/เลือกนักเรียน --</option>
-                            ${users.map(u => `<option value="${u.id}">${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`).join('')}
+                            ${activeStudents.map(u => `<option value="${u.id}">${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`).join('')}
                         </select>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -2288,7 +2309,7 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
     let historyTableRows = '';
     if (recentLogs.length > 0) {
         historyTableRows = recentLogs.map(l => {
-            const borrower = l.users;
+            const borrower = users.find(u => u.id === l.student_id);
             const name = borrower ? `${escapeHtml(borrower.first_name)} ${escapeHtml(borrower.last_name)}` : 'ไม่ระบุ';
             const bDate = new Date(l.borrow_timestamp).toLocaleDateString('th-TH') + ' ' + new Date(l.borrow_timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
             const rDate = l.return_timestamp 
@@ -2344,14 +2365,12 @@ window.refreshAdminQrModal = async function(instrumentId) {
             instrumentsExt.getScanDetails(Number(instrumentId)),
             supabase
                 .from('borrow_logs')
-                .select('*, users(first_name, last_name, prefix, class_level)')
+                .select('*')
                 .eq('instrument_id', Number(instrumentId))
                 .order('borrow_timestamp', { ascending: false }),
             supabase
                 .from('users')
-                .select('id, first_name, last_name, prefix, class_level')
-                .neq('student_group', 'deactivated')
-                .neq('role', 'admin')
+                .select('id, first_name, last_name, prefix, class_level, role, student_group')
                 .order('first_name')
         ]);
 
@@ -2367,6 +2386,7 @@ window.refreshAdminQrModal = async function(instrumentId) {
         }
     }
 };
+
 
 window.adminQuickReturn = async function(instrumentId, studentId, isDamaged) {
     let problemDescription = null;
