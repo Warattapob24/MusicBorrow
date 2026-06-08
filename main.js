@@ -16,6 +16,25 @@ import { showDashboardView, showAuthView } from './ui.js';
 import { addSafeEventListener } from './utils.js';
 import { scheduledNotificationsApi } from './api.js';
 
+// ─────────────────────────────────────────────
+// Parse QR Scan URL parameter early
+// ─────────────────────────────────────────────
+try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const scanId = urlParams.get('scan');
+    if (scanId) {
+        localStorage.setItem('pendingScanId', scanId);
+        // Clean URL parameter
+        urlParams.delete('scan');
+        const cleanSearch = urlParams.toString();
+        const newUrl = window.location.pathname + (cleanSearch ? '?' + cleanSearch : '');
+        window.history.replaceState({}, document.title, newUrl);
+        console.log('[QR] Saved pendingScanId to localStorage:', scanId);
+    }
+} catch (e) {
+    console.error('[QR] Failed to parse scan URL parameter:', e);
+}
+
 window.addEventListener('offline', () => {
     document.getElementById('offline-toast')?.classList.add('show');
 });

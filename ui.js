@@ -6,9 +6,9 @@
 import { currentUser, getUserProfile, isUserBlocked, setCurrentUser, getCurrentUser, requestPushPermission } from './auth.js';
 import { 
     borrow, borrowExt, repair, usersExt, authApi, instrumentsExt, realtimeApi,
-    badgesExt, knowledgeExt, rankingsExt, gamesExt, notificationsExt 
+    badgesExt, knowledgeExt, rankingsExt, gamesExt, notificationsExt, adminExt
 } from './api.js';
-import { ICONS, VAPID_PUBLIC_KEY } from './config.js';
+import { supabase, ICONS, VAPID_PUBLIC_KEY } from './config.js';
 import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
 import { initAdminDashboard, destroyAdminDashboard } from './admin-dashboard.js';
 import { initStudentDashboard, destroyStudentDashboard } from './student-dashboard.js';
@@ -332,10 +332,13 @@ export async function showDashboardView(user) {
 
     const dashboardSection = document.getElementById('dashboard-section');
     if (currentUser && currentUser.id === user.id && !dashboardSection.classList.contains('hidden')) {
-        const pendingScanId = sessionStorage.getItem('pendingScanId');
+        const pendingScanId = localStorage.getItem('pendingScanId') || sessionStorage.getItem('pendingScanId');
         if (pendingScanId) {
+            localStorage.removeItem('pendingScanId');
             sessionStorage.removeItem('pendingScanId');
-            await processQrScan(pendingScanId);
+            setTimeout(async () => {
+                await processQrScan(pendingScanId);
+            }, 500);
         }
         return;
     }
@@ -421,10 +424,13 @@ export async function showDashboardView(user) {
              requestPushPermission(user.id, VAPID_PUBLIC_KEY);
         }
 
-        const pendingScanId = sessionStorage.getItem('pendingScanId');
+        const pendingScanId = localStorage.getItem('pendingScanId') || sessionStorage.getItem('pendingScanId');
         if (pendingScanId) {
+            localStorage.removeItem('pendingScanId');
             sessionStorage.removeItem('pendingScanId');
-            await processQrScan(pendingScanId);
+            setTimeout(async () => {
+                await processQrScan(pendingScanId);
+            }, 500);
         }
 
     } catch (error) {
@@ -1744,8 +1750,7 @@ export async function processQrScan(instrumentId) {
     if (!instrumentId) return;
 
     if (currentUser && currentUser.role === 'admin') {
-        Swal.fire('แอดมิน', `สแกน QR Code ของเครื่องดนตรี ID: ${instrumentId}`, 'info');
-        return;
+        return window.__oadShowAdminQrManagement(instrumentId);
     }
 
     if (!currentUser) {
@@ -2142,6 +2147,434 @@ export function lazyLoadSection(sectionSelector, loadingFunction) {
 
     observer.observe(section);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 👑 Admin QR Code Scanned Management Modal & Quick Actions
+// ─────────────────────────────────────────────────────────────────────────────
+window.__oadShowAdminQrManagement = async function(instrumentId) {
+    Swal.fire({
+        title: 'กำลังดึงข้อมูลเครื่องดนตรี...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    try {
+        const [scanRes, logsRes, usersRes] = await Promise.all([
+            instrumentsExt.getScanDetails(Number(instrumentId)),
+            supabase
+                .from('borrow_logs')
+                .select('*, users(first_name, last_name, prefix, class_level)')
+                .eq('instrument_id', Number(instrumentId))
+                .order('borrow_timestamp', { ascending: false }),
+            supabase
+                .from('users')
+                .select('id, first_name, last_name, prefix, class_level')
+                .neq('student_group', 'deactivated')
+                .neq('role', 'admin')
+                .order('first_name')
+        ]);
+
+        if (scanRes.error) throw scanRes.error;
+        if (logsRes.error) throw logsRes.error;
+        if (usersRes.error) throw usersRes.error;
+
+        const scanResult = scanRes.data;
+        if (!scanResult) throw new Error(`ไม่พบเครื่องดนตรี ID: ${instrumentId} ในระบบ`);
+
+        const logs = logsRes.data || [];
+        const users = usersRes.data || [];
+
+        Swal.fire({
+            title: 'จัดการเครื่องดนตรี (ผู้ดูแลระบบ)',
+            html: '<div id="admin-qr-modal-content" style="text-align:left; font-size:0.95rem; color: #1e293b;"></div>',
+            width: '600px',
+            showConfirmButton: false,
+            showCloseButton: true,
+            didOpen: () => {
+                window.renderAdminQrModalContent(instrumentId, scanResult, logs, users);
+            }
+        });
+    } catch (err) {
+        console.error('[Admin QR Error]:', err);
+        Swal.fire('เกิดข้อผิดพลาด!', err?.message || 'ไม่สามารถโหลดข้อมูลผู้ดูแลระบบได้', 'error');
+    }
+};
+
+window.renderAdminQrModalContent = function(instrumentId, instrument, logs, users) {
+    const container = document.getElementById('admin-qr-modal-content');
+    if (!container) return;
+
+    const currentBorrowerLog = logs.find(l => l.return_timestamp === null);
+    
+    // Status Badge
+    let statusBadge = '';
+    const status = instrument.status;
+    if (status === 'พร้อมใช้งาน') {
+        statusBadge = '<span style="background-color:#10b981; color:white; padding:0.2rem 0.6rem; border-radius:12px; font-weight:bold; font-size:0.85em;">🟢 พร้อมใช้งาน</span>';
+    } else if (status === 'ถูกยืมอยู่') {
+        statusBadge = '<span style="background-color:#ef4444; color:white; padding:0.2rem 0.6rem; border-radius:12px; font-weight:bold; font-size:0.85em;">🔴 ถูกยืมอยู่</span>';
+    } else if (status === 'ส่งซ่อม') {
+        statusBadge = '<span style="background-color:#f59e0b; color:white; padding:0.2rem 0.6rem; border-radius:12px; font-weight:bold; font-size:0.85em;">🟡 ส่งซ่อม</span>';
+    } else if (status === 'ชำรุด') {
+        statusBadge = '<span style="background-color:#64748b; color:white; padding:0.2rem 0.6rem; border-radius:12px; font-weight:bold; font-size:0.85em;">⚫ ชำรุด</span>';
+    } else {
+        statusBadge = `<span style="background-color:#6b7280; color:white; padding:0.2rem 0.6rem; border-radius:12px; font-weight:bold; font-size:0.85em;">${escapeHtml(status)}</span>`;
+    }
+
+    let borrowerHtml = '';
+    if (status === 'ถูกยืมอยู่' && currentBorrowerLog) {
+        const borrower = currentBorrowerLog.users;
+        const bName = borrower ? `${escapeHtml(borrower.prefix || '')} ${escapeHtml(borrower.first_name)} ${escapeHtml(borrower.last_name)}` : 'ไม่พบข้อมูลผู้ใช้';
+        const bClass = borrower?.class_level ? escapeHtml(borrower.class_level) : 'ไม่ระบุ';
+        const bDate = new Date(currentBorrowerLog.borrow_timestamp).toLocaleString('th-TH');
+        const dDate = currentBorrowerLog.due_date ? new Date(currentBorrowerLog.due_date).toLocaleDateString('th-TH') : 'ไม่มีกำหนด';
+        borrowerHtml = `
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 0.75rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; color: #1e293b;">
+                <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color:#0f172a;">👤 ผู้ยืมในปัจจุบัน</h6>
+                <div style="display:grid; grid-template-columns: 80px 1fr; gap: 0.25rem 0.5rem; font-size:0.9em;">
+                    <span style="color:#64748b;">ชื่อผู้ยืม:</span> <strong>${bName}</strong>
+                    <span style="color:#64748b;">ระดับชั้น:</span> <strong>${bClass}</strong>
+                    <span style="color:#64748b;">วันที่ยืม:</span> <strong>${bDate} น.</strong>
+                    <span style="color:#64748b;">กำหนดคืน:</span> <strong>${currentBorrowerLog.is_take_home ? `<span style="color:#ef4444;">${dDate} (ยืมกลับบ้าน)</span>` : 'ยืมซ้อมในห้อง'}</strong>
+                </div>
+            </div>
+        `;
+    } else {
+        borrowerHtml = `
+            <div style="background: #f8fafc; padding: 0.75rem; border-radius: 0.75rem; margin-bottom: 1rem; border: 1px dashed #cbd5e1; text-align:center; color: #64748b;">
+                ไม่มีผู้ยืมเครื่องดนตรีนี้ในปัจจุบัน
+            </div>
+        `;
+    }
+
+    // Render Quick Actions Buttons
+    let actionsHtml = '';
+    if (status === 'ถูกยืมอยู่' && currentBorrowerLog) {
+        actionsHtml = `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom:1rem;">
+                <button onclick="window.adminQuickReturn(${instrumentId}, '${currentBorrowerLog.student_id}', false)" style="background-color:#10b981; border-color:#10b981; color:white; padding:0.5rem; font-size:0.9em; font-weight:bold; border-radius:0.5rem; cursor:pointer; width:100%;">✅ คืนเครื่อง (ปกติ)</button>
+                <button onclick="window.adminQuickReturn(${instrumentId}, '${currentBorrowerLog.student_id}', true)" style="background-color:#ef4444; border-color:#ef4444; color:white; padding:0.5rem; font-size:0.9em; font-weight:bold; border-radius:0.5rem; cursor:pointer; width:100%;">❌ คืนเครื่อง (ชำรุด/ส่งซ่อม)</button>
+            </div>
+        `;
+    } else if (status === 'พร้อมใช้งาน') {
+        actionsHtml = `
+            <div style="background: #f1f5f9; padding: 1rem; border-radius: 0.75rem; margin-bottom:1rem; border: 1px solid #e2e8f0; color: #1e293b;">
+                <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color:#0f172a;">📝 ยืมแทนนักเรียน (Quick Borrow)</h6>
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                    <div>
+                        <select id="admin-borrow-user-select" style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid #cbd5e1; font-size:0.9em;">
+                            <option value="">-- ค้นหา/เลือกนักเรียน --</option>
+                            ${users.map(u => `<option value="${u.id}">${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="margin:0; font-size:0.9em; display:flex; align-items:center; gap:0.25rem; cursor:pointer; color: #1e293b;">
+                            <input type="checkbox" id="admin-borrow-takehome" style="margin:0;"> ยืมกลับบ้าน (7 วัน)
+                        </label>
+                        <button onclick="window.adminQuickBorrow(${instrumentId})" style="background-color:#3b82f6; border-color:#3b82f6; color:white; padding:0.4rem 1.2rem; font-size:0.9em; font-weight:bold; border-radius:0.5rem; cursor:pointer;">ยืมด่วน</button>
+                    </div>
+                </div>
+            </div>
+            <button onclick="window.adminQuickReportRepair(${instrumentId})" style="background-color:#f59e0b; border-color:#f59e0b; color:white; padding:0.5rem; font-size:0.9em; font-weight:bold; border-radius:0.5rem; cursor:pointer; width:100%; margin-bottom:1rem;">🔧 ส่งแจ้งซ่อม / ปรับชำรุด</button>
+        `;
+    } else { // 'ส่งซ่อม' or 'ชำรุด'
+        actionsHtml = `
+            <button onclick="window.adminQuickRepairComplete(${instrumentId})" style="background-color:#10b981; border-color:#10b981; color:white; padding:0.5rem; font-size:0.9em; font-weight:bold; border-radius:0.5rem; cursor:pointer; width:100%; margin-bottom:1rem;">✅ ซ่อมเสร็จสิ้น (ปรับเป็นพร้อมใช้งาน)</button>
+        `;
+    }
+
+    // Render Recent History Table
+    const recentLogs = logs.slice(0, 5);
+    let historyTableRows = '';
+    if (recentLogs.length > 0) {
+        historyTableRows = recentLogs.map(l => {
+            const borrower = l.users;
+            const name = borrower ? `${escapeHtml(borrower.first_name)} ${escapeHtml(borrower.last_name)}` : 'ไม่ระบุ';
+            const bDate = new Date(l.borrow_timestamp).toLocaleDateString('th-TH') + ' ' + new Date(l.borrow_timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+            const rDate = l.return_timestamp 
+                ? (new Date(l.return_timestamp).toLocaleDateString('th-TH') + ' ' + new Date(l.return_timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.') 
+                : '<span style="color:#ef4444; font-weight:bold;">กำลังยืม</span>';
+            return `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 0.5rem 0.25rem;">${name}</td>
+                    <td style="padding: 0.5rem 0.25rem;">${bDate}</td>
+                    <td style="padding: 0.5rem 0.25rem;">${rDate}</td>
+                </tr>
+            `;
+        }).join('');
+    } else {
+        historyTableRows = '<tr><td colspan="3" style="text-align:center; padding: 1rem; color:#64748b;">ไม่มีประวัติการยืมเครื่องดนตรีนี้</td></tr>';
+    }
+
+    container.innerHTML = `
+        <div style="margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:1.15rem; font-weight:bold; color:#0f172a;">${escapeHtml(instrument.instrument_name)} (${escapeHtml(instrument.type || 'เครื่องดนตรี')})</span>
+            ${statusBadge}
+        </div>
+        
+        ${borrowerHtml}
+        ${actionsHtml}
+
+        <h6 style="margin:1rem 0 0.5rem 0; font-weight:700; font-size:0.95rem; color:#0f172a;">📜 ประวัติการยืม 5 ครั้งล่าสุด</h6>
+        <div style="border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow:hidden;">
+            <table style="width:100%; border-collapse:collapse; margin:0; font-size:0.85em; text-align:left; color:#334155;">
+                <thead>
+                    <tr style="background:#f1f5f9; border-bottom:1px solid #e2e8f0;">
+                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: #1e293b;">ผู้ยืม</th>
+                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: #1e293b;">วันที่ยืม</th>
+                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: #1e293b;">วันที่คืน</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${historyTableRows}
+                </tbody>
+            </table>
+        </div>
+    `;
+};
+
+window.refreshAdminQrModal = async function(instrumentId) {
+    const contentEl = document.getElementById('admin-qr-modal-content');
+    if (contentEl) {
+        contentEl.innerHTML = '<div aria-busy="true" style="text-align:center; padding:2rem; color:#64748b;">กำลังรีโหลดข้อมูลใหม่...</div>';
+    }
+
+    try {
+        const [scanRes, logsRes, usersRes] = await Promise.all([
+            instrumentsExt.getScanDetails(Number(instrumentId)),
+            supabase
+                .from('borrow_logs')
+                .select('*, users(first_name, last_name, prefix, class_level)')
+                .eq('instrument_id', Number(instrumentId))
+                .order('borrow_timestamp', { ascending: false }),
+            supabase
+                .from('users')
+                .select('id, first_name, last_name, prefix, class_level')
+                .neq('student_group', 'deactivated')
+                .neq('role', 'admin')
+                .order('first_name')
+        ]);
+
+        if (scanRes.error) throw scanRes.error;
+        if (logsRes.error) throw logsRes.error;
+        if (usersRes.error) throw usersRes.error;
+
+        window.renderAdminQrModalContent(instrumentId, scanRes.data, logsRes.data || [], usersRes.data || []);
+    } catch (err) {
+        console.error('[Admin QR Reload Error]:', err);
+        if (contentEl) {
+            contentEl.innerHTML = `<p style="color:red; text-align:center;">ผิดพลาดในการรีโหลดข้อมูล: ${err.message}</p>`;
+        }
+    }
+};
+
+window.adminQuickReturn = async function(instrumentId, studentId, isDamaged) {
+    let problemDescription = null;
+    
+    if (isDamaged) {
+        const { value: problem } = await Swal.fire({
+            title: 'ระบุปัญหาชำรุด',
+            input: 'textarea',
+            inputLabel: 'อาการชำรุดของเครื่องดนตรี',
+            inputPlaceholder: 'เช่น คอหัก, ลูกบิดหัก, มีรอยแตก...',
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยันและส่งซ่อม',
+            cancelButtonText: 'ยกเลิก',
+            inputValidator: (value) => !value && 'กรุณาระบุปัญหา!'
+        });
+        
+        if (!problem) return;
+        problemDescription = problem;
+    }
+
+    Swal.fire({ title: 'กำลังบันทึกข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    
+    try {
+        const { data, error } = await borrowExt.returnInstrument(Number(instrumentId), studentId, problemDescription);
+        if (error) throw error;
+        
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: data?.message || 'คืนเครื่องดนตรีเรียบร้อย',
+            showConfirmButton: false,
+            timer: 3000
+        });
+
+        // Award badge check
+        if (data?.log_id) {
+            const { data: newBadges } = await badgesExt.checkAndAward(studentId, data.log_id);
+            if (newBadges && newBadges.length > 0) {
+                newBadges.forEach(badge => {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'นักเรียนได้รับเหรียญตรา!', html: `<b>${escapeHtml(badge.badge_name)}</b>`, showConfirmButton: false, timer: 4000 });
+                });
+            }
+        }
+
+        await window.refreshAdminQrModal(instrumentId);
+        
+        // Refresh dashboard background views if they exist
+        if (typeof refreshOnReturn === 'function') refreshOnReturn();
+        if (typeof renderAdminView === 'function') renderAdminView();
+
+    } catch (err) {
+        console.error('[Admin QR Return Error]:', err);
+        Swal.fire('เกิดข้อผิดพลาด!', err?.message || 'ไม่สามารถคืนอุปกรณ์ได้', 'error');
+    }
+};
+
+window.adminQuickBorrow = async function(instrumentId) {
+    const studentSelect = document.getElementById('admin-borrow-user-select');
+    const takeHomeCheckbox = document.getElementById('admin-borrow-takehome');
+    
+    if (!studentSelect || !studentSelect.value) {
+        Swal.fire('กรุณาเลือกนักเรียน', 'คุณต้องเลือกนักเรียนที่จะยืมแทนก่อนครับ', 'warning');
+        return;
+    }
+
+    const studentId = studentSelect.value;
+    const isTakeHome = takeHomeCheckbox ? takeHomeCheckbox.checked : false;
+
+    let dueDateStr = null;
+    if (isTakeHome) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 7); // Default 7 days
+        dueDateStr = dueDate.toISOString().slice(0, 10);
+    }
+
+    Swal.fire({ title: 'กำลังบันทึกการยืม...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        const { data, error } = await borrowExt.borrowInstrumentAtomic(
+            Number(instrumentId),
+            studentId,
+            isTakeHome,
+            dueDateStr,
+            false,
+            'normal'
+        );
+
+        if (error) throw error;
+
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: data?.message || 'ยืมเครื่องดนตรีแทนนักเรียนเรียบร้อย',
+            showConfirmButton: false,
+            timer: 3000
+        });
+
+        await window.refreshAdminQrModal(instrumentId);
+
+        // Refresh background views
+        if (typeof refreshOnReturn === 'function') refreshOnReturn();
+        if (typeof renderAdminView === 'function') renderAdminView();
+
+    } catch (err) {
+        console.error('[Admin QR Borrow Error]:', err);
+        Swal.fire('เกิดข้อผิดพลาด!', err?.message || 'ไม่สามารถทำรายการยืมได้', 'error');
+    }
+};
+
+window.adminQuickReportRepair = async function(instrumentId) {
+    const { value: problem } = await Swal.fire({
+        title: 'ระบุปัญหา / การชำรุด',
+        input: 'textarea',
+        inputLabel: 'อาการชำรุดของเครื่องดนตรี',
+        inputPlaceholder: 'กรุณากรอกหัวข้อชำรุด เช่น สายขาด, ปิกการ์ดชำรุด...',
+        showCancelButton: true,
+        confirmButtonText: 'บันทึกการส่งซ่อม',
+        cancelButtonText: 'ยกเลิก',
+        inputValidator: (value) => !value && 'กรุณาระบุปัญหาก่อนกดบันทึกครับ!'
+    });
+
+    if (!problem) return;
+
+    Swal.fire({ title: 'กำลังบันทึกข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        // Insert repair log
+        const { error: repErr } = await supabase.from('repair_logs').insert({
+            instrument_id: parseInt(instrumentId),
+            reported_by_user_id: currentUser.id,
+            problem_description: problem,
+            repair_status: 'แจ้งซ่อม'
+        });
+        if (repErr) throw repErr;
+
+        // Update instrument status to "ส่งซ่อม"
+        const { error: instErr } = await instrumentsExt.updateStatus(Number(instrumentId), 'ส่งซ่อม', problem);
+        if (instErr) throw instErr;
+
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'ส่งซ่อมเครื่องดนตรีเรียบร้อย',
+            showConfirmButton: false,
+            timer: 3000
+        });
+
+        await window.refreshAdminQrModal(instrumentId);
+
+        // Refresh background views
+        if (typeof refreshOnReturn === 'function') refreshOnReturn();
+        if (typeof renderAdminView === 'function') renderAdminView();
+
+    } catch (err) {
+        console.error('[Admin QR Repair Error]:', err);
+        Swal.fire('เกิดข้อผิดพลาด!', err?.message || 'ไม่สามารถส่งซ่อมอุปกรณ์ได้', 'error');
+    }
+};
+
+window.adminQuickRepairComplete = async function(instrumentId) {
+    Swal.fire({ title: 'กำลังบันทึกข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        // Get active repair logs for this instrument
+        const { data: repairLogs, error: fetchErr } = await supabase
+            .from('repair_logs')
+            .select('*')
+            .eq('instrument_id', Number(instrumentId))
+            .in('repair_status', ['แจ้งซ่อม', 'กำลังซ่อม'])
+            .order('created_at', { ascending: false });
+
+        if (fetchErr) throw fetchErr;
+
+        // Resolve repair log
+        if (repairLogs && repairLogs.length > 0) {
+            const { error: resolveErr } = await supabase.from('repair_logs')
+                .update({ repair_status: 'ซ่อมเสร็จสิ้น' })
+                .eq('id', repairLogs[0].id);
+            if (resolveErr) throw resolveErr;
+        }
+
+        // Set status back to ready
+        const { error: instErr } = await instrumentsExt.updateStatus(Number(instrumentId), 'พร้อมใช้งาน', 'ปกติ');
+        if (instErr) throw instErr;
+
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'ซ่อมเครื่องดนตรีเสร็จสิ้น พร้อมใช้งาน',
+            showConfirmButton: false,
+            timer: 3000
+        });
+
+        await window.refreshAdminQrModal(instrumentId);
+
+        // Refresh background views
+        if (typeof refreshOnReturn === 'function') refreshOnReturn();
+        if (typeof renderAdminView === 'function') renderAdminView();
+
+    } catch (err) {
+        console.error('[Admin QR Repair Complete Error]:', err);
+        Swal.fire('เกิดข้อผิดพลาด!', err?.message || 'ไม่สามารถซ่อมอุปกรณ์เสร็จสิ้นได้', 'error');
+    }
+};
 
 export function timeAgo(date) {
     if (!date) return '';

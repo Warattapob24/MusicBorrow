@@ -3488,7 +3488,7 @@ export async function processQrScan(instrumentId) {
         return Swal.fire('กรุณาล็อกอิน', 'คุณต้องเข้าสู่ระบบก่อนทำรายการผ่าน QR Code', 'info');
     }
     if (cu.role === 'admin') {
-        return Swal.fire('แอดมิน', `สแกน QR Code ของเครื่องดนตรี ID: ${instrumentId}`, 'info');
+        return window.__oadShowAdminQrManagement(instrumentId);
     }
 
     Swal.fire({ title: 'กำลังตรวจสอบข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
