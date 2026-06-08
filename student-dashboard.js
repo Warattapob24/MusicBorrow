@@ -276,8 +276,11 @@ export async function loadAndRenderMyBorrowedItems(userId) {
                 } else if (log.approval_status === 'rejected') {
                     statusHtml = `<span style="display:inline-flex; align-items:center; gap:4px; padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: bold; background:rgba(239,68,68,0.1); color:#dc2626;">❌ คำขอถูกปฏิเสธ</span>`;
                 } else {
+                    const labelText = log.borrow_type === 'special'
+                        ? '👑 ยืมโดยผู้ดูแล (ไม่นับเวลา)'
+                        : `🏠 กำหนดคืน: <span class="borrow-timer" data-is-take-home="true" data-due-date="${log.due_date || ''}">กำลังคำนวณ...</span>`;
                     statusHtml = `<span style="display:inline-flex; align-items:center; gap:4px; padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: bold; background:rgba(16,185,129,0.1); color:#059669;">
-                        🏠 กำหนดคืน: <span class="borrow-timer" data-is-take-home="true" data-due-date="${log.due_date || ''}">กำลังคำนวณ...</span>
+                        ${labelText}
                     </span>`;
                 }
             } else {

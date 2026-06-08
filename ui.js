@@ -2168,7 +2168,7 @@ window.__oadShowAdminQrManagement = async function(instrumentId) {
                 .order('borrow_timestamp', { ascending: false }),
             supabase
                 .from('users')
-                .select('id, first_name, last_name, prefix, class_level, role, student_group')
+                .select('id, student_id, first_name, last_name, prefix, class_level, role, student_group')
                 .order('first_name')
         ]);
 
@@ -2203,7 +2203,7 @@ window.filterAdminBorrowUsers = function(query) {
     if (!select || !window.__cachedAdminUsers) return;
     const search = query.toLowerCase().trim();
     const filtered = window.__cachedAdminUsers.filter(u => {
-        const fullName = `${u.prefix || ''} ${u.first_name} ${u.last_name} ${u.class_level || ''}`.toLowerCase();
+        const fullName = `${u.student_id || ''} ${u.prefix || ''} ${u.first_name} ${u.last_name} ${u.class_level || ''}`.toLowerCase();
         return fullName.includes(search);
     });
     
@@ -2211,7 +2211,7 @@ window.filterAdminBorrowUsers = function(query) {
     let html = '<option value="">-- ค้นหา/เลือกนักเรียน --</option>';
     filtered.forEach(u => {
         const selected = u.id === currentVal ? 'selected' : '';
-        html += `<option value="${u.id}" ${selected}>${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`;
+        html += `<option value="${u.id}" ${selected}>${u.student_id ? `[${escapeHtml(u.student_id)}] ` : ''}${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`;
     });
     select.innerHTML = html;
 };
@@ -2244,6 +2244,14 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
         const bClass = borrower?.class_level ? escapeHtml(borrower.class_level) : 'ไม่ระบุ';
         const bDate = new Date(currentBorrowerLog.borrow_timestamp).toLocaleString('th-TH');
         const dDate = currentBorrowerLog.due_date ? new Date(currentBorrowerLog.due_date).toLocaleDateString('th-TH') : 'ไม่มีกำหนด';
+        
+        let dueText = 'ยืมซ้อมในห้อง';
+        if (currentBorrowerLog.borrow_type === 'special') {
+            dueText = '<span style="color: var(--text-main);">ยืมโดยผู้ดูแล (ไม่นับเวลา)</span>';
+        } else if (currentBorrowerLog.is_take_home) {
+            dueText = `<span style="color:#ef4444;">${dDate} (ยืมกลับบ้าน)</span>`;
+        }
+
         borrowerHtml = `
             <div style="background: var(--input-bg, #f8fafc); padding: 1rem; border-radius: 0.75rem; margin-bottom: 1rem; border: 1px solid var(--input-border, #cbd5e1); color: var(--text-main, #1e293b);">
                 <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color: var(--text-main, #0f172a);">👤 ผู้ยืมในปัจจุบัน</h6>
@@ -2251,7 +2259,7 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
                     <span style="color: var(--pico-muted-color, #64748b);">ชื่อผู้ยืม:</span> <strong>${bName}</strong>
                     <span style="color: var(--pico-muted-color, #64748b);">ระดับชั้น:</span> <strong>${bClass}</strong>
                     <span style="color: var(--pico-muted-color, #64748b);">วันที่ยืม:</span> <strong>${bDate} น.</strong>
-                    <span style="color: var(--pico-muted-color, #64748b);">กำหนดคืน:</span> <strong>${currentBorrowerLog.is_take_home ? `<span style="color:#ef4444;">${dDate} (ยืมกลับบ้าน)</span>` : 'ยืมซ้อมในห้อง'}</strong>
+                    <span style="color: var(--pico-muted-color, #64748b);">กำหนดคืน:</span> <strong>${dueText}</strong>
                 </div>
             </div>
         `;
@@ -2282,16 +2290,22 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
                 <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color: var(--text-main, #0f172a);">📝 ยืมแทนนักเรียน (Quick Borrow)</h6>
                 <div style="display:flex; flex-direction:column; gap:0.5rem;">
                     <div>
-                        <input type="text" id="admin-borrow-user-search" placeholder="🔍 พิมพ์ค้นหารายชื่อ..." style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid var(--input-border, #cbd5e1); background-color: var(--pico-form-element-background-color, var(--card-bg)); color: var(--text-main); font-size:0.9em; margin-bottom:0.5rem;" oninput="window.filterAdminBorrowUsers(this.value)">
+                        <input type="text" id="admin-borrow-user-search" placeholder="🔍 พิมพ์ค้นหารายชื่อหรือเลขประจำตัว..." style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid var(--input-border, #cbd5e1); background-color: var(--pico-form-element-background-color, var(--card-bg)); color: var(--text-main); font-size:0.9em; margin-bottom:0.5rem;" oninput="window.filterAdminBorrowUsers(this.value)">
                         <select id="admin-borrow-user-select" style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid var(--input-border, #cbd5e1); background-color: var(--pico-form-element-background-color, var(--card-bg)); color: var(--text-main); font-size:0.9em;">
                             <option value="">-- ค้นหา/เลือกนักเรียน --</option>
-                            ${activeStudents.map(u => `<option value="${u.id}">${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`).join('')}
+                            ${activeStudents.map(u => `<option value="${u.id}">${u.student_id ? `[${escapeHtml(u.student_id)}] ` : ''}${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`).join('')}
                         </select>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.25rem;">
                         <label style="margin:0; font-size:0.9em; display:flex; align-items:center; gap:0.25rem; cursor:pointer; color: var(--text-main, #1e293b);">
-                            <input type="checkbox" id="admin-borrow-takehome" style="margin:0;"> ยืมกลับบ้าน (7 วัน)
+                            <input type="checkbox" id="admin-borrow-takehome" style="margin:0;" onchange="document.getElementById('admin-borrow-duedate-wrap').style.display = this.checked ? 'flex' : 'none'"> ยืมกลับบ้าน
                         </label>
+                        <div id="admin-borrow-duedate-wrap" style="display:none; align-items:center; gap:0.5rem; margin-top:0.25rem; width:100%;">
+                            <span style="font-size:0.85em; color: var(--text-main); white-space:nowrap;">กำหนดคืน:</span>
+                            <input type="date" id="admin-borrow-duedate" style="flex:1; padding:0.3rem; font-size:0.9em; margin:0;" min="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; align-items:center; margin-top:0.5rem;">
                         <button onclick="window.adminQuickBorrow(${instrumentId})" style="background-color:#3b82f6; border-color:#3b82f6; color:white; padding:0.4rem 1.2rem; font-size:0.9em; font-weight:bold; border-radius:0.5rem; cursor:pointer;">ยืมด่วน</button>
                     </div>
                 </div>
@@ -2370,7 +2384,7 @@ window.refreshAdminQrModal = async function(instrumentId) {
                 .order('borrow_timestamp', { ascending: false }),
             supabase
                 .from('users')
-                .select('id, first_name, last_name, prefix, class_level, role, student_group')
+                .select('id, student_id, first_name, last_name, prefix, class_level, role, student_group')
                 .order('first_name')
         ]);
 
@@ -2458,9 +2472,13 @@ window.adminQuickBorrow = async function(instrumentId) {
 
     let dueDateStr = null;
     if (isTakeHome) {
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 7); // Default 7 days
-        dueDateStr = dueDate.toISOString().slice(0, 10);
+        const dueDateInput = document.getElementById('admin-borrow-duedate');
+        if (dueDateInput && dueDateInput.value) {
+            dueDateStr = dueDateInput.value;
+        } else {
+            Swal.fire('กรุณาระบุวันกำหนดคืน', 'กรุณาเลือกวันที่กำหนดคืนเครื่องดนตรีด้วยครับ', 'warning');
+            return;
+        }
     }
 
     Swal.fire({ title: 'กำลังบันทึกการยืม...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
@@ -2469,10 +2487,10 @@ window.adminQuickBorrow = async function(instrumentId) {
         const { data, error } = await borrowExt.borrowInstrumentAtomic(
             Number(instrumentId),
             studentId,
-            isTakeHome,
+            true, // Always set true on database level to prevent practice time / XP accrual
             dueDateStr,
             false,
-            'normal'
+            isTakeHome ? 'take_home' : 'special' // 'take_home' for take-home, 'special' for in-school special admin borrow
         );
 
         if (error) throw error;
