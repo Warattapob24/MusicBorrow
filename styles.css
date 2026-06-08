@@ -447,20 +447,35 @@ tr.user-rank-highlight td { background: rgba(16, 185, 129, 0.1); font-weight: 70
    🛠️ 6. SWEETALERT2 FIXES
    ========================================= */
 
-/* FINAL FIX: Notification popup is ALWAYS white background + dark text in
-   every theme. Earlier rules used `var(--text-main)` which resolves to white
-   in dark mode → white-on-white when the popup is forced white via Swal's
-   `background` option. We hardcode the colours here so nothing can override. */
-
-/* Force popup background white in EVERY theme */
-.swal2-popup,
-html[data-theme="light"] .swal2-popup,
-html[data-theme="dark"] .swal2-popup,
-html[data-theme="rainbow"] .swal2-popup {
-    background: #ffffff !important;
+/* FINAL FIX: SweetAlert2 popup adaptive background and text coloring per theme. */
+.swal2-popup {
+    background: var(--card-bg, #ffffff) !important;
+    color: var(--text-main, #1e293b) !important;
 }
 
-/* Force ALL text inside the popup to be dark */
+/* Light theme defaults */
+html[data-theme="light"] .swal2-popup {
+    background: #ffffff !important;
+    color: #1e293b !important;
+}
+
+/* 🌙 Dark theme */
+html[data-theme="dark"] .swal2-popup {
+    background: var(--pico-card-background-color, #1f2937) !important;
+    color: var(--pico-color, #f3f4f6) !important;
+    border: 1px solid var(--input-border, #334155) !important;
+}
+
+/* 🌈 Rainbow theme */
+html[data-theme="rainbow"] .swal2-popup {
+    background: var(--pico-card-background-color, rgba(255, 255, 255, 0.85)) !important;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    color: var(--pico-color, #111827) !important;
+    border: 1px solid var(--pico-card-border-color, rgba(209, 213, 219, 0.5)) !important;
+}
+
+/* Force all popup descendants to inherit adaptive color */
 .swal2-popup,
 .swal2-popup .swal2-title,
 .swal2-popup .swal2-html-container,
@@ -469,35 +484,48 @@ html[data-theme="rainbow"] .swal2-popup {
 .swal2-popup .swal2-html-container div,
 .swal2-popup .swal2-html-container label,
 .swal2-popup #notification-list-container,
-.swal2-popup #notification-list-container *,
-.swal2-popup .notification-item,
-.swal2-popup .notification-item p,
-html[data-theme="light"] .swal2-popup,
-html[data-theme="dark"] .swal2-popup,
+.swal2-popup #notification-list-container * {
+    color: inherit !important;
+}
+
+/* Ensure specific dark theme texts follow the dark text variable */
 html[data-theme="dark"] .swal2-popup .swal2-title,
 html[data-theme="dark"] .swal2-popup .swal2-html-container,
 html[data-theme="dark"] .swal2-popup #notification-list-container,
-html[data-theme="dark"] .swal2-popup #notification-list-container *,
-html[data-theme="rainbow"] .swal2-popup,
-html[data-theme="rainbow"] .swal2-popup .swal2-title,
-html[data-theme="rainbow"] .swal2-popup .swal2-html-container {
-    color: #1e293b !important;
+html[data-theme="dark"] .swal2-popup #notification-list-container * {
+    color: var(--pico-color, #f3f4f6) !important;
 }
 
-/* Inputs inside Swal popup: dark mode gets a muted background but dark text */
+/* Ensure specific rainbow theme texts follow the dark text variable */
+html[data-theme="rainbow"] .swal2-popup .swal2-title,
+html[data-theme="rainbow"] .swal2-popup .swal2-html-container,
+html[data-theme="rainbow"] .swal2-popup #notification-list-container,
+html[data-theme="rainbow"] .swal2-popup #notification-list-container * {
+    color: var(--pico-color, #111827) !important;
+}
+
+/* Inputs/Selects inside Swal popup: respect theme colors */
+.swal2-popup .swal2-input,
+.swal2-popup .swal2-select,
+.swal2-popup .swal2-textarea {
+    background-color: var(--input-bg, #f8fafc) !important;
+    color: var(--text-main, #1e293b) !important;
+    border: 1px solid var(--input-border, #cbd5e1) !important;
+}
+
 html[data-theme="dark"] .swal2-input,
 html[data-theme="dark"] .swal2-select,
 html[data-theme="dark"] .swal2-textarea {
-    background-color: #f1f5f9 !important;
-    color: #1e293b !important;
-    border: 1px solid #cbd5e1 !important;
+    background-color: var(--input-bg, #0f172a) !important;
+    color: var(--text-main, #f3f4f6) !important;
+    border: 1px solid var(--input-border, #334155) !important;
 }
 
 /* Timestamp slightly muted in all themes */
 .swal2-popup #notification-list-container small,
 html[data-theme="dark"] .swal2-popup #notification-list-container small,
 html[data-theme="rainbow"] .swal2-popup #notification-list-container small {
-    color: #64748b !important;
+    color: var(--pico-muted-color, #64748b) !important;
 }
 
 /* Notification item polish — subtle hover + clear unread state */

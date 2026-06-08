@@ -2184,7 +2184,7 @@ window.__oadShowAdminQrManagement = async function(instrumentId) {
 
         Swal.fire({
             title: 'จัดการเครื่องดนตรี (ผู้ดูแลระบบ)',
-            html: '<div id="admin-qr-modal-content" style="text-align:left; font-size:0.95rem; color: #1e293b;"></div>',
+            html: '<div id="admin-qr-modal-content" style="text-align:left; font-size:0.95rem; color: var(--text-main, #1e293b);"></div>',
             width: '600px',
             showConfirmButton: false,
             showCloseButton: true,
@@ -2245,19 +2245,19 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
         const bDate = new Date(currentBorrowerLog.borrow_timestamp).toLocaleString('th-TH');
         const dDate = currentBorrowerLog.due_date ? new Date(currentBorrowerLog.due_date).toLocaleDateString('th-TH') : 'ไม่มีกำหนด';
         borrowerHtml = `
-            <div style="background: #f8fafc; padding: 1rem; border-radius: 0.75rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; color: #1e293b;">
-                <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color:#0f172a;">👤 ผู้ยืมในปัจจุบัน</h6>
+            <div style="background: var(--input-bg, #f8fafc); padding: 1rem; border-radius: 0.75rem; margin-bottom: 1rem; border: 1px solid var(--input-border, #cbd5e1); color: var(--text-main, #1e293b);">
+                <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color: var(--text-main, #0f172a);">👤 ผู้ยืมในปัจจุบัน</h6>
                 <div style="display:grid; grid-template-columns: 80px 1fr; gap: 0.25rem 0.5rem; font-size:0.9em;">
-                    <span style="color:#64748b;">ชื่อผู้ยืม:</span> <strong>${bName}</strong>
-                    <span style="color:#64748b;">ระดับชั้น:</span> <strong>${bClass}</strong>
-                    <span style="color:#64748b;">วันที่ยืม:</span> <strong>${bDate} น.</strong>
-                    <span style="color:#64748b;">กำหนดคืน:</span> <strong>${currentBorrowerLog.is_take_home ? `<span style="color:#ef4444;">${dDate} (ยืมกลับบ้าน)</span>` : 'ยืมซ้อมในห้อง'}</strong>
+                    <span style="color: var(--pico-muted-color, #64748b);">ชื่อผู้ยืม:</span> <strong>${bName}</strong>
+                    <span style="color: var(--pico-muted-color, #64748b);">ระดับชั้น:</span> <strong>${bClass}</strong>
+                    <span style="color: var(--pico-muted-color, #64748b);">วันที่ยืม:</span> <strong>${bDate} น.</strong>
+                    <span style="color: var(--pico-muted-color, #64748b);">กำหนดคืน:</span> <strong>${currentBorrowerLog.is_take_home ? `<span style="color:#ef4444;">${dDate} (ยืมกลับบ้าน)</span>` : 'ยืมซ้อมในห้อง'}</strong>
                 </div>
             </div>
         `;
     } else {
         borrowerHtml = `
-            <div style="background: #f8fafc; padding: 0.75rem; border-radius: 0.75rem; margin-bottom: 1rem; border: 1px dashed #cbd5e1; text-align:center; color: #64748b;">
+            <div style="background: var(--input-bg, #f8fafc); padding: 0.75rem; border-radius: 0.75rem; margin-bottom: 1rem; border: 1px dashed var(--input-border, #cbd5e1); text-align:center; color: var(--pico-muted-color, #64748b);">
                 ไม่มีผู้ยืมเครื่องดนตรีนี้ในปัจจุบัน
             </div>
         `;
@@ -2278,18 +2278,18 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
         `;
     } else if (status === 'พร้อมใช้งาน') {
         actionsHtml = `
-            <div style="background: #f1f5f9; padding: 1rem; border-radius: 0.75rem; margin-bottom:1rem; border: 1px solid #e2e8f0; color: #1e293b;">
-                <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color:#0f172a;">📝 ยืมแทนนักเรียน (Quick Borrow)</h6>
+            <div style="background: var(--input-bg, #f1f5f9); padding: 1rem; border-radius: 0.75rem; margin-bottom:1rem; border: 1px solid var(--input-border, #cbd5e1); color: var(--text-main, #1e293b);">
+                <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color: var(--text-main, #0f172a);">📝 ยืมแทนนักเรียน (Quick Borrow)</h6>
                 <div style="display:flex; flex-direction:column; gap:0.5rem;">
                     <div>
-                        <input type="text" id="admin-borrow-user-search" placeholder="🔍 พิมพ์ค้นหารายชื่อ..." style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid #cbd5e1; font-size:0.9em; margin-bottom:0.5rem;" oninput="window.filterAdminBorrowUsers(this.value)">
-                        <select id="admin-borrow-user-select" style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid #cbd5e1; font-size:0.9em;">
+                        <input type="text" id="admin-borrow-user-search" placeholder="🔍 พิมพ์ค้นหารายชื่อ..." style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid var(--input-border, #cbd5e1); background-color: var(--pico-form-element-background-color, var(--card-bg)); color: var(--text-main); font-size:0.9em; margin-bottom:0.5rem;" oninput="window.filterAdminBorrowUsers(this.value)">
+                        <select id="admin-borrow-user-select" style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid var(--input-border, #cbd5e1); background-color: var(--pico-form-element-background-color, var(--card-bg)); color: var(--text-main); font-size:0.9em;">
                             <option value="">-- ค้นหา/เลือกนักเรียน --</option>
                             ${activeStudents.map(u => `<option value="${u.id}">${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`).join('')}
                         </select>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label style="margin:0; font-size:0.9em; display:flex; align-items:center; gap:0.25rem; cursor:pointer; color: #1e293b;">
+                        <label style="margin:0; font-size:0.9em; display:flex; align-items:center; gap:0.25rem; cursor:pointer; color: var(--text-main, #1e293b);">
                             <input type="checkbox" id="admin-borrow-takehome" style="margin:0;"> ยืมกลับบ้าน (7 วัน)
                         </label>
                         <button onclick="window.adminQuickBorrow(${instrumentId})" style="background-color:#3b82f6; border-color:#3b82f6; color:white; padding:0.4rem 1.2rem; font-size:0.9em; font-weight:bold; border-radius:0.5rem; cursor:pointer;">ยืมด่วน</button>
@@ -2316,34 +2316,34 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
                 ? (new Date(l.return_timestamp).toLocaleDateString('th-TH') + ' ' + new Date(l.return_timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.') 
                 : '<span style="color:#ef4444; font-weight:bold;">กำลังยืม</span>';
             return `
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 0.5rem 0.25rem;">${name}</td>
-                    <td style="padding: 0.5rem 0.25rem;">${bDate}</td>
-                    <td style="padding: 0.5rem 0.25rem;">${rDate}</td>
+                <tr style="border-bottom: 1px solid var(--input-border, #f1f5f9);">
+                    <td style="padding: 0.5rem 0.25rem; color: var(--text-main);">${name}</td>
+                    <td style="padding: 0.5rem 0.25rem; color: var(--text-main);">${bDate}</td>
+                    <td style="padding: 0.5rem 0.25rem; color: var(--text-main);">${rDate}</td>
                 </tr>
             `;
         }).join('');
     } else {
-        historyTableRows = '<tr><td colspan="3" style="text-align:center; padding: 1rem; color:#64748b;">ไม่มีประวัติการยืมเครื่องดนตรีนี้</td></tr>';
+        historyTableRows = '<tr><td colspan="3" style="text-align:center; padding: 1rem; color: var(--pico-muted-color, #64748b);">ไม่มีประวัติการยืมเครื่องดนตรีนี้</td></tr>';
     }
 
     container.innerHTML = `
         <div style="margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:1.15rem; font-weight:bold; color:#0f172a;">${escapeHtml(instrument.instrument_name)} (${escapeHtml(instrument.type || 'เครื่องดนตรี')})</span>
+            <span style="font-size:1.15rem; font-weight:bold; color: var(--text-main, #0f172a);">${escapeHtml(instrument.instrument_name)} (${escapeHtml(instrument.type || 'เครื่องดนตรี')})</span>
             ${statusBadge}
         </div>
         
         ${borrowerHtml}
         ${actionsHtml}
 
-        <h6 style="margin:1rem 0 0.5rem 0; font-weight:700; font-size:0.95rem; color:#0f172a;">📜 ประวัติการยืม 5 ครั้งล่าสุด</h6>
-        <div style="border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow:hidden;">
-            <table style="width:100%; border-collapse:collapse; margin:0; font-size:0.85em; text-align:left; color:#334155;">
+        <h6 style="margin:1rem 0 0.5rem 0; font-weight:700; font-size:0.95rem; color: var(--text-main, #0f172a);">📜 ประวัติการยืม 5 ครั้งล่าสุด</h6>
+        <div style="border: 1px solid var(--input-border, #e2e8f0); border-radius: 0.5rem; overflow:hidden;">
+            <table style="width:100%; border-collapse:collapse; margin:0; font-size:0.85em; text-align:left; color: var(--text-main, #334155);">
                 <thead>
-                    <tr style="background:#f1f5f9; border-bottom:1px solid #e2e8f0;">
-                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: #1e293b;">ผู้ยืม</th>
-                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: #1e293b;">วันที่ยืม</th>
-                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: #1e293b;">วันที่คืน</th>
+                    <tr style="background: var(--input-bg, #f1f5f9); border-bottom:1px solid var(--input-border, #e2e8f0);">
+                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: var(--text-main, #1e293b);">ผู้ยืม</th>
+                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: var(--text-main, #1e293b);">วันที่ยืม</th>
+                        <th style="padding: 0.5rem 0.25rem; font-weight:600; color: var(--text-main, #1e293b);">วันที่คืน</th>
                     </tr>
                 </thead>
                 <tbody>
