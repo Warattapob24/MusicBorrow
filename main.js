@@ -131,6 +131,24 @@ async function initApp() {
                 console.warn('[AUTH] touch_user_last_seen failed:', err?.message);
             });
 
+            // ตรวจสอบว่าหน้าจอ Login แสดงอยู่หรือไม่ เพื่อแสดง Loading Block ป้องกันการคลิกซ้ำซ้อน
+            const authSection = document.getElementById('auth-section');
+            let isShowingLoading = false;
+            if (authSection && !authSection.classList.contains('hidden')) {
+                isShowingLoading = true;
+                const googleBtn = document.getElementById('google-login-btn');
+                if (googleBtn) googleBtn.disabled = true;
+                
+                Swal.fire({
+                    title: 'กำลังเข้าสู่ระบบ...',
+                    text: 'กำลังโหลดข้อมูลโปรไฟล์ โปรดรอสักครู่',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+            }
+
             try {
                 console.log('[AUTH] step 1: fetching profile...');
                 // ⏱️ Timeout getUserProfile ที่ 8 วิ ป้องกันค้าง
@@ -142,6 +160,11 @@ async function initApp() {
                 console.log('[AUTH] step 2: profile result', { hasProfile: !!profile, error: profileError?.message });
 
                 if (profileError) {
+                    if (isShowingLoading) {
+                        Swal.close();
+                        const googleBtn = document.getElementById('google-login-btn');
+                        if (googleBtn) googleBtn.disabled = false;
+                    }
                     console.error('[AUTH] Profile fetch failed:', profileError);
                     // กรณี Token มีปัญหาจริงๆ ให้เคลียร์ออก
                     if (profileError.code === 'PGRST301' || profileError.message?.includes('JWT')) {
@@ -167,6 +190,11 @@ async function initApp() {
                 // 🟢 3. กรณี OAuth แล้วยังไม่มีข้อมูล (User ใหม่)
                 if (!profile) {
                     console.log('[AUTH] New OAuth user detected. Rendering Onboarding UI...');
+                    if (isShowingLoading) {
+                        Swal.close();
+                        const googleBtn = document.getElementById('google-login-btn');
+                        if (googleBtn) googleBtn.disabled = false;
+                    }
                     
                     // ปิด Dashboard และเปิดส่วน Register
                     document.getElementById('dashboard-section')?.classList.add('hidden');
@@ -208,11 +236,19 @@ async function initApp() {
                 console.log('[AUTH] step 3: calling showDashboardView...');
                 await showDashboardView(session.user);
                 console.log('[AUTH] step 4: dashboard shown ✅');
+                if (isShowingLoading) {
+                    Swal.close();
+                }
                 clearTimeout(dashboardSafetyTimer);
                 _maybeDispatchNotifications();
 
             } catch (err) {
                 console.error('[AUTH] launchDashboard failed:', err);
+                if (isShowingLoading) {
+                    Swal.close();
+                    const googleBtn = document.getElementById('google-login-btn');
+                    if (googleBtn) googleBtn.disabled = false;
+                }
                 // 🛡️ เคลียร์ state เฉพาะถ้า launch นี้ยังเป็น current — ห้ามแตะ session ใหม่
                 if (launchedSessionToken === session.access_token) {
                     launchedSessionToken = null;

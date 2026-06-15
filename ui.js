@@ -88,6 +88,17 @@ document.addEventListener('submit', (e) => {
     }
 }, true);
 
+// Hide admin quick borrow suggestions when clicking outside
+document.addEventListener('click', (e) => {
+    const searchInput = document.getElementById('admin-borrow-user-search');
+    const suggestionsDiv = document.getElementById('admin-borrow-suggestions');
+    if (searchInput && suggestionsDiv) {
+        if (e.target !== searchInput && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 🚧 Soft Block UI — sticky banner + body attribute that disables interactions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,6 +271,9 @@ export function showAuthView() {
     if (loginForm) {
         loginForm.reset();
         loginForm.classList.remove('hidden');
+        // Ensure Google Login button is enabled
+        const googleBtn = document.getElementById('google-login-btn');
+        if (googleBtn) googleBtn.disabled = false;
     }
     if (registerForm) {
         registerForm.reset();
@@ -2198,22 +2212,59 @@ window.__oadShowAdminQrManagement = async function(instrumentId) {
     }
 };
 
-window.filterAdminBorrowUsers = function(query) {
-    const select = document.getElementById('admin-borrow-user-select');
-    if (!select || !window.__cachedAdminUsers) return;
-    const search = query.toLowerCase().trim();
-    const filtered = window.__cachedAdminUsers.filter(u => {
-        const fullName = `${u.student_id || ''} ${u.prefix || ''} ${u.first_name} ${u.last_name} ${u.class_level || ''}`.toLowerCase();
-        return fullName.includes(search);
-    });
+window.filterAdminBorrowSuggestions = function(query) {
+    const idInput = document.getElementById('admin-borrow-user-id');
+    if (idInput) idInput.value = ''; // Clear ID so they must select from suggestion
     
-    const currentVal = select.value;
-    let html = '<option value="">-- ค้นหา/เลือกนักเรียน --</option>';
-    filtered.forEach(u => {
-        const selected = u.id === currentVal ? 'selected' : '';
-        html += `<option value="${u.id}" ${selected}>${u.student_id ? `[${escapeHtml(u.student_id)}] ` : ''}${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`;
-    });
-    select.innerHTML = html;
+    const suggestionsDiv = document.getElementById('admin-borrow-suggestions');
+    if (!suggestionsDiv || !window.__cachedAdminUsers) return;
+    
+    const search = query.toLowerCase().trim();
+    let filtered = window.__cachedAdminUsers;
+    if (search) {
+        filtered = window.__cachedAdminUsers.filter(u => {
+            const fullName = `${u.student_id || ''} ${u.prefix || ''} ${u.first_name} ${u.last_name} ${u.class_level || ''}`.toLowerCase();
+            return fullName.includes(search);
+        });
+    }
+    
+    const showUsers = filtered.slice(0, 15);
+    
+    if (showUsers.length === 0) {
+        suggestionsDiv.innerHTML = `<div style="padding: 0.5rem 0.75rem; color: var(--pico-muted-color, #64748b); text-align: center; font-size: 0.95em;">ไม่พบข้อมูลนักเรียน</div>`;
+    } else {
+        let html = '';
+        showUsers.forEach(u => {
+            const studentIdPart = u.student_id ? `[${u.student_id}] ` : '';
+            const prefixPart = u.prefix || '';
+            const namePart = `${u.first_name} ${u.last_name}`;
+            const classPart = u.class_level ? ` (${u.class_level})` : '';
+            const displayName = `${studentIdPart}${prefixPart} ${namePart}${classPart}`.trim().replace(/\s+/g, ' ');
+            const valueForInput = `${studentIdPart}${prefixPart} ${namePart}`.trim().replace(/\s+/g, ' ');
+
+            html += `
+                <div onclick="window.selectAdminBorrowUser('${escapeHtml(u.id)}', '${escapeHtml(valueForInput)}')" 
+                     style="padding: 0.5rem 0.75rem; cursor: pointer; border-bottom: 1px solid var(--input-border, #e2e8f0); color: var(--text-main, #1e293b); font-size: 0.9em; text-align: left; transition: background-color 0.15s ease;"
+                     onmouseover="this.style.backgroundColor='var(--pico-primary-hover-background, #3b82f6)'; this.style.color='white';"
+                     onmouseout="this.style.backgroundColor=''; this.style.color='';"
+                     class="suggestion-item">
+                     ${escapeHtml(displayName)}
+                </div>
+            `;
+        });
+        suggestionsDiv.innerHTML = html;
+    }
+    suggestionsDiv.style.display = 'block';
+    suggestionsDiv.scrollTop = 0;
+};
+
+window.selectAdminBorrowUser = function(id, displayName) {
+    const searchInput = document.getElementById('admin-borrow-user-search');
+    const idInput = document.getElementById('admin-borrow-user-id');
+    const suggestionsDiv = document.getElementById('admin-borrow-suggestions');
+    if (searchInput) searchInput.value = displayName;
+    if (idInput) idInput.value = id;
+    if (suggestionsDiv) suggestionsDiv.style.display = 'none';
 };
 
 window.renderAdminQrModalContent = function(instrumentId, instrument, logs, users) {
@@ -2289,12 +2340,10 @@ window.renderAdminQrModalContent = function(instrumentId, instrument, logs, user
             <div style="background: var(--input-bg, #f1f5f9); padding: 1rem; border-radius: 0.75rem; margin-bottom:1rem; border: 1px solid var(--input-border, #cbd5e1); color: var(--text-main, #1e293b);">
                 <h6 style="margin:0 0 0.5rem 0; font-weight:700; font-size:0.95rem; color: var(--text-main, #0f172a);">📝 ยืมแทนนักเรียน (Quick Borrow)</h6>
                 <div style="display:flex; flex-direction:column; gap:0.5rem;">
-                    <div>
-                        <input type="text" id="admin-borrow-user-search" placeholder="🔍 พิมพ์ค้นหารายชื่อหรือเลขประจำตัว..." style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid var(--input-border, #cbd5e1); background-color: var(--pico-form-element-background-color, var(--card-bg)); color: var(--text-main); font-size:0.9em; margin-bottom:0.5rem;" oninput="window.filterAdminBorrowUsers(this.value)">
-                        <select id="admin-borrow-user-select" style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid var(--input-border, #cbd5e1); background-color: var(--pico-form-element-background-color, var(--card-bg)); color: var(--text-main); font-size:0.9em;">
-                            <option value="">-- ค้นหา/เลือกนักเรียน --</option>
-                            ${activeStudents.map(u => `<option value="${u.id}">${u.student_id ? `[${escapeHtml(u.student_id)}] ` : ''}${escapeHtml(u.prefix || '')} ${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)} ${u.class_level ? `(${escapeHtml(u.class_level)})` : ''}</option>`).join('')}
-                        </select>
+                    <div style="position: relative;">
+                        <input type="text" id="admin-borrow-user-search" placeholder="🔍 พิมพ์ค้นหาด้วยชื่อหรือเลขประจำตัวนักเรียน..." style="width:100%; padding:0.4rem; border-radius:0.5rem; border:1px solid var(--input-border, #cbd5e1); background-color: var(--pico-form-element-background-color, var(--card-bg)); color: var(--text-main); font-size:0.9em; margin-bottom:0px;" oninput="window.filterAdminBorrowSuggestions(this.value)" onfocus="window.filterAdminBorrowSuggestions(this.value)" onkeydown="if(event.key === 'Enter') { event.preventDefault(); }" autocomplete="off">
+                        <input type="hidden" id="admin-borrow-user-id" value="">
+                        <div id="admin-borrow-suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background-color: var(--card-bg, #ffffff); border: 1px solid var(--input-border, #cbd5e1); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); max-height: 200px; overflow-y: auto; z-index: 99999; display: none; margin-top: 4px;"></div>
                     </div>
                     <div style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.25rem;">
                         <label style="margin:0; font-size:0.9em; display:flex; align-items:center; gap:0.25rem; cursor:pointer; color: var(--text-main, #1e293b);">
@@ -2459,15 +2508,15 @@ window.adminQuickReturn = async function(instrumentId, studentId, isDamaged) {
 };
 
 window.adminQuickBorrow = async function(instrumentId) {
-    const studentSelect = document.getElementById('admin-borrow-user-select');
+    const idInput = document.getElementById('admin-borrow-user-id');
     const takeHomeCheckbox = document.getElementById('admin-borrow-takehome');
     
-    if (!studentSelect || !studentSelect.value) {
-        Swal.fire('กรุณาเลือกนักเรียน', 'คุณต้องเลือกนักเรียนที่จะยืมแทนก่อนครับ', 'warning');
+    if (!idInput || !idInput.value) {
+        Swal.fire('กรุณาเลือกนักเรียน', 'คุณต้องพิมพ์ค้นหาและคลิกเลือกนักเรียนที่จะยืมแทนจากรายการแนะนำก่อนครับ', 'warning');
         return;
     }
 
-    const studentId = studentSelect.value;
+    const studentId = idInput.value;
     const isTakeHome = takeHomeCheckbox ? takeHomeCheckbox.checked : false;
 
     let dueDateStr = null;

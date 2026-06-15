@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สไลด์นำเสนอ: ระบบยืม-คืนเครื่องดนตรี Music Borrow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Prompt:wght@300;400;500;600;700;800&family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════
+           🎨 DESIGN SYSTEM & VARIABLES
+           ═══════════════════════════════════════════════════════════════ */
+        :root {
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.4);
+            --secondary: #8b5cf6;
+            --secondary-glow: rgba(139, 92, 246, 0.4);
+            --accent: #ec4899;
+            --accent-glow: rgba(236, 72, 153, 0.4);
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.4);
+            --amber: #f59e0b;
+            --amber-glow: rgba(245, 158, 11, 0.4);
+            --dark-bg: #0b0f19;
+            --dark-card: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(148, 163, 184, 0.15);
+            --text-main: #f3f4f6;
+            --text-muted: #94a3b8;
+            --font-family: 'Prompt', 'Outfit', sans-serif;
+            --font-academic: 'Sarabun', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--dark-bg);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 40%);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           🖥️ PRESENTATION LAYOUT
+           ═══════════════════════════════════════════════════════════════ */
+        .presentation-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            height: calc(100vh - 60px);
+        }
+
+        /* Slide Screen Frame */
+        .slide-viewport {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .slide-wrapper {
+            width: 100%;
+            max-width: 1200px;
+            aspect-ratio: 16/9;
+            background: var(--dark-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 3rem;
+            transition: transform 0.5s ease;
+        }
+
+        /* Presenter notes sidebar */
+        .notes-sidebar {
+            width: 380px;
+            background: rgba(15, 23, 42, 0.9);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease, width 0.3s ease;
+            transform: translateX(100%);
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            z-index: 10;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+        }
+
+        .notes-sidebar.active {
+            transform: translateX(0);
+            position: relative;
+        }
+
+        .notes-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(30, 41, 59, 0.5);
+        }
+
+        .notes-header h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--amber);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .notes-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            font-family: var(--font-academic);
+            font-size: 1.05rem;
+            line-height: 1.7;
+            color: #e2e8f0;
+        }
+
+        .notes-content p {
+            margin-bottom: 1rem;
+        }
+
+        .notes-content b {
+            color: var(--primary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           🎛️ SLIDE CONTENT STYLES
+           ═══════════════════════════════════════════════════════════════ */
+        .slide {
+            position: absolute;
+            inset: 3rem;
+            display: none;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2.5rem;
+            align-items: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .slide.active {
+            display: grid;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Fullwidth slide variant (like cover and wrapup) */
+        .slide.full-width {
+            grid-template-columns: 1fr;
+            text-align: center;
+            justify-content: center;
+        }
+
+        /* Typographic elements */
+        .slide-title-area {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .slide-badge {
+            align-self: flex-start;
+            padding: 0.35rem 0.85rem;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 99px;
+            color: #60a5fa;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .slide.full-width .slide-badge {
+            align-self: center;
+        }
+
+        .slide-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            line-height: 1.25;
+            background: linear-gradient(135deg, #ffffff 30%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .slide-subtitle {
+            font-size: 1.25rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .slide-body {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .bullet-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .bullet-item {
+            position: relative;
+            padding-left: 1.75rem;
+            font-size: 1rem;
+            line-height: 1.5;
+            color: var(--text-main);
+        }
+
+        .bullet-item::before {
+            content: '✦';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .bullet-item strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .bullet-item p {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+            font-family: var(--font-academic);
+        }
+
+        /* Visual column card styling */
+        .visual-column {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 1.5rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           📱 DYNAMIC INTERACTIVE MOCKUPS (Within slides)
+           ═══════════════════════════════════════════════════════════════ */
+        /* Slide 1 Player Card */
+        .mockup-player-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 1.25rem;
+            width: 250px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .avatar-frame {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            margin: 0 auto 0.75rem;
+            display: grid;
+            place-items: center;
+            font-size: 2.2rem;
+            border: 3px solid rgba(255,255,255,0.1);
+        }
+
+        .player-name {
+            font-weight: 800;
+            font-size: 1rem;
+            color: #ffffff;
+        }
+
+        .player-lv {
+            font-size: 0.75rem;
+            background: var(--amber);
+            color: #000000;
+            padding: 0.15rem 0.5rem;
+            border-radius: 99px;
+            font-weight: 800;
+            display: inline-block;
+            margin-top: 0.25rem;
+        }
+
+        .player-bar-track {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin-top: 0.75rem;
+            overflow: hidden;
+        }
+
+        .player-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fbbf24, #f59e0b);
+            width: 65%;
+        }
+
+        .player-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed var(--border-color);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Slide 2 Loop flow / Objectives mock */
+        .mockup-obj-box {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .obj-pill {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 0.85rem 1rem;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .obj-pill-num {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #ffffff;
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            font-size: 0.8rem;
+        }
+
+        /* Slide 3 Infinite Loop */
+        .mockup-loop-cycle {
+            width: 260px;
+            height: 180px;
+            position: relative;
+        }
+
+        .loop-node {
+            position: absolute;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1.5px solid var(--border-color);
+            padding: 0.6rem 1rem;
+            border-radius: 0.75rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .loop-node.n1 { top: 10px; left: 50%; transform: translateX(-50%); border-color: var(--primary); }
+        .loop-node.n2 { bottom: 10px; right: 10px; border-color: var(--amber); }
+        .loop-node.n3 { bottom: 10px; left: 10px; border-color: var(--secondary); }
+
+        .loop-arrow {
+            position: absolute;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+        }
+        .loop-arrow.a1 { top: 40px; right: 50px; transform: rotate(45deg); }
+        .loop-arrow.a2 { bottom: 20px; left: 50%; transform: translateX(-50%) rotate(180deg); }
+        .loop-arrow.a3 { top: 40px; left: 50px; transform: rotate(-45deg); }
+
+        /* Slide 4 Tuner Mockup */
+        .mockup-tuner {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 1rem;
+            width: 200px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .tuner-gauge {
+            width: 120px;
+            height: 60px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-bottom: none;
+            border-radius: 60px 60px 0 0;
+            margin: 0.5rem auto;
+            position: relative;
+        }
+
+        .tuner-needle {
+            width: 3px;
+            height: 50px;
+            background: var(--emerald);
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: rotate(2deg);
+            box-shadow: 0 0 8px var(--emerald);
+        }
+
+        .tuner-note {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--emerald);
+        }
+
+        /* Slide 5 Boss Raid & MiniGame */
+        .mockup-boss-lobby {
+            background: linear-gradient(135deg, #db2777 0%, #7c3aed 100%);
+            border-radius: 1rem;
+            padding: 1rem;
+            width: 250px;
+            color: #ffffff;
+            box-shadow: 0 10px 25px rgba(124, 58, 237, 0.3);
+        }
+
+        .boss-hp-bar {
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .boss-hp-fill {
+            height: 100%;
+            background: #ef4444;
+            width: 78%;
+        }
+
+        .boss-party {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.75rem;
+            justify-content: center;
+        }
+
+        .party-member {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: grid;
+            place-items: center;
+            font-size: 1rem;
+            border: 1.5px solid #ffffff;
+        }
+
+        /* Slide 6 Leaderboard & Badges */
+        .mockup-leaderboard {
+            width: 240px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 1rem;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .lead-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.25rem;
+            font-size: 0.75rem;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .lead-row.highlight {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .lead-badge-list {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            justify-content: center;
+        }
+
+        .badge-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            display: grid;
+            place-items: center;
+            font-size: 1.1rem;
+        }
+
+        /* Slide 7 QR scanning */
+        .mockup-qr-scan {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .qr-cam {
+            width: 140px;
+            height: 140px;
+            border: 2px dashed var(--primary);
+            border-radius: 1rem;
+            display: grid;
+            place-items: center;
+            position: relative;
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .qr-cam::after {
+            content: '';
+            position: absolute;
+            left: 0; right: 0; height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            animation: scanLine 2.5s infinite;
+        }
+
+        .soft-block-alert {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--amber);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* Slide 8 Analytics Graph */
+        .mockup-analytics {
+            width: 250px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 1rem;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .graph-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 0.75rem;
+            height: 100px;
+            padding-bottom: 0.25rem;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .graph-bar {
+            flex: 1;
+            background: linear-gradient(to top, var(--primary), var(--secondary));
+            border-radius: 4px 4px 0 0;
+            position: relative;
+        }
+
+        .graph-bar::after {
+            content: attr(data-val);
+            position: absolute;
+            top: -16px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.6rem;
+            font-weight: 700;
+        }
+
+        /* Slide 9 Research Chart */
+        .mockup-chart-container {
+            width: 270px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 1.25rem;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .chart-header {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.75rem;
+            text-align: center;
+        }
+
+        .chart-item {
+            margin-bottom: 0.6rem;
+        }
+
+        .chart-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-bottom: 0.15rem;
+        }
+
+        .chart-bar-bg {
+            height: 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .chart-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--emerald));
+            border-radius: 4px;
+        }
+
+        /* Slide 10 Wrapup / QR Code */
+        .mockup-qr-demo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .qr-display-box {
+            width: 150px;
+            height: 150px;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 1rem;
+            display: grid;
+            place-items: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .qr-display-box img {
+            width: 100%;
+            height: 100%;
+        }
+
+        .qr-link-text {
+            font-size: 0.8rem;
+            color: var(--primary);
+            font-family: monospace;
+            font-weight: 600;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           🎛️ BOTTOM CONTROL BAR
+           ═══════════════════════════════════════════════════════════════ */
+        .control-bar {
+            height: 60px;
+            background: rgba(15, 23, 42, 0.95);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            z-index: 10;
+        }
+
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .ctrl-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-main);
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        .ctrl-btn:hover:not(:disabled) {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary-glow);
+            transform: scale(1.05);
+        }
+
+        .ctrl-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn-text {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-radius: 99px;
+            padding: 0 1rem;
+            width: auto;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .btn-text.notes-toggle.active {
+            background: var(--amber);
+            color: #000000;
+            border-color: var(--amber);
+        }
+
+        .slide-counter {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .slide-counter span {
+            color: #ffffff;
+        }
+
+        .indicator-dots {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .indicator-dot.active {
+            background: var(--primary);
+            transform: scale(1.2);
+            box-shadow: 0 0 8px var(--primary-glow);
+        }
+
+        /* Responsive */
+        @media (max-width: 960px) {
+            .slide {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+                overflow-y: auto;
+            }
+            .visual-column {
+                display: none; /* Hide visual mockups on small screens to save space */
+            }
+            .slide-title {
+                font-size: 1.75rem;
+            }
+            .slide-viewport {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="presentation-container">
+        <!-- Slide Area -->
+        <div class="slide-viewport" id="viewport">
+            <div class="slide-wrapper">
+
+                <!-- SLIDE 1 -->
+                <div class="slide active full-width" data-index="1">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 1 / Title & Hook</span>
+                        <h1 class="slide-title" style="font-size: 2.5rem; line-height: 1.25;">ระบบการยืม – คืน เครื่องดนตรี<br>โดยใช้เว็บแอปพลิเคชัน Music Borrow</h1>
+                        <p class="slide-subtitle" style="margin-top: 0.75rem;">เปลี่ยนชั่วโมงซ้อมดนตรีให้สนุกขึ้น ด้วยการผจญภัยสุดตื่นเต้น!</p>
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 1.5rem; align-items: center;">
+                        <div class="mockup-player-card">
+                            <div class="avatar-frame">🧙‍♂️</div>
+                            <div class="player-name">วรัทภพ ทุมนาหาด</div>
+                            <span class="player-lv">LV.15 Bard</span>
+                            <div class="player-bar-track">
+                                <div class="player-bar-fill"></div>
+                            </div>
+                            <div class="player-stats">
+                                <div>⭐ 48 ดาวทอง</div>
+                                <div>🔥 Streak: 7 วัน</div>
+                            </div>
+                        </div>
+                        <div style="text-align: left; max-width: 400px;">
+                            <div style="font-size: 0.95rem; color: #ffffff; font-weight: 700; margin-bottom: 0.5rem;">ผู้พัฒนา & หน่วยงาน:</div>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem;">• <strong>ผู้พัฒนา:</strong> วรัทภพ ทุมนาหาด (ชุมนุมดนตรีสากล)</p>
+                            <p style="font-size: 0.85rem; color: var(--text-muted);">• <strong>หน่วยงาน:</strong> โรงเรียนโนนไทยคุรุอุปถัมภ์ สังกัด อบจ.นครราชสีมา</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 2 -->
+                <div class="slide" data-index="2">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 2 / Problems & Objectives</span>
+                        <h1 class="slide-title">ปัญหาการวิจัย & วัตถุประสงค์</h1>
+                        <p class="slide-subtitle">ความท้าทายในห้องเรียนแบบเดิม สู่เป้าหมายของระบบนวัตกรรม</p>
+                    </div>
+                    <div class="slide-body">
+                        <ul class="bullet-list">
+                            <li class="bullet-item">
+                                <strong>ปัญหาการดำเนินงานระบบยืม-คืนแบบเดิม</strong>
+                                <p>ขาดความสะดวกรวดเร็ว ค้นหายุ่งยาก เป็นภาระงานเอกสาร และไม่เอื้อต่อการจัดคลังเครื่องดนตรีรวมถึงการประเมินผลอย่างเป็นระบบ</p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>ปัญหาความสม่ำเสมอในการฝึกซ้อม</strong>
+                                <p>นักเรียนขาดกลไกจูงใจในการฝึกซ้อม ขาดคู่มือและเครื่องมือช่วยฝึกซ้อมส่วนบุคคลที่มีประสิทธิภาพที่บ้าน</p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="visual-column">
+                        <div class="mockup-obj-box">
+                            <div style="font-size: 0.8rem; font-weight: 800; color: #ffffff; margin-bottom: 0.25rem; text-align: center;">วัตถุประสงค์การวิจัย (Research Objectives)</div>
+                            <div class="obj-pill">
+                                <div class="obj-pill-num">1</div>
+                                <div style="color: #ffffff; font-weight: 500; font-family: var(--font-academic); line-height: 1.3;">พัฒนาระบบข้อมูลการยืม-คืนเครื่องดนตรี Music Borrow ให้มีประสิทธิภาพมากที่สุด</div>
+                            </div>
+                            <div class="obj-pill">
+                                <div class="obj-pill-num">2</div>
+                                <div style="color: #ffffff; font-weight: 500; font-family: var(--font-academic); line-height: 1.3;">ประเมินความพึงพอใจของนักเรียนชุมนุมดนตรีสากลต่อระบบ เพื่อตอบโจทย์พฤติกรรมการเรียนรู้จริง</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 3 -->
+                <div class="slide" data-index="3">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 3 / The Gamified Loop</span>
+                        <h1 class="slide-title">หัวใจหลักของแอป: วงจรความสนุก</h1>
+                        <p class="slide-subtitle">กระตุ้นวินัยการซ้อมดนตรีด้วยหลักการขับเคลื่อนของเกม RPG</p>
+                    </div>
+                    <div class="slide-body">
+                        <ul class="bullet-list">
+                            <li class="bullet-item">
+                                <strong>ซ้อมดนตรีจริง (Real Practice)</strong>
+                                <p>บันทึกชั่วโมงบินและพัฒนาเวลาซ้อมดนตรีจริง ผ่านปุ่มจับเวลาในแอปพลิเคชันอย่างโปร่งใส</p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>ได้รับรางวัลสะสม (Reward Loops)</strong>
+                                <p>รับค่าประสบการณ์ (XP), ดาวทอง, และปลดล็อกเหรียญตราเกียรติยศแห่งวินัยความพยายาม</p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>ท้าทายภารกิจกลุ่ม (Cooperative Challenges)</strong>
+                                <p>รวมกลุ่มกับเพื่อนเพื่อนำแต้มการฝึกซ้อมไปพิชิตภารกิจสู้บอสประจำสัปดาห์ในห้องเรียน</p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="visual-column">
+                        <div class="mockup-loop-cycle">
+                            <div class="loop-node n1">🎻 ซ้อมดนตรีจริง</div>
+                            <div class="loop-arrow a1">➔</div>
+                            <div class="loop-node n2">🏆 รับ XP & ดาวทอง</div>
+                            <div class="loop-arrow a2">➔</div>
+                            <div class="loop-node n3">🐉 ปราบภารกิจบอส</div>
+                            <div class="loop-arrow a3">➔</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 4 -->
+                <div class="slide" data-index="4">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 4 / The Practice Hub</span>
+                        <h1 class="slide-title">ศูนย์รวมเครื่องมือ & คลิปช่วยสอน</h1>
+                        <p class="slide-subtitle">เพิ่มศักยภาพการเรียนรู้นอกห้องเรียนผ่าน Practice Aids ส่วนตัว</p>
+                    </div>
+                    <div class="slide-body">
+                        <ul class="bullet-list">
+                            <li class="bullet-item">
+                                <strong>เครื่องมือช่วยฝึกซ้อมแบบพกพา (In-App Tools)</strong>
+                                <p>เครื่องตั้งสายคีย์สากล (Tuner) ที่แม่นยำ และเมโทรนอม (Metronome) ปรับอัตราจังหวะได้ตามใจพร้อมฟังก์ชันแตะจับจังหวะ (Tap Tempo)</p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>คลังทบทวนบทเรียนอัจฉริยะ (Tutorial Library)</strong>
+                                <p>รวบรวมวิดีโอเทคนิค วิธีการดูแลรักษา และทางนิ้วที่ถูกต้องจากคุณครู สามารถเปิดฝึกตามได้ทุกที่ทุกเวลา</p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="visual-column">
+                        <div style="display: flex; gap: 1rem;">
+                            <div class="mockup-tuner">
+                                <div class="tuner-note">A</div>
+                                <div class="tuner-cents">Perfect Pitch</div>
+                                <div class="tuner-gauge">
+                                    <div class="tuner-needle"></div>
+                                </div>
+                                <span style="font-size: 0.65rem; color: var(--emerald); font-weight: 700;">In-Tune</span>
+                            </div>
+                            <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 1rem; width: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 1px solid var(--border-color);">
+                                <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🎬</div>
+                                <div style="font-size: 0.65rem; font-weight: 700; text-align: center;">วิดีโอสอนคีย์บอร์ด</div>
+                                <div style="font-size: 0.65rem; background: var(--amber); color: black; padding: 1px 4px; border-radius: 4px; margin-top: 0.25rem; font-weight: bold;">+50 XP</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 5 -->
+                <div class="slide" data-index="5">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 5 / Minigames & Boss Raids</span>
+                        <h1 class="slide-title">เรียนสนุกผ่านมินิเกม & ล่าบอส</h1>
+                        <p class="slide-subtitle">เปลี่ยนทฤษฎีดนตรีและการประเมินกลุ่มให้เป็นเรื่องตื่นเต้นในห้องเรียน</p>
+                    </div>
+                    <div class="slide-body">
+                        <ul class="bullet-list">
+                            <li class="bullet-item">
+                                <strong>มินิเกมสะกดโน้ตดนตรี (Staff Wars)</strong>
+                                <p>ฝึกอ่านและจำตัวโน้ตบนบรรทัด 5 เส้นในเวลาจำกัด ช่วยให้จำสัญลักษณ์กุญแจซอลและเอฟได้อย่างเป็นธรรมชาติ</p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>ระบบล่าบอสเพื่อประเมินกลุ่ม (Boss Raid)</strong>
+                                <p>ครูเปิดห้องสอบบอสพร้อมรหัสปาร์ตี้ 4 หลัก นักเรียนนำเวลาฝึกซ้อมจริงที่สะสมที่บ้านมารวมพลังต่อสู้และประเมินผลผ่านแบบเรียลไทม์</p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="visual-column">
+                        <div class="mockup-boss-lobby">
+                            <div class="dragon">🐉</div>
+                            <div class="boss-name">บอส: โน้ตวิบัติคีย์เพี้ยน</div>
+                            <div class="boss-hp-bar">
+                                <div class="boss-hp-fill"></div>
+                            </div>
+                            <div style="font-size: 0.65rem; text-align: right; font-weight: 700; opacity: 0.9;">HP: 7,800 / 10,000</div>
+                            <div class="boss-party">
+                                <div class="party-member">🎸</div>
+                                <div class="party-member">🎺</div>
+                                <div class="party-member">🎹</div>
+                                <div class="party-member">🥁</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 6 -->
+                <div class="slide" data-index="6">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 6 / Level & Ranking</span>
+                        <h1 class="slide-title">สะสมเวลาซ้อม & การจัดอันดับ</h1>
+                        <p class="slide-subtitle">สร้างแรงผลักดันเชิงบวกและความภาคภูมิใจผ่านสัญลักษณ์ความสำเร็จ</p>
+                    </div>
+                    <div class="slide-body">
+                        <ul class="bullet-list">
+                            <li class="bullet-item">
+                                <strong>เหรียญตราเกียรติยศ (Achievement Badges)</strong>
+                                <p>มอบเหรียญตราเพื่อส่งเสริมพฤติกรรมการฝึกซ้อม เช่น ตรา "ขุนพลไม่นอนข้ามคืน" สำหรับผู้ที่เข้ามาซ้อมดนตรีติดต่อกันเป็นเวลา 7 วัน</p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>กระดานผู้นำการแข่งขันสร้างสรรค์ (Leaderboard)</strong>
+                                <p>แสดงลำดับและสถิติเวลาซ้อมของเพื่อนร่วมชุมนุม/ร่วมห้องเรียนแบบรายเดือน กระตุ้นแรงจูงใจให้พัฒนาและภูมิใจไปด้วยกัน</p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="visual-column">
+                        <div class="mockup-leaderboard">
+                            <div class="lead-row highlight">
+                                <span class="rank-num gold">1</span>
+                                <span style="font-weight: 700;">วรัทภพ (Me)</span>
+                                <span style="margin-left: auto; color: var(--amber); font-weight: bold;">450 XP</span>
+                            </div>
+                            <div class="lead-row">
+                                <span class="rank-num silver">2</span>
+                                <span>น้องเอิร์ธ</span>
+                                <span style="margin-left: auto;">420 XP</span>
+                            </div>
+                            <div class="lead-row">
+                                <span class="rank-num bronze">3</span>
+                                <span>น้องเจเจ</span>
+                                <span style="margin-left: auto;">380 XP</span>
+                            </div>
+                            <div class="lead-badge-list">
+                                <div class="badge-icon">🥇</div>
+                                <div class="badge-icon" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3);">🔥</div>
+                                <div class="badge-icon" style="background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.3);">🏆</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 7 -->
+                <div class="slide" data-index="7">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 7 / Smart QR Scan</span>
+                        <h1 class="slide-title">สแกนยืม-คืน รวดเร็ว & แจ้งเตือน</h1>
+                        <p class="slide-subtitle">การดำเนินรายการที่สะดวกรวดเร็วและเป็นระเบียบเรียบร้อย</p>
+                    </div>
+                    <div class="slide-body">
+                        <ul class="bullet-list">
+                            <li class="bullet-item">
+                                <strong>ทำรายการยืม-คืนสะดวกรวดเร็ว (Quick Scan)</strong>
+                                <p>ครูผู้ดูแลหรือแอดมินสแกน QR Code เพื่อทำบันทึกความก้าวหน้าและการบำรุงรักษาได้อย่างถูกต้อง ทันใจ ประหยัดเวลาของครู</p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>ตักเตือนเพื่อส่งเสริมวินัยอย่างเป็นมิตร (Soft Block)</strong>
+                                <p>หากคืนเครื่องเกินกำหนด ระบบจะจำกัดสิทธิ์ยืมเครื่องเพิ่มเติมชั่วคราวเพื่อส่งเสริมระเบียบวินัย แต่ยังเปิดสิทธิ์เข้าใช้ส่วนช่วยซ้อม คลังวิดีโอ และมินิเกมได้ปกติ</p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="visual-column">
+                        <div class="mockup-qr-scan">
+                            <div class="qr-cam">
+                                <div class="qr-icon" style="font-size: 2.5rem;">📱</div>
+                            </div>
+                            <div class="soft-block-alert">
+                                <span>⚠️</span>
+                                <span style="font-family: var(--font-academic);">โหมด Soft Block: เข้าใช้เครื่องตั้งสายและดูบทเรียนได้ปกติ</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 8 -->
+                <div class="slide" data-index="8">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 8 / Personalized Analytics</span>
+                        <h1 class="slide-title">รายงานข้อมูลพัฒนาการ & คลาวด์</h1>
+                        <p class="slide-subtitle">ประเมินความก้าวหน้าได้ทุกคลิก ช่วยคุณครูลดขั้นตอนงานกระดาษ</p>
+                    </div>
+                    <div class="slide-body">
+                        <ul class="bullet-list">
+                            <li class="bullet-item">
+                                <strong>ประวัติบันทึกความพยายาม (My Practice Log)</strong>
+                                <p>สรุปชั่วโมงสะสมซ้อม กิจกรรม และคลิปวิดีโอที่เรียนรู้ แปลงเป็นกราฟและตารางแบบเรียลไทม์เพื่อสร้างทิศทางบวกในการพัฒนาตนเอง</p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>รายงานแดชบอร์ดคุณครู & ระบบคลาวด์ดิจิทัล</strong>
+                                <p>ครูตรวจสอบเวลาซ้อมรวม สถิติมินิเกม และประเมินผลได้สะดวกในคลิกเดียว ลดภาระการตรวจประเมินด้วยมืออย่างเห็นได้ชัด</p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="visual-column">
+                        <div class="mockup-analytics">
+                            <div style="font-size: 0.7rem; font-weight: 700; color: #ffffff; text-align: center; margin-bottom: 0.5rem;">กราฟเวลาฝึกซ้อมสะสมของนักเรียน</div>
+                            <div class="graph-bars">
+                                <div class="graph-bar" data-val="60m" style="height: 60px;"></div>
+                                <div class="graph-bar" data-val="120m" style="height: 100px; background: linear-gradient(to top, var(--amber), var(--primary))"></div>
+                                <div class="graph-bar" data-val="45m" style="height: 45px;"></div>
+                                <div class="graph-bar" data-val="90m" style="height: 80px;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--text-muted); margin-top: 0.25rem;">
+                                <span>จ.</span><span>อ.</span><span>พ.</span><span>พฤ.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 9 -->
+                <div class="slide" data-index="9">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 9 / Research Impact</span>
+                        <h1 class="slide-title">ผลลัพธ์ความพึงพอใจและประสิทธิผล</h1>
+                        <p class="slide-subtitle">ความสัมฤทธิ์ผลจากการทดลองและเก็บข้อมูลงานวิจัยจริง</p>
+                    </div>
+                    <div class="slide-body">
+                        <ul class="bullet-list">
+                            <li class="bullet-item">
+                                <strong>ประสิทธิภาพโดยรวมจากการวิจัย</strong>
+                                <p>กลุ่มตัวอย่างนักเรียนชุมนุมดนตรีสากล 50 คน (แบบเจาะจง) ผลความพึงพอใจภาพรวมอยู่ในระดับมากที่สุด <strong>(ค่าเฉลี่ย x̄ = 4.54, S.D. = 0.62)</strong></p>
+                            </li>
+                            <li class="bullet-item">
+                                <strong>การรับรองและประเมินโดยผู้เชี่ยวชาญ</strong>
+                                <p>ผู้เชี่ยวชาญร่วมประเมินระบบอยู่ในระดับความเหมาะสมและประสิทธิภาพมากที่สุด <strong>(ค่าเฉลี่ย x̄ = 4.86, S.D. = 0.21)</strong></p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="visual-column">
+                        <div class="mockup-chart-container">
+                            <div class="chart-header">ความพึงพอใจจำแนกตามรายด้าน</div>
+                            <div class="chart-item">
+                                <div class="chart-label"><span>1. บูรณาการเกม & แรงจูงใจ</span><strong>4.56</strong></div>
+                                <div class="chart-bar-bg"><div class="chart-bar-fill" style="width: 91%;"></div></div>
+                            </div>
+                            <div class="chart-item">
+                                <div class="chart-label"><span>2. ส่งเสริมวินัย & ควบคุมตนเอง</span><strong>4.54</strong></div>
+                                <div class="chart-bar-bg"><div class="chart-bar-fill" style="width: 90.8%;"></div></div>
+                            </div>
+                            <div class="chart-item">
+                                <div class="chart-label"><span>3. ประสิทธิภาพ & การออกแบบ</span><strong>4.52</strong></div>
+                                <div class="chart-bar-bg"><div class="chart-bar-fill" style="width: 90.4%;"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLIDE 10 -->
+                <div class="slide full-width" data-index="10">
+                    <div class="slide-title-area">
+                        <span class="slide-badge">Slide 10 / Wrap Up & Demo</span>
+                        <h1 class="slide-title">ยินดีต้อนรับสู่ห้องเรียนดนตรียุคใหม่</h1>
+                        <p class="slide-subtitle" style="margin-top: 0.5rem;">สแกนเพื่อเปิดใช้งานหน้าเดโมสดร่วมกันได้ทันที!</p>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: 1.5rem;">
+                        <div class="mockup-qr-demo">
+                            <div class="qr-display-box">
+                                <!-- Modern SVG QR code placeholder for local use -->
+                                <svg width="100" height="100" viewBox="0 0 29 29" fill="black">
+                                    <path d="M0 0h7v7H0zm2 2v3h3V2zm0 10h1v1H2zm0 5h1v1H2zm10 0h1v1h-1zm-2 2h1v1h-1zm0-2h1v1h-1zm1 1h1v1h-1zm3 1h1v1h-1zm-2 2h1v1h-1zm3 0h1v1h-1zm1-1h1v1h-1zm2-1h1v1h-1zm-1-1h1v1h-1zm1-1h1v1h-1zm-3-1h1v1h-1zm1-1h1v1h-1zm1-1h1v1h-1zm-2-2h1v1h-1zm-2 2h1v1h-1zm-1-2h1v1h-1zm-1 0h1v1h-1zm3-3h1v1h-1zm4 3h1v1h-1zm0-1h1v1h-1zm1 1h1v1h-1zm0 3h1v1h-1zm2 1h1v1h-1zm0-2h1v1h-1zm-1 0h1v1h-1zm-1-2h1v1h-1zm-1 0h1v1h-1zm1-1h1v1h-1zm2-3h1v1h-1zm0-1h1v1h-1zm1 1h1v1h-1zm0 1h1v1h-1zm1-2h1v1h-1zm0-2h1v1h-1zm-2 2h1v1h-1zm-1-2h1v1h-1zm3-1h1v1h-1zm-11 5h1v1h-1zm-1 1h1v1h-1zm2 1h1v1h-1zm0-2h1v1h-1zm-1 0h1v1h-1zm2-3h1v1h-1zm-2 2h1v1h-1zm-1 0h1v1h-1zm2-3h1v1h-1zm-1-1h1v1h-1zm-2 1h1v1h-1zm4 1h1v1h-1zm-3 2h1v1h-1zm8 2h1v1h-1zm-2 1h1v1h-1zm1 1h1v1h-1zm-2 1h1v1h-1zm2 0h1v1h-1zm0 2h1v1h-1zm1 1h1v1h-1zm-3-2h1v1h-1zm-1 1h1v1h-1zm-1-1h1v1h-1zm1-1h1v1h-1zm-2-1h1v1h-1zm-1 1h1v1h-1zm1 1h1v1h-1zm-1 0h1v1h-1zm2 2h1v1h-1zm2-7h1v1h-1zm0-1h1v1h-1zm-1-1h1v1h-1zm1 3h1v1h-1zm-1-1h1v1h-1zm-1 1h1v1h-1zm1-2h1v1h-1zm-3 1h1v1h-1zm2 1h1v1h-1zm-1-2h1v1h-1zm3-3h1v1h-1zm-1 0h1v1h-1zm-2-1h1v1h-1zm-2-2h1v1h-1zm1 1h1v1h-1zm-1 1h1v1h-1zm1-2h1v1h-1zm3-2h1v1h-1zm-2-1h1v1h-1zm-2 1h1v1h-1zm0-2h1v1h-1zm5 3h1v1h-1zm-1 1h1v1h-1zm-1-1h1v1h-1zm-1 1h1v1h-1zm-1-1h1v1h-1zm1-1h1v1h-1zm2-1h1v1h-1zm-1-1h1v1h-1zm0 2h1v1h-1zm-3-2h1v1h-1zm0 1h1v1h-1zm1 1h1v1h-1zm-2-2h1v1h-1zm0 2h1v1h-1zm0 3h1v1h-1zm3 0h1v1h-1zm-2 1h1v1h-1zm1 1h1v1h-1zm-3-2h1v1h-1zm-1 1h1v1h-1zm-1-1h1v1h-1zm1 2h1v1h-1zm2 0h1v1h-1zm-1 1h1v1h-1zm-2-1h1v1h-1zm2-2h1v1h-1zm-1-1h1v1h-1zm-2 1h1v1h-1zm1 1h1v1h-1zm-2 0h1v1h-1zm1-2h1v1h-1zm-1-1h1v1h-1zm-1 1h1v1h-1zm2-2h1v1h-1zm-2 0h1v1h-1zm0-4h7v7H8zm2 2v3h3V10zm12-10h7v7h-7zm2 2v3h3V2zM0 22h7v7H0zm2 2v3h3v-3zm18 0h1v1h-1zm2 0h1v1h-1zm-2 2h1v1h-1zm2 0h1v1h-1zm0 2h1v1h-1zm-2 0h1v1h-1zm3-1h1v1h-1zm-1-1h1v1h-1zm1-1h1v1h-1zm-1 1h1v1h-1z"/>
+                                </svg>
+                            </div>
+                            <span class="qr-link-text">music-borrow.vercel.app/demo/demo-presentation.html</span>
+                        </div>
+                        <a href="demo-presentation.html" target="_blank" style="margin-top: 1.5rem; text-decoration: none; padding: 0.8rem 1.5rem; background: var(--primary); border-radius: 99px; color: white; font-weight: 700; font-size: 0.85rem; box-shadow: 0 10px 20px rgba(59,130,246,0.3)">
+                            🖱️ คลิกเปิดหน้าจอสาธิต (Interactive Demo)
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Notes Sidebar -->
+        <div class="notes-sidebar" id="notes-sidebar">
+            <div class="notes-header">
+                <h3>🗣️ Speaking Note</h3>
+                <button class="ctrl-btn" onclick="toggleNotes()" style="width: 28px; height: 28px; font-size: 0.8rem;">✕</button>
+            </div>
+            <div class="notes-content" id="notes-text">
+                <!-- Injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Control Bar -->
+    <div class="control-bar">
+        <div class="slide-counter">
+            สไลด์ <span id="current-num">1</span> / <span id="total-num">10</span>
+        </div>
+
+        <div class="indicator-dots" id="dots-container">
+            <!-- Injected by JS -->
+        </div>
+
+        <div class="nav-controls">
+            <button class="ctrl-btn btn-text notes-toggle" id="notes-toggle-btn" onclick="toggleNotes()">
+                💬 โน้ตคนพูด
+            </button>
+            <button class="ctrl-btn" id="prev-btn" onclick="prevSlide()">◀</button>
+            <button class="ctrl-btn" id="next-btn" onclick="nextSlide()">▶</button>
+            <button class="ctrl-btn" onclick="toggleFullScreen()" title="เต็มหน้าจอ">🖥️</button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+       🧠 PRESENTATION JAVASCRIPT
+       ═══════════════════════════════════════════════════════════════ -->
+    <script>
+        // 1. Speaking notes data for each slide
+        const speakingNotes = {
+            1: `<p><b>บทพูดนำเสนอ (Hook & Title):</b></p>
+                <p>"สวัสดีครับคณะกรรมการทุกท่านครับ ทุกท่านยังจำความรู้สึกในวัยเยาว์ตอนที่ฝึกฝนเครื่องดนตรีได้ไหมครับ? การฝึกซ้อมดนตรีที่บ้านเป็นช่วงเวลาสำคัญอย่างยิ่งที่จะช่วยเสริมสร้างความเพียรพยายาม ความมีวินัย และความกระตือรือร้นของนักเรียน</p>
+                <p>วันนี้ผม วรัทภพ ทุมนาหาด จากชุมนุมดนตรีสากล โรงเรียนโนนไทยคุรุอุปถัมภ์ ขอนำเสนอความก้าวหน้าครั้งสำคัญผ่าน <b>Music Borrow</b> ระบบการยืม – คืน เครื่องดนตรี โดยใช้เว็บแอปพลิเคชัน Music Borrow นวัตกรรมที่ยกระดับการจัดการห้องดนตรีและฝึกทักษะด้วยแนวคิดเกม RPG ที่จะกระตุ้นให้นักเรียนรู้สึกเพลิดเพลิน สนใจฝึกฝน และพัฒนาฝีมือร่วมกันอย่างยั่งยืนครับ"</p>`,
+            
+            2: `<p><b>บทพูดนำเสนอ (Research Problems & Objectives):</b></p>
+                <p>"สำหรับการวิจัยครั้งนี้มีจุดเริ่มต้นจากความท้าทายสำคัญสองประการครับ ประการแรกคือปัญหาจากการดำเนินงานข้อมูลระบบยืม-คืนแบบเดิมในโรงเรียนที่ขาดความสะดวก รวดเร็ว และเป็นภาระงานเอกสาร อีกทั้งตัวนักเรียนเองก็ขาดระบบช่วยกระตุ้นแรงจูงใจในการซ้อมและเครื่องมือสนับสนุนการฝึกซ้อมส่วนตัวที่บ้าน</p>
+                <p>ดังนั้น ทางผู้วิจัยจึงได้กำหนดวัตถุประสงค์การวิจัยไว้ 2 ข้อหลักตามบทคัดย่อครับ ข้อแรกคือ <b>เพื่อพัฒนาระบบการยืม–คืน เครื่องดนตรี โดยใช้เว็บแอปพลิเคชัน Music Borrow โรงเรียนโนนไทยคุรุอุปถัมภ์ สังกัดองค์การบริหารส่วนจังหวัดนครราชสีมา</b> ให้มีความเหมาะสมและมีประสิทธิภาพ และข้อที่สองคือ <b>เพื่อประเมินความพึงพอใจของนักเรียนชุมนุมดนตรีสากล</b> ต่อการใช้งานระบบดังกล่าว เพื่อให้ผลลัพธ์ตอบสนองความต้องการและพฤติกรรมการเรียนรู้จริงของนักเรียนอย่างตรงจุดและมีประสิทธิภาพสูงสุดครับ"</p>`,
+            
+            3: `<p><b>บทพูดนำเสนอ (The Gamified Loop):</b></p>
+                <p>"หัวใจของ Music Borrow คือการวางกลไกกระตุ้นแรงจูงใจเชิงบวกครับ ยิ่งซ้อมจริง ก็ยิ่งช่วยอัปเลเวลตัวละครของตัวเองให้เติบโต ได้รับดาวทอง และสะสมเหรียญตราเกียรติยศแห่งความพยายาม และนักเรียนยังสามารถจับกลุ่มเพื่อนร่วมปาร์ตี้เพื่อนำชั่วโมงฝึกซ้อมสะสมของแต่ละคนมารวมพลังกันพิชิตภารกิจสู้บอสประจำสัปดาห์ในชั้นเรียนได้ การฝึกซ้อมดนตรีจึงแปรเปลี่ยนเป็นความตื่นเต้นที่ทุกคนพร้อมก้าวเดินและเติบโตไปด้วยกันในทุกๆ วันครับ"</p>`,
+            
+            4: `<p><b>บทพูดนำเสนอ (The Practice Hub):</b></p>
+                <p>"แอปนี้ทำหน้าที่เป็นเสมือนศูนย์ซ้อมส่วนตัวและคลังความรู้แบบพกพาของเด็กๆ ครับ เมื่อนักเรียนซ้อมดนตรีและต้องการปรับระดับเสียง ก็สามารถใช้เครื่องตั้งสายในแอปตรวจสอบได้ทันที พร้อมใช้เมโทรนอมฝึกซ้อมความแม่นยำของจังหวะ ซึ่งสามารถกดแตะนิ้วเคาะเพื่อจับความเร็วของจังหวะเพลงจริงได้ทันที</p>
+                <p>และหากต้องการทบทวนเทคนิคที่เรียนในคาบเรียน ก็มีคลังวิดีโอช่วยสอนจากคุณครูให้เปิดหัดเป่าตามได้ทุกเวลา ช่วยเสริมทักษะส่วนบุคคลให้พัฒนาก้าวหน้าและถูกต้องแม่นยำขึ้นอย่างรวดเร็วครับ"</p>`,
+            
+            5: `<p><b>บทพูดนำเสนอ (Minigames & Boss Raids):</b></p>
+                <p>"นี่คือมิติใหม่ของการผนึกกำลังและการทำงานร่วมกันครับ เราเปลี่ยนวิชาทฤษฎีดนตรีที่ต้องจำตัวโน้ตบนบรรทัด 5 เส้นให้ตื่นเต้นผ่านมินิเกม Staff Wars ที่เล่นง่ายและเพลิดเพลิน</p>
+                <p>และเรายังมีระบบ 'ล่าบอสในห้องเรียน' ซึ่งเป็นกิจกรรมกลุ่มที่ยอดเยี่ยม ครูจะฉายหน้าจอห้องล่าบอสขึ้้นบอร์ดหน้าชั้นเรียน นักเรียนกดใส่รหัสเพื่อพาตัวละครอวาตาร์เข้ามาจัดปาร์ตี้ร่วมกัน แล้วนำชั่วโมงซ้อมสะสมของทุกคนมารวมกันเพื่อทำเป้าหมายให้สำเร็จ สร้างความสัมพันธ์ที่ดีและบรรยากาศการเรียนดนตรีที่แอคทีฟสุดๆ ครับ"</p>`,
+            
+            6: `<p><b>บทพูดนำเสนอ (Level & Ranking):</b></p>
+                <p>"ทุกนาทีแห่งความตั้งใจซ้อมของเด็กๆ จะได้รับการบันทึกและให้รางวัลอย่างคุ้มค่าครับ ยิ่งซ้อมมาก ตัวละครดนตรียิ่งแข็งแกร่ง เลเวลสูงขึ้น และสามารถปลดล็อกเหรียญตราเกียรติยศพิเศษต่างๆ เช่น ตรา 'ขุนพลไม่นอนข้ามคืน' มาประดับตกแต่งโปรไฟล์ พร้อมมีกระดาน Leaderboard อัปเดตรายเดือนเพื่อสร้างการแข่งขันเชิงสร้างสรรค์ ดึงดูดให้นักเรียนอยากพัฒนาและภูมิใจในผลลัพธ์การเรียนรู้ของตัวเองอย่างยั่งยืนครับ"</p>`,
+            
+            7: `<p><b>บทพูดนำเสนอ (Smart QR Scan):</b></p>
+                <p>"ระบบการยืมคืนเราปรับปรุงใหม่ให้ทำงานง่ายและสะดวกมากครับ สแกนง่ายและเร็ว สแกนปุ๊บ ซ้อมปั๊บ รับ XP มีแจ้งเตือนคอยดูแลความก้าวหน้าและการจองบำรุงรักษาคลังเครื่องดนตรี</p>
+                <p>และเพื่อรักษาระเบียบและกระตุ้นการมีวินัย ระบบ Soft Block ของเราได้รับการออกแบบอย่างเป็นมิตรที่สุดครับ แม้จะมีข้อจำกัดในการยืมเครื่องใหม่ชั่วคราวเพื่อส่งเสริมความรับผิดชอบ แต่แอปยังคงอนุญาตให้นักเรียนฝึกซ้อมและเรียนรู้บทเรียนวิดีโอได้เป็นปกติ เพื่อช่วยประคับประคองและสนับสนุนพัฒนาการของนักเรียนอย่างอบอุ่นครับ"</p>`,
+            
+            8: `<p><b>บทพูดนำเสนอ (Personalized Analytics):</b></p>
+                <p>"เมื่อมีการสะสมสถิติ ข้อมูลความถูกต้องเป็นสิ่งที่เราใส่ใจครับ ระบบสรุปเวลารายบุคคล (Personalized Analytics) ได้รับการออกแบบให้ตรวจสอบและบันทึกเวลาตามชั่วโมงซ้อมจริงอย่างแม่นยำ เพื่อสร้างความน่าเชื่อถือและความโปร่งใสของสถิติ</p>
+                <p>ระบบจะรวบรวมเวลาการซ้อมแสดงผลเป็นกราฟส่งตรงถึงครูผู้ประเมิน ช่วยให้ครูตรวจสอบความพยายามและพฤติกรรมเด็กได้ง่ายในระบบดิจิทัล ลดภาระการตรวจสมุดบันทึกแบบเดิม ช่วยคุณครูทำงานประเมินผลได้สะดวกยิ่งขึ้นครับ"</p>`,
+            
+            9: `<p><b>บทพูดนำเสนอ (Research Impact):</b></p>
+                <p>"และทั้งหมดนี้คือสิ่งที่เราพิสูจน์แล้วผ่านการใช้งานวิจัยจริงในโรงเรียนครับ ผลประเมินความพึงพอใจของนักเรียนกลุ่มตัวอย่างชุมนุมดนตรีสากล โรงเรียนโนนไทยคุรุอุปถัมภ์ จำนวน 50 คน อยู่ในระดับมากที่สุด ค่าเฉลี่ย 4.54 คะแนน โดยเฉพาะด้านระบบเกมมิฟิเคชันที่ได้คะแนนสูงสุดถึง 4.56 คะแนน สะท้อนว่าเด็กๆ มีแรงกระตุ้นและแรงจูงใจเชิงบวก ด้านการประเมินประสิทธิภาพโดยผู้เชี่ยวชาญก็อยู่ในระดับมากที่สุดเช่นกันที่ 4.86 คะแนน</p>
+                <p>และสิ่งสำคัญคือ อัตราความปลอดภัยและการได้รับการบำรุงรักษาของเครื่องดนตรีเพิ่มสูงขึ้นอย่างชัดเจน เพราะนักเรียนทุกคนตระหนักรู้และช่วยกันดูแลรักษาเครื่องดนตรีร่วมกันอย่างมีระบบระเบียบครับ"</p>`,
+            
+            10: `<p><b>บทพูดนำเสนอ (Demo Screen & Wrap Up):</b></p>
+                 <p>"บทสรุปของ Music Borrow คือเครื่องพิสูจน์ว่า เทคโนโลยีสามารถนำมาประยุกต์เปลี่ยนความรับผิดชอบและการซ้อมดนตรีให้เป็นกระบวนการเรียนรู้ที่มีความสุขของเยาวชนได้อย่างยั่งยืนครับ</p>
+                 <p>เพื่อร่วมเปิดประสบการณ์นี้ด้วยตนเอง ขอเรียนเชิญคณะกรรมการทุกท่านร่วมยกมือถือสแกน QR Code หน้าจอนี้เพื่อเยี่ยมชมหน้าทดลองจำลองการบรรยายและลองสัมผัสแดชบอร์ด มินิเกม หรือเมนูต่างๆ ไปพร้อมๆ กันได้เลยครับ ขอขอบพระคุณคณะกรรมการทุกท่านครับ"</p>`
+        };
+
+        // 2. Slide state variables
+        let currentSlide = 1;
+        const totalSlides = 10;
+        const slides = document.querySelectorAll('.slide');
+        const currentNum = document.getElementById('current-num');
+        const totalNum = document.getElementById('total-num');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const dotsContainer = document.getElementById('dots-container');
+        const notesText = document.getElementById('notes-text');
+        const notesSidebar = document.getElementById('notes-sidebar');
+        const notesToggleBtn = document.getElementById('notes-toggle-btn');
+        const viewport = document.getElementById('viewport');
+
+        // 3. Initialize Slides
+        function initSlides() {
+            totalNum.textContent = totalSlides;
+            
+            // Build indicator dots
+            dotsContainer.innerHTML = '';
+            for(let i = 1; i <= totalSlides; i++) {
+                const dot = document.createElement('div');
+                dot.className = `indicator-dot ${i === 1 ? 'active' : ''}`;
+                dot.addEventListener('click', () => goToSlide(i));
+                dotsContainer.appendChild(dot);
+            }
+            
+            updateSlideUI();
+        }
+
+        // 4. Update UI Elements for active slide
+        function updateSlideUI() {
+            // Update active state on slide divs
+            slides.forEach(slide => {
+                if (parseInt(slide.getAttribute('data-index')) === currentSlide) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            // Update Counter
+            currentNum.textContent = currentSlide;
+
+            // Update Dots
+            const dots = document.querySelectorAll('.indicator-dot');
+            dots.forEach((dot, idx) => {
+                if (idx + 1 === currentSlide) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+
+            // Enable/Disable buttons
+            prevBtn.disabled = (currentSlide === 1);
+            nextBtn.disabled = (currentSlide === totalSlides);
+
+            // Update speaking notes
+            notesText.innerHTML = speakingNotes[currentSlide] || "<p>ไม่มีโน้ตสำหรับสไลด์นี้</p>";
+            
+            // Trigger animation in tuner/metronome mockup if visible
+            const tunerNeedle = document.querySelector('.tuner-needle');
+            if (tunerNeedle) {
+                if (currentSlide === 4) {
+                    tunerNeedle.classList.add('tuning');
+                } else {
+                    tunerNeedle.classList.remove('tuning');
+                }
+            }
+        }
+
+        // 5. Navigation functions
+        function nextSlide() {
+            if (currentSlide < totalSlides) {
+                currentSlide++;
+                updateSlideUI();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1) {
+                currentSlide--;
+                updateSlideUI();
+            }
+        }
+
+        function goToSlide(index) {
+            if (index >= 1 && index <= totalSlides) {
+                currentSlide = index;
+                updateSlideUI();
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // 6. Speaking notes drawer toggle
+        function toggleNotes() {
+            notesSidebar.classList.toggle('active');
+            notesToggleBtn.classList.toggle('active');
+        }
+
+        // 7. Fullscreen Toggle
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Swipe Gestures for touchscreens
+        let touchstartX = 0;
+        let touchendX = 0;
+
+        document.addEventListener('touchstart', e => {
+            touchstartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            handleGesture();
+        });
+
+        function handleGesture() {
+            if (touchendX < touchstartX - 50) {
+                nextSlide(); // Swiped left
+            }
+            if (touchendX > touchstartX + 50) {
+                prevSlide(); // Swiped right
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', initSlides);
+    </script>
+</body>
+</html>

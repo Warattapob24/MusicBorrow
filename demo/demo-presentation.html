@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎵 ระบบยืมคืนเครื่องดนตรี v6.0 — Interactive Demo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+<!-- SweetAlert2 for highly interactive popup prompts -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════
-   🎨 THEME — copied 1:1 from production app (styles.css)
+   🎨 THEME & CORE VARIABLES
    ═══════════════════════════════════════════════════════════════ */
 :root {
     --primary-blue: #3B82F6;
@@ -27,6 +29,8 @@
     --purple: #8b5cf6;
     --pink: #ec4899;
     --accent-bg: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.02);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.04);
 }
 [data-theme="dark"] {
     --bg-gradient-1: #1e1b4b;
@@ -54,7 +58,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
-    font-family: 'Prompt', -apple-system, sans-serif;
+    font-family: 'Prompt', 'Sarabun', sans-serif;
     background-color: var(--main-bg);
     background-image: radial-gradient(circle at top right, var(--bg-gradient-1), transparent 40%),
                       radial-gradient(circle at bottom left, var(--bg-gradient-2), transparent 40%);
@@ -66,7 +70,7 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   📱 APP SHELL (mobile-first 480px frame)
+   📱 APP SHELL (mobile-first 480px frame vs desktop browser frame)
    ═══════════════════════════════════════════════════════════════ */
 .demo-stage {
     max-width: 1100px;
@@ -75,9 +79,14 @@ body {
     grid-template-columns: 1fr 320px;
     gap: 1.5rem;
     align-items: start;
+    transition: max-width 0.3s ease;
+}
+.demo-stage.admin-mode {
+    max-width: 1400px;
+    grid-template-columns: 1fr 340px;
 }
 @media (max-width: 900px) {
-    .demo-stage { grid-template-columns: 1fr; }
+    .demo-stage, .demo-stage.admin-mode { grid-template-columns: 1fr; }
     .control-panel { position: sticky; top: 0; z-index: 50; }
 }
 
@@ -91,11 +100,64 @@ body {
     box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
     overflow: hidden;
     position: relative;
-    min-height: 720px;
+    min-height: 760px;
+    display: block;
+}
+
+/* 💻 Browser Widescreen Frame (For Admin Demo) */
+.browser-frame {
+    display: none;
+    flex-direction: column;
+    background: var(--card-bg);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 1.25rem;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    overflow: hidden;
+    min-height: 760px;
+    width: 100%;
+}
+.browser-header {
+    background: var(--input-bg);
+    border-bottom: 1px solid var(--input-border);
+    padding: 0.6rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.browser-dots {
+    display: flex;
+    gap: 0.4rem;
+}
+.browser-dots .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.browser-dots .dot.red { background: #ef4444; }
+.browser-dots .dot.yellow { background: #f59e0b; }
+.browser-dots .dot.green { background: #10b981; }
+.browser-address {
+    flex: 1;
+    background: var(--card-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    font-family: monospace;
+}
+.browser-content {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 700px;
+    display: flex;
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   🎚️ CONTROL PANEL (right sidebar — guides + tour controls)
+   🎚️ CONTROL PANEL (guides + tour controls)
    ═══════════════════════════════════════════════════════════════ */
 .control-panel {
     background: var(--card-bg);
@@ -131,7 +193,7 @@ body {
     border: 2px solid var(--input-border);
     background: var(--input-bg);
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 0.85rem;
     color: var(--text-main);
     transition: all 0.2s;
@@ -172,7 +234,7 @@ body {
     height: 100%; background: var(--accent-bg); width: 0%; transition: width 0.5s ease;
     box-shadow: 0 0 8px rgba(59,130,246,0.6);
 }
-.feature-jumps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; margin-top: 0.75rem; }
+.feature-jumps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; margin-top: 0.75rem; }
 .jump-btn {
     padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--input-border);
     background: var(--input-bg); cursor: pointer; font-size: 1.2rem; transition: all 0.2s;
@@ -195,11 +257,9 @@ body {
 .screen.active { display: block; animation: slideUp 0.4s ease; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
 /* ═══════════════════════════════════════════════════════════════
-   🔝 TOP APP BAR
+   🔝 TOP APP BAR & NAVIGATION
    ═══════════════════════════════════════════════════════════════ */
 .app-bar {
     display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem 1rem;
@@ -226,9 +286,6 @@ body {
     animation: pulse 2s infinite;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   ⬇️ BOTTOM NAV
-   ═══════════════════════════════════════════════════════════════ */
 .bottom-nav {
     position: absolute; bottom: 0; left: 0; right: 0;
     background: var(--card-bg); border-top: 1px solid var(--input-border);
@@ -245,7 +302,7 @@ body {
 .nav-item.active { color: var(--primary-blue); background: rgba(59,130,246,0.1); transform: translateY(-3px); }
 
 /* ═══════════════════════════════════════════════════════════════
-   🃏 SHARED CARD STYLES
+   🃏 CARD & COMMON UI COMPONENTS
    ═══════════════════════════════════════════════════════════════ */
 .card {
     background: var(--card-bg); border-radius: 1.5rem; padding: 1.25rem;
@@ -272,6 +329,7 @@ body {
 .btn.success { background: linear-gradient(135deg, #10b981, #059669); color: white; }
 .btn.danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
 .btn.full { width: 100%; justify-content: center; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 .input-field {
     width: 100%; padding: 0.7rem 0.9rem; border-radius: 0.75rem;
     border: 1px solid var(--input-border); background: var(--input-bg);
@@ -282,19 +340,88 @@ body {
 label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.3rem; color: var(--text-muted); }
 
 /* ═══════════════════════════════════════════════════════════════
-   1️⃣ LOGIN SCREEN
+   🎙️ PRACTICE STUDIO COMPONENTS
+   ═══════════════════════════════════════════════════════════════ */
+.tuner-container, .metro-container {
+    text-align: center;
+    padding: 1.25rem;
+    background: var(--input-bg);
+    border-radius: 1.25rem;
+    border: 1px solid var(--input-border);
+    margin-bottom: 1rem;
+}
+.tuner-gauge {
+    width: 140px;
+    height: 70px;
+    border: 3px solid var(--input-border);
+    border-bottom: none;
+    border-radius: 70px 70px 0 0;
+    margin: 0.5rem auto 1rem;
+    position: relative;
+    overflow: hidden;
+}
+.tuner-needle {
+    width: 3px;
+    height: 60px;
+    background: var(--danger);
+    position: absolute;
+    bottom: 0;
+    left: calc(50% - 1.5px);
+    transform-origin: bottom center;
+    transform: rotate(0deg);
+    transition: transform 0.2s ease;
+}
+.tuner-needle.tuning {
+    animation: tunerWobble 1.2s infinite ease-in-out;
+}
+@keyframes tunerWobble {
+    0%, 100% { transform: rotate(-12deg); }
+    50% { transform: rotate(18deg); }
+    25% { transform: rotate(2deg); }
+    75% { transform: rotate(-5deg); }
+}
+.tuner-note {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--primary-blue);
+    margin-bottom: 0.25rem;
+}
+.tuner-cents { font-size: 0.8rem; color: var(--text-muted); }
+
+.metro-arm-container {
+    width: 20px;
+    height: 80px;
+    margin: 0.5rem auto 1rem;
+    position: relative;
+}
+.metro-arm {
+    width: 4px;
+    height: 80px;
+    background: var(--text-main);
+    position: absolute;
+    bottom: 0;
+    left: 8px;
+    transform-origin: bottom center;
+    transform: rotate(0deg);
+}
+.metro-arm.swinging {
+    animation: metroSwing 0.6s infinite alternate ease-in-out;
+}
+@keyframes metroSwing {
+    from { transform: rotate(-25deg); }
+    to { transform: rotate(25deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   1️⃣ STUDENT SCREENS (LOGIN, DASHBOARD, BORROW, ETC)
    ═══════════════════════════════════════════════════════════════ */
 #screen-login { display: flex; flex-direction: column; justify-content: center; padding-top: 3rem; }
 #screen-login.active { display: flex; }
-.login-hero {
-    text-align: center; margin-bottom: 2rem;
-}
+.login-hero { text-align: center; margin-bottom: 2rem; }
 .login-hero .logo-big {
     width: 90px; height: 90px; margin: 0 auto 1rem; border-radius: 50%;
-    background: var(--accent-bg);
-    display: grid; place-items: center; font-size: 3rem;
-    box-shadow: 0 15px 40px rgba(59,130,246,0.4);
-    animation: pulse 3s infinite;
+    background: var(--accent-bg); display: grid; place-items: center; font-size: 3rem;
+    box-shadow: 0 15px 40px rgba(59,130,246,0.4); animation: pulse 3s infinite;
 }
 .login-hero h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 0.3rem; color: var(--text-main); }
 .login-hero p { font-size: 0.9rem; color: var(--text-muted); }
@@ -307,9 +434,6 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 }
 .google-btn:hover { background: #f1f5f9; }
 
-/* ═══════════════════════════════════════════════════════════════
-   2️⃣ DASHBOARD
-   ═══════════════════════════════════════════════════════════════ */
 .profile-strip { display: flex; align-items: center; gap: 0.85rem; }
 .profile-avatar {
     width: 60px; height: 60px; border-radius: 50%; background: var(--accent-bg);
@@ -340,9 +464,6 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 .streak-banner .flame { font-size: 1.8rem; animation: pulse 1.5s infinite; }
 .streak-banner .num { font-size: 1.4rem; font-weight: 800; }
 
-/* ═══════════════════════════════════════════════════════════════
-   3️⃣ BORROW (QR scan)
-   ═══════════════════════════════════════════════════════════════ */
 .qr-scanner-box {
     background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 1.5rem;
     padding: 2rem 1rem; text-align: center; color: white; position: relative;
@@ -370,9 +491,7 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 .instr-info { flex: 1; }
 .instr-name { font-weight: 700; font-size: 0.9rem; }
 .instr-meta { font-size: 0.75rem; color: var(--text-muted); }
-.badge {
-    display: inline-block; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.7rem; font-weight: 700;
-}
+.badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.7rem; font-weight: 700; }
 .badge.green { background: rgba(16,185,129,0.15); color: #047857; }
 .badge.blue { background: rgba(59,130,246,0.15); color: #1d4ed8; }
 .badge.red { background: rgba(239,68,68,0.15); color: #b91c1c; }
@@ -381,9 +500,6 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 [data-theme="dark"] .badge.green { color: #6ee7b7; }
 [data-theme="dark"] .badge.blue { color: #93c5fd; }
 
-/* ═══════════════════════════════════════════════════════════════
-   4️⃣ LEARNING FEED
-   ═══════════════════════════════════════════════════════════════ */
 .video-card {
     background: var(--card-bg); border-radius: 1.25rem; overflow: hidden;
     margin-bottom: 1rem; border: 1px solid var(--input-border);
@@ -409,9 +525,6 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
     padding: 0.25rem 0.55rem; border-radius: 1rem; font-weight: 700; font-size: 0.75rem;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   6️⃣ BOSS RAID
-   ═══════════════════════════════════════════════════════════════ */
 .boss-card {
     background: linear-gradient(135deg, #7c3aed, #db2777); color: white;
     border-radius: 1.5rem; padding: 1.25rem; margin-bottom: 1rem;
@@ -424,8 +537,7 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 }
 .boss-card .dragon {
     font-size: 3rem; margin-bottom: 0.5rem; display: block;
-    text-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    animation: pulse 2s infinite;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: pulse 2s infinite;
 }
 .boss-name { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.25rem; }
 .boss-desc { font-size: 0.85rem; opacity: 0.9; margin-bottom: 0.85rem; }
@@ -444,9 +556,6 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
     background: transparent; color: white; border: 2px solid rgba(255,255,255,0.6);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   7️⃣ REPAIR
-   ═══════════════════════════════════════════════════════════════ */
 .timeline { position: relative; padding-left: 1.5rem; }
 .timeline::before {
     content: ''; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 2px;
@@ -462,9 +571,6 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 .timeline-title { font-weight: 700; font-size: 0.9rem; }
 .timeline-time { font-size: 0.75rem; color: var(--text-muted); }
 
-/* ═══════════════════════════════════════════════════════════════
-   8️⃣ BADGES + LEADERBOARD
-   ═══════════════════════════════════════════════════════════════ */
 .badge-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.6rem; }
 .medal-card {
     background: var(--card-bg); border: 1px solid var(--input-border); border-radius: 1rem;
@@ -487,8 +593,179 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 .rank-num.bronze { color: #c2410c; font-size: 1rem; }
 
 /* ═══════════════════════════════════════════════════════════════
-   🎬 GUIDED TOUR OVERLAY (callout system)
+   💻 ADMIN WORKSPACE STYLES (Mocking admin-dashboard.js)
    ═══════════════════════════════════════════════════════════════ */
+.admin-sidebar {
+    width: 250px;
+    background: var(--input-bg);
+    border-right: 1px solid var(--input-border);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 0.75rem;
+    gap: 0.4rem;
+}
+.admin-menu-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    padding: 0.5rem 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.admin-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 0.75rem;
+    border-radius: 0.6rem;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    font-family: inherit;
+    position: relative;
+}
+.admin-tab-btn:hover {
+    background: rgba(59,130,246,0.06);
+    color: var(--primary-deep);
+}
+.admin-tab-btn.active {
+    background: var(--accent-bg);
+    color: white;
+}
+.admin-tab-badge {
+    position: absolute;
+    right: 10px;
+    background: var(--danger);
+    color: white;
+    border-radius: 99px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+}
+.admin-main {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+    background: var(--card-bg);
+}
+.admin-panel {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+.admin-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    border-bottom: 2px solid var(--input-bg);
+    padding-bottom: 0.75rem;
+}
+.admin-panel-header h2 {
+    font-size: 1.3rem;
+    font-weight: 800;
+}
+.admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.admin-stat-card {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.admin-stat-val { font-size: 1.8rem; font-weight: 800; color: var(--primary-blue); }
+.admin-stat-lbl { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; }
+
+.admin-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+@media (max-width: 1200px) { .admin-grid-2 { grid-template-columns: 1fr; } }
+
+.admin-box {
+    border: 1px solid var(--input-border);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    background: var(--card-bg);
+    margin-bottom: 1.25rem;
+}
+.admin-box-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text-main);
+    border-bottom: 1px dashed var(--input-border);
+    padding-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* 📊 Tables inside Admin */
+.oad-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+}
+.oad-table th, .oad-table td {
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--input-border);
+}
+.oad-table th {
+    font-weight: 700;
+    color: var(--text-muted);
+    background: var(--input-bg);
+}
+.oad-table tr:hover { background: rgba(59,130,246,0.02); }
+
+.oad-btn {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.oad-btn-green { background: rgba(16,185,129,0.15); color: #047857; }
+.oad-btn-green:hover { background: #10b981; color: white; }
+.oad-btn-red { background: rgba(239,68,68,0.15); color: #b91c1c; }
+.oad-btn-red:hover { background: #ef4444; color: white; }
+.oad-btn-blue { background: var(--primary-blue); color: white; }
+.oad-btn-blue:hover { background: var(--primary-deep); }
+.oad-btn-ghost { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--input-border); }
+.oad-btn-ghost:hover { background: var(--input-border); }
+
+/* Heatmap Grid */
+.heatmap-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.heatmap-label { width: 35px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-align: right; }
+.heatmap-grid { flex: 1; display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; }
+.heatmap-cell {
+    height: 16px; border-radius: 2px; background: var(--input-bg);
+    border: 1px solid rgba(148, 163, 184, 0.15); cursor: pointer; position: relative;
+}
+.heatmap-cell:hover { transform: scale(1.15); z-index: 5; }
+
+/* 🎬 GUIDED TOUR OVERLAY (callout system) */
 .tour-overlay {
     position: fixed; inset: 0; background: rgba(15,23,42,0.55); z-index: 100;
     display: none; backdrop-filter: blur(2px);
@@ -526,13 +803,10 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 .tour-callout button.next { background: var(--accent-bg); color: white; }
 .tour-callout button.skip { background: transparent; color: #94a3b8; }
 
-.spotlight {
-    position: relative; z-index: 101; box-shadow: 0 0 0 9999px rgba(15,23,42,0.55);
-    border-radius: 1rem;
-}
+.spotlight { position: relative; z-index: 101; box-shadow: 0 0 0 9999px rgba(15,23,42,0.55); border-radius: 1rem; }
 
 /* ═══════════════════════════════════════════════════════════════
-   🔔 TOAST NOTIFICATIONS
+   🔔 TOAST & NOTIFICATIONS
    ═══════════════════════════════════════════════════════════════ */
 .toast {
     position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
@@ -540,12 +814,12 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
     box-shadow: 0 15px 40px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 0.6rem;
     z-index: 110; font-weight: 600; font-size: 0.9rem; max-width: 90%;
     border-left: 4px solid var(--success); animation: slideUp 0.3s ease;
+    color: #1e293b;
 }
 .toast.error { border-left-color: var(--danger); }
 .toast.warning { border-left-color: var(--warning); }
 .toast.info { border-left-color: var(--primary-blue); }
 
-/* Push notification simulator */
 .push-notif {
     position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
     background: linear-gradient(135deg, #1e293b, #0f172a); color: white;
@@ -560,16 +834,9 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 .empty-state { text-align: center; padding: 2rem 1rem; color: var(--text-muted); }
 .empty-state .icon { font-size: 3rem; margin-bottom: 0.5rem; }
 
-/* ═══════════════════════════════════════════════════════════════
-   🎉 CONFETTI / EXP GAIN
-   ═══════════════════════════════════════════════════════════════ */
-.exp-gain-overlay {
-    position: fixed; inset: 0; pointer-events: none; z-index: 105;
-    display: grid; place-items: center;
-}
+.exp-gain-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 105; display: grid; place-items: center; }
 .exp-gain-text {
-    font-size: 4rem; font-weight: 900;
-    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    font-size: 4rem; font-weight: 900; background: linear-gradient(135deg, #fbbf24, #f59e0b);
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     animation: expPop 1.5s ease-out forwards;
 }
@@ -579,22 +846,15 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
     100% { transform: scale(1) translateY(-100px); opacity: 0; }
 }
 
-/* Footer note */
-.footer-note {
-    text-align: center; padding: 1.5rem 0 0.5rem;
-    font-size: 0.75rem; color: var(--text-muted); max-width: 1100px; margin: 0 auto;
-}
+.footer-note { text-align: center; padding: 1.5rem 0 0.5rem; font-size: 0.75rem; color: var(--text-muted); max-width: 1100px; margin: 0 auto; }
 .footer-note b { color: var(--primary-blue); }
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     LAYOUT: Phone Frame + Control Panel
-     ═══════════════════════════════════════════════════════════════ -->
-<div class="demo-stage">
+<div class="demo-stage" id="demoStage">
 
-    <!-- ─────── PHONE FRAME ─────── -->
+    <!-- 📱 PHONE FRAME (Student View) -->
     <div class="phone-frame" id="phoneFrame">
 
         <!-- ═══ SCREEN 1: LOGIN ═══ -->
@@ -611,14 +871,14 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
             <button class="btn primary full" onclick="doLogin()">เข้าสู่ระบบ →</button>
             <div class="divider">หรือ</div>
             <button class="google-btn" onclick="doLogin()">
-                <span style="font-size: 1.2rem;">G</span> เข้าสู่ระบบด้วย Google
+                <span style="font-size: 1.2rem; font-weight: 800; color: #4285F4;">G</span> เข้าสู่ระบบด้วย Google
             </button>
             <p style="text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
                 ยังไม่มีบัญชี? <b style="color: var(--primary-blue); cursor: pointer;">ลงทะเบียน</b>
             </p>
         </section>
 
-        <!-- ═══ APP BAR (hidden on login) ═══ -->
+        <!-- ═══ STUDENT APP BAR (hidden on login) ═══ -->
         <div class="app-bar" id="appBar" style="display: none;">
             <div class="app-logo">🎵</div>
             <div class="app-title">สวัสดี, สมชาย ✨</div>
@@ -628,7 +888,7 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
             <button class="app-icon" onclick="cycleTheme()" title="เปลี่ยนธีม" id="themeBtn">🌓</button>
         </div>
 
-        <!-- ═══ SCREEN 2: DASHBOARD ═══ -->
+        <!-- ═══ SCREEN 2: STUDENT DASHBOARD ═══ -->
         <section class="screen" id="screen-dashboard" data-screen="dashboard">
             <!-- Profile + XP -->
             <div class="card gradient" id="profileCard">
@@ -673,17 +933,147 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 
             <!-- Quick actions -->
             <div class="card">
-                <div class="card-title">⚡ ทางลัด</div>
+                <div class="card-title">⚡ ทางลัดกิจกรรม</div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                    <button class="btn ghost" onclick="goTo('borrow')">🎺 ยืมเครื่อง</button>
-                    <button class="btn ghost" onclick="goTo('boss')">🐉 ล่าบอส</button>
-                    <button class="btn ghost" onclick="goTo('share')">🎬 แชร์คลิป</button>
-                    <button class="btn ghost" onclick="goTo('repair')">🛠️ แจ้งซ่อม</button>
+                    <button class="btn ghost" onclick="goTo('practice')">🎛️ เครื่องมือซ้อม</button>
+                    <button class="btn ghost" onclick="goTo('games')">🎮 เกม & Loops</button>
+                    <button class="btn ghost" onclick="goTo('borrow')">🎺 ยืมเครื่องดนตรี</button>
+                    <button class="btn ghost" onclick="goTo('boss')">🐉 สอบล่าบอส</button>
+                    <button class="btn ghost" onclick="goTo('share')">📤 แชร์คลิปความรู้</button>
+                    <button class="btn ghost" onclick="goTo('repair')">🛠️ แจ้งซ่อมเครื่อง</button>
                 </div>
             </div>
         </section>
 
-        <!-- ═══ SCREEN 3: BORROW ═══ -->
+        <!-- ═══ SCREEN 3: PRACTICE STUDIO (New) ═══ -->
+        <section class="screen" id="screen-practice" data-screen="practice">
+            <div class="card gradient" style="background: linear-gradient(135deg, #10b981, #059669);">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-size: 2.5rem;">🎛️</span>
+                    <div>
+                        <div style="font-weight: 800; font-size: 1.05rem;">Practice Studio</div>
+                        <div style="font-size: 0.8rem; opacity: 0.9;">เครื่องมือซ้อมดนตรีและบันทึกเวลาซ้อมจริง</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tuner -->
+            <div class="tuner-container" id="tunerBox">
+                <h3 class="card-title" style="justify-content: center; margin-bottom: 0.5rem;">🎙️ เครื่องตั้งสาย (Tuner)</h3>
+                <div class="tuner-gauge">
+                    <div class="tuner-needle" id="tunerNeedle"></div>
+                </div>
+                <div class="tuner-note" id="tunerNote">A</div>
+                <div class="tuner-cents" id="tunerCents">440.0 Hz (ตรงคีย์)</div>
+                <button class="btn primary full" id="tunerBtn" onclick="toggleTuner()">🎙️ เริ่มการตั้งสาย</button>
+            </div>
+
+            <!-- Metronome -->
+            <div class="metro-container" id="metroBox">
+                <h3 class="card-title" style="justify-content: center; margin-bottom: 0.5rem;">🥁 เครื่องเคาะจังหวะ (Metronome)</h3>
+                <div class="metro-arm-container">
+                    <div class="metro-arm" id="metroArm"></div>
+                </div>
+                <div style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem;" id="bpmDisplay">120 BPM</div>
+                <input type="range" min="60" max="200" value="120" style="width: 85%; margin-bottom: 0.75rem;" oninput="updateBPM(this.value)">
+                <button class="btn primary full" id="metroBtn" onclick="toggleMetro()">▶ เริ่มเคาะจังหวะ</button>
+            </div>
+
+            <!-- Practice Timer -->
+            <div class="card" style="text-align: center;" id="practiceTimerBox">
+                <h3 class="card-title" style="justify-content: center; margin-bottom: 0.5rem;">⏱️ ตัวจับเวลาการซ้อม</h3>
+                <div style="font-size: 2.5rem; font-weight: 800; color: var(--success); margin: 0.5rem 0;" id="practiceTimerDisplay">00:00</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">บันทึกการซ้อมสะสมเพื่อรับแต้มประเมินความสม่ำเสมอ</div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn ghost" style="flex: 1;" id="practiceTimerBtn" onclick="togglePracticeTimer()">⏱️ เริ่มซ้อม</button>
+                    <button class="btn success" style="flex: 1.2;" id="practiceSubmitBtn" onclick="submitPracticeTime()" disabled>📤 ส่งเวลาซ้อม</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ SCREEN 4: GAMES & LOOPS FEED (New) ═══ -->
+        <section class="screen" id="screen-games" data-screen="games">
+            <div class="card gradient" style="background: linear-gradient(135deg, #a855f7, #6b21a8);">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-size: 2.5rem;">🎮</span>
+                    <div>
+                        <div style="font-weight: 800; font-size: 1.05rem;">มินิเกมและผลงานดนตรี</div>
+                        <div style="font-size: 0.8rem; opacity: 0.9;">เข้าห้องทดสอบความรู้และแชร์เพลงสร้างสรรค์</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">🎼 ห้องมินิเกมดนตรี</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: var(--input-bg); padding: 0.75rem; border-radius: 0.75rem; border: 1px solid var(--input-border);">
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.85rem;">🎼 Staff Wars (ห้องโน้ต)</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">ฝึกอ่านคีย์โน้ตบนบรรทัด 5 เส้น</div>
+                        </div>
+                        <button class="btn primary" onclick="launchGame('Staff Wars')" style="padding:0.4rem 0.8rem; font-size:0.8rem;">เล่น 🎮</button>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: var(--input-bg); padding: 0.75rem; border-radius: 0.75rem; border: 1px solid var(--input-border);">
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.85rem;">🥁 Rhythm Core (ห้องจังหวะ)</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">ฝึกทักษะเคาะจังหวะตามเมโทรโนม</div>
+                        </div>
+                        <button class="btn primary" onclick="launchGame('Rhythm Core')" style="padding:0.4rem 0.8rem; font-size:0.8rem;">เล่น 🎮</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="text-align: center; border: 2px dashed #a855f7; background: rgba(168, 85, 247, 0.03);">
+                <h3 class="card-title" style="justify-content: center; color: #a855f7; font-weight:800;">🎛️ Launchpad Music Looper</h3>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">แต่งมิกซ์จังหวะและท่วงทำนองในแบบของคุณเอง</p>
+                <button class="btn primary full" style="background: linear-gradient(135deg, #a855f7, #ec4899);" onclick="launchCreator()">🎛️ เปิด Music Loop Creator</button>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">🎧 ฟีดแชร์เพลง Launchpad ล่าสุด</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;" id="loopsFeedContainer">
+                    <div style="background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 1rem; padding: 0.85rem; position: relative;">
+                        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
+                            <div style="width: 38px; height: 38px; border-radius: 50%; background: #a855f7; color: white; display: grid; place-items: center; font-weight: 800; font-size: 0.95rem;">ว</div>
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.8rem;">ดช.วิชัย เรืองเดช (ม.2/3)</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">เผยแพร่เมื่อ 2 ชม. ก่อน</div>
+                            </div>
+                        </div>
+                        <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 0.25rem;">Summer Remix Beats ☀️</div>
+                        <div style="display: flex; gap: 0.4rem; margin-bottom: 0.6rem;">
+                            <span class="badge purple">⚡ BPM: 120</span>
+                            <span class="badge blue">🥁 Synthwave</span>
+                        </div>
+                        <div style="display: flex; gap: 0.4rem;">
+                            <button class="btn primary" onclick="toggleLoopPlay(this, 'summer')" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;">▶ ฟังเพลง</button>
+                            <button class="btn ghost" onclick="remixLoop('Summer Remix')" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;">🎛️ Remix</button>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 1rem; padding: 0.85rem; position: relative;">
+                        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
+                            <div style="width: 38px; height: 38px; border-radius: 50%; background: #ec4899; color: white; display: grid; place-items: center; font-weight: 800; font-size: 0.95rem;">ส</div>
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.8rem;">ดญ.สุชาดา ศรีทอง (ม.2/1)</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">เผยแพร่เมื่อ เมื่อวานนี้</div>
+                            </div>
+                        </div>
+                        <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 0.25rem;">Loy Krathong Lo-fi Trap 🌸</div>
+                        <div style="display: flex; gap: 0.4rem; margin-bottom: 0.6rem;">
+                            <span class="badge purple">⚡ BPM: 90</span>
+                            <span class="badge green">🪈 ขลุ่ยรีมิกซ์</span>
+                        </div>
+                        <div style="display: flex; gap: 0.4rem;">
+                            <button class="btn primary" onclick="toggleLoopPlay(this, 'loy')" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;">▶ ฟังเพลง</button>
+                            <button class="btn ghost" onclick="remixLoop('Loy Krathong')" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;">🎛️ Remix</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ SCREEN 5: BORROW ═══ -->
         <section class="screen" id="screen-borrow" data-screen="borrow">
             <div class="qr-scanner-box" id="qrBox">
                 <div class="qr-frame"><span class="qr-icon">📷</span></div>
@@ -691,7 +1081,7 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
             </div>
             <button class="btn primary full" onclick="scanQR()" style="margin-bottom: 1rem;">📷 สแกน QR หรือเลือกจากรายการ</button>
 
-            <div class="card">
+            <div class="card" id="studentInstrumentsList">
                 <div class="card-title">🎺 เครื่องดนตรีที่พร้อมยืม</div>
                 <div class="instrument-card" onclick="confirmBorrow('ฟลู้ท #003')">
                     <div class="instr-img">🪈</div>
@@ -699,28 +1089,28 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
                         <div class="instr-name">ฟลู้ท #003</div>
                         <div class="instr-meta">ประเภท: เครื่องลม · สภาพ: ดี</div>
                     </div>
-                    <span class="badge green">พร้อม</span>
+                    <span class="badge green" id="badge-flute-003">พร้อม</span>
                 </div>
-                <div class="instrument-card" onclick="confirmBorrow('ขลุ่ย #007')">
+                <div class="instrument-card" onclick="confirmBorrow('ขลุ่ยเพียงออ #007')">
                     <div class="instr-img">🎵</div>
                     <div class="instr-info">
                         <div class="instr-name">ขลุ่ยเพียงออ #007</div>
                         <div class="instr-meta">ประเภท: ดนตรีไทย · สภาพ: ดีมาก</div>
                     </div>
-                    <span class="badge green">พร้อม</span>
+                    <span class="badge green" id="badge-khlui-007">พร้อม</span>
                 </div>
-                <div class="instrument-card" style="opacity: 0.5;">
+                <div class="instrument-card" onclick="confirmBorrow('กีตาร์โปร่ง #012')" style="opacity: 0.85;">
                     <div class="instr-img">🎸</div>
                     <div class="instr-info">
                         <div class="instr-name">กีตาร์โปร่ง #012</div>
-                        <div class="instr-meta">ผู้ยืม: ดช.อนันต์ · กำหนดคืน: 12/พ.ค.</div>
+                        <div class="instr-meta">ประเภท: เครื่องสาย · สภาพ: ปานกลาง</div>
                     </div>
-                    <span class="badge blue">ยืมอยู่</span>
+                    <span class="badge green" id="badge-guitar-012">พร้อม</span>
                 </div>
             </div>
         </section>
 
-        <!-- ═══ SCREEN 4: LEARNING FEED ═══ -->
+        <!-- ═══ SCREEN 6: LEARNING FEED ═══ -->
         <section class="screen" id="screen-learning" data-screen="learning">
             <div class="card gradient">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -753,47 +1143,36 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
                     </div>
                 </div>
             </div>
-
-            <div class="video-card">
-                <div class="video-thumb" onclick="watchVideo()" style="background: linear-gradient(135deg, #10b981, #f59e0b);">🪈</div>
-                <div class="video-meta">
-                    <div class="video-title">ฟลู้ท: เพลง Twinkle Twinkle</div>
-                    <div class="video-info">
-                        <span>เพื่อน·พี่เอก · 5 นาที</span>
-                        <span class="exp-chip">+30 XP</span>
-                    </div>
-                </div>
-            </div>
         </section>
 
-        <!-- ═══ SCREEN 5: SHARE CLIP ═══ -->
+        <!-- ═══ SCREEN 7: SHARE CLIP ═══ -->
         <section class="screen" id="screen-share" data-screen="share">
-            <div class="card">
+            <div class="card" id="shareClipCard">
                 <div class="card-title">🎬 แชร์คลิปการเรียนรู้</div>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
                     เพิ่มคลิป YouTube/Drive เพื่อให้เพื่อนได้เรียนรู้ด้วย — รับ <b style="color: var(--primary-blue);">+100 XP</b> เมื่อครูอนุมัติ
                 </p>
                 <label class="field-label">🎵 ประเภทเครื่อง</label>
-                <select class="input-field">
+                <select class="input-field" id="shareType">
                     <option>ฟลู้ท</option><option>ขลุ่ย</option><option>กีตาร์</option><option>ระนาดเอก</option>
                 </select>
                 <label class="field-label">📝 ชื่อคลิป</label>
-                <input class="input-field" placeholder="เช่น เพลง Mary Had a Little Lamb">
+                <input class="input-field" placeholder="เช่น เพลง Mary Had a Little Lamb" id="shareTitle">
                 <label class="field-label">🔗 ลิงก์ YouTube/Drive</label>
-                <input class="input-field" placeholder="https://youtu.be/...">
+                <input class="input-field" placeholder="https://youtu.be/..." id="shareUrl">
                 <label class="field-label">💬 คำอธิบาย (ไม่บังคับ)</label>
                 <textarea class="input-field" rows="3" placeholder="บอกเล่าสิ่งที่เรียนรู้..."></textarea>
                 <button class="btn primary full" onclick="submitClip()">📤 ส่งให้ครูตรวจ</button>
             </div>
             <div class="card" style="background: linear-gradient(135deg, #fef3c7, #fde68a); border-color: #f59e0b;">
                 <div class="card-title" style="color: #78350f;">⏳ คลิปที่รอตรวจ</div>
-                <div style="font-size: 0.85rem; color: #78350f;">
+                <div style="font-size: 0.85rem; color: #78350f;" id="shareClipWait">
                     "ระนาดเอก: เพลงลาวดวงเดือน" — ส่งเมื่อ 2 วันก่อน
                 </div>
             </div>
         </section>
 
-        <!-- ═══ SCREEN 6: BOSS RAID ═══ -->
+        <!-- ═══ SCREEN 8: BOSS RAID ═══ -->
         <section class="screen" id="screen-boss" data-screen="boss">
             <div class="card gradient" style="background: linear-gradient(135deg, #1e1b4b, #4c1d95);">
                 <div style="text-align: center;">
@@ -802,7 +1181,7 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
                 </div>
             </div>
 
-            <div class="boss-card">
+            <div class="boss-card" id="bossCardDragon">
                 <span class="dragon">🐉</span>
                 <div class="boss-name">มังกรไฟ — สอบขั้นกลาง</div>
                 <div class="boss-desc">บรรเลงเพลง "ลาวดวงเดือน" ครบ 3 ท่อน ภายใน 5 นาที</div>
@@ -832,17 +1211,17 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
             </div>
         </section>
 
-        <!-- ═══ SCREEN 7: REPAIR ═══ -->
+        <!-- ═══ SCREEN 9: REPAIR ═══ -->
         <section class="screen" id="screen-repair" data-screen="repair">
-            <div class="card">
+            <div class="card" id="repairFormCard">
                 <div class="card-title">🛠️ แจ้งซ่อมเครื่องดนตรี</div>
                 <label class="field-label">🎺 เครื่องที่ต้องการซ่อม</label>
-                <select class="input-field">
+                <select class="input-field" id="repairSelect">
                     <option>ฟลู้ท #003 (ที่ยืมอยู่)</option>
-                    <option>ขลุ่ย #007</option>
+                    <option>ขลุ่ยเพียงออ #007</option>
                 </select>
                 <label class="field-label">⚠️ อาการเสีย</label>
-                <textarea class="input-field" rows="3" placeholder="เช่น คีย์ที่ 3 ติด กดยาก"></textarea>
+                <textarea class="input-field" rows="3" placeholder="เช่น คีย์ที่ 3 ติด กดยาก" id="repairSymptom"></textarea>
                 <label class="field-label">📷 รูปภาพ (ไม่บังคับ)</label>
                 <button class="btn ghost full" style="margin-bottom: 0.75rem;">📷 ถ่ายรูป / อัปโหลด</button>
                 <button class="btn primary full" onclick="submitRepair()">📋 ส่งคำร้องแจ้งซ่อม</button>
@@ -850,7 +1229,7 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 
             <div class="card">
                 <div class="card-title">📜 คำร้องล่าสุด</div>
-                <div class="timeline">
+                <div class="timeline" id="studentRepairTimeline">
                     <div class="timeline-item">
                         <div class="timeline-dot done"></div>
                         <div class="timeline-title">📥 รับคำร้องแล้ว</div>
@@ -861,12 +1240,12 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
                         <div class="timeline-title">🔍 ครูตรวจสอบ</div>
                         <div class="timeline-time">10/พ.ค. 14:20</div>
                     </div>
-                    <div class="timeline-item">
+                    <div class="timeline-item" id="repairTimelineStep3">
                         <div class="timeline-dot active"></div>
                         <div class="timeline-title">🔧 กำลังซ่อม</div>
                         <div class="timeline-time">วันนี้</div>
                     </div>
-                    <div class="timeline-item">
+                    <div class="timeline-item" id="repairTimelineStep4">
                         <div class="timeline-dot"></div>
                         <div class="timeline-title">✅ ซ่อมเสร็จ พร้อมใช้</div>
                         <div class="timeline-time">รออัปเดต</div>
@@ -875,9 +1254,9 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
             </div>
         </section>
 
-        <!-- ═══ SCREEN 8: BADGES ═══ -->
+        <!-- ═══ SCREEN 10: BADGES ═══ -->
         <section class="screen" id="screen-badges" data-screen="badges">
-            <div class="card gradient" style="background: linear-gradient(135deg, #f59e0b, #ef4444);">
+            <div class="card gradient" style="background: linear-gradient(135deg, #f59e0b, #ef4444);" id="badgeHeroCard">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <span style="font-size: 2.5rem;">🏆</span>
                     <div>
@@ -889,16 +1268,16 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 
             <div class="card">
                 <div class="card-title">🏅 เหรียญตราของฉัน</div>
-                <div class="badge-grid">
+                <div class="badge-grid" id="studentBadgesGrid">
                     <div class="medal-card unlocked"><div class="medal-icon">🥇</div><div class="medal-name">มือใหม่</div></div>
                     <div class="medal-card unlocked"><div class="medal-icon">🔥</div><div class="medal-name">7 วันติด</div></div>
                     <div class="medal-card unlocked"><div class="medal-icon">🎬</div><div class="medal-name">นักเรียน</div></div>
                     <div class="medal-card unlocked"><div class="medal-icon">🐉</div><div class="medal-name">ปราบบอส</div></div>
                     <div class="medal-card unlocked"><div class="medal-icon">📚</div><div class="medal-name">นักแชร์</div></div>
                     <div class="medal-card unlocked"><div class="medal-icon">⭐</div><div class="medal-name">ดาวรุ่ง</div></div>
-                    <div class="medal-card locked"><div class="medal-icon">👑</div><div class="medal-name">???</div></div>
-                    <div class="medal-card locked"><div class="medal-icon">💎</div><div class="medal-name">???</div></div>
-                    <div class="medal-card locked"><div class="medal-icon">🌟</div><div class="medal-name">???</div></div>
+                    <div class="medal-card locked" id="badgeLock1"><div class="medal-icon">👑</div><div class="medal-name">???</div></div>
+                    <div class="medal-card locked" id="badgeLock2"><div class="medal-icon">💎</div><div class="medal-name">???</div></div>
+                    <div class="medal-card locked" id="badgeLock3"><div class="medal-icon">🌟</div><div class="medal-name">???</div></div>
                 </div>
             </div>
 
@@ -919,15 +1298,10 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
                     <div class="profile-avatar" style="width: 36px; height: 36px; font-size: 0.95rem;">ส</div>
                     <div style="flex: 1; font-size: 0.85rem;"><b>ดช.สมชาย (คุณ)</b><br><span style="font-size: 0.7rem; color: var(--primary-blue);">1,300 XP</span></div>
                 </div>
-                <div class="leaderboard-row">
-                    <span class="rank-num">4</span>
-                    <div class="profile-avatar" style="width: 36px; height: 36px; font-size: 0.95rem; background: linear-gradient(135deg,#8b5cf6,#ec4899);">ก</div>
-                    <div style="flex: 1; font-size: 0.85rem;"><b>ดญ.กมลา</b><br><span style="font-size: 0.7rem; color: var(--text-muted);">1,150 XP</span></div>
-                </div>
             </div>
         </section>
 
-        <!-- ═══ BOTTOM NAV ═══ -->
+        <!-- ═══ STUDENT BOTTOM NAV ═══ -->
         <nav class="bottom-nav" id="bottomNav" style="display: none;">
             <button class="nav-item active" data-target="dashboard" onclick="goTo('dashboard')"><span class="icon">🏠</span>หน้าหลัก</button>
             <button class="nav-item" data-target="learning" onclick="goTo('learning')"><span class="icon">📚</span>เรียน</button>
@@ -936,14 +1310,335 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
             <button class="nav-item" data-target="borrow" onclick="goTo('borrow')"><span class="icon">🎺</span>ยืม</button>
         </nav>
     </div>
-    <!-- /.phone-frame -->
+    <!-- /#phoneFrame -->
 
-    <!-- ─────── CONTROL PANEL ─────── -->
+    <!-- 💻 DESKTOP BROWSER FRAME (Admin View) -->
+    <div class="browser-frame" id="browserFrame">
+        <div class="browser-header">
+            <div class="browser-dots">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <div class="browser-address">
+                <span>https://music-borrow.vercel.app/admin/dashboard</span>
+            </div>
+            <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); background: var(--card-bg); padding: 0.2rem 0.6rem; border-radius: 4px; border: 1px solid var(--input-border)">
+                👤 ADMIN SESSION ACTIVE
+            </div>
+        </div>
+
+        <div class="browser-content">
+            <!-- Left Navigation Sidebar -->
+            <aside class="admin-sidebar">
+                <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0 0.75rem 1rem; border-bottom: 1px solid var(--input-border)">
+                    <span style="font-size: 1.5rem;">⚙️</span>
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.9rem;">ระบบจัดการยืมคืน</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Admin Panel v6.0</div>
+                    </div>
+                </div>
+
+                <div class="admin-menu-title" style="margin-top: 1rem;">เมนูหลัก</div>
+                <button class="admin-tab-btn active" data-tab="overview" onclick="goTo('overview')">
+                    <span>📊</span> ภาพรวมระบบ
+                </button>
+                <button class="admin-tab-btn" data-tab="borrows" onclick="goTo('borrows')">
+                    <span>📦</span> อนุมัติยืมคืน
+                    <span class="admin-tab-badge" id="adminBorrowsBadge">1</span>
+                </button>
+                <button class="admin-tab-btn" data-tab="repairs" onclick="goTo('repairs')">
+                    <span>🔧</span> จัดการแจ้งซ่อม
+                    <span class="admin-tab-badge" id="adminRepairsBadge" style="background: var(--warning);">1</span>
+                </button>
+                <button class="admin-tab-btn" data-tab="users" onclick="goTo('users')">
+                    <span>👥</span> จัดการนักเรียน
+                </button>
+                <button class="admin-tab-btn" data-tab="recovery" onclick="goTo('recovery')">
+                    <span>🔄</span> กู้คืนบัญชี
+                    <span class="admin-tab-badge" id="adminRecoveryBadge" style="background: var(--primary-blue);">1</span>
+                </button>
+
+                <div class="admin-menu-title" style="margin-top: 1rem;">วิชาการ & กิจกรรม</div>
+                <button class="admin-tab-btn" data-tab="bosses" onclick="goTo('bosses')">
+                    <span>🐉</span> ด่านทดสอบบอส
+                    <span class="admin-tab-badge" id="adminBossesBadge" style="background: var(--purple);">1</span>
+                </button>
+                <button class="admin-tab-btn" data-tab="knowledge" onclick="goTo('knowledge')">
+                    <span>📚</span> อนุมัติสื่อ & เพลง
+                </button>
+                <button class="admin-tab-btn" data-tab="settings" onclick="goTo('settings')">
+                    <span>⚙️</span> ตั้งค่าระบบ
+                </button>
+                
+                <div style="margin-top: auto; padding: 0.75rem; border-top: 1px dashed var(--input-border)">
+                    <button class="btn danger full" style="padding: 0.5rem; font-size: 0.8rem;" onclick="switchRole('student')">🚪 ออกจากระบบแอดมิน</button>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="admin-main">
+                <!-- Panel 1: Overview -->
+                <div class="admin-panel" id="admin-panel-overview" style="display: block;">
+                    <div class="admin-panel-header">
+                        <h2>📊 ภาพรวมระบบจัดการ</h2>
+                        <button class="oad-btn oad-btn-ghost" onclick="toast('🔄 รีเฟรชข้อมูลสำเร็จ', 'success')">🔄 รีเฟรชแดชบอร์ด</button>
+                    </div>
+
+                    <!-- KPI Statistics Row -->
+                    <div class="admin-stats-grid">
+                        <div class="admin-stat-card">
+                            <span class="admin-stat-lbl">📦 ยืมอยู่ปัจจุบัน</span>
+                            <span class="admin-stat-val" id="kpiActiveBorrows">2 เครื่อง</span>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="admin-stat-lbl">⌛ รออนุมัติยืม</span>
+                            <span class="admin-stat-val" id="kpiPendingBorrows" style="color: var(--danger)">1 รายการ</span>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="admin-stat-lbl">🔧 คิวส่งซ่อม</span>
+                            <span class="admin-stat-val" id="kpiRepairs" style="color: var(--warning)">1 เครื่อง</span>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="admin-stat-lbl">⏱️ เวลาซ้อมสะสม</span>
+                            <span class="admin-stat-val">340 นาที</span>
+                        </div>
+                    </div>
+
+                    <div class="admin-grid-2">
+                        <!-- Heatmap -->
+                        <div class="admin-box">
+                            <div class="admin-box-title">
+                                <span>📈 ช่วงเวลายืมคืนหนาแน่น (Donut & Heatmap)</span>
+                                <span style="font-size:0.75rem; font-weight:normal; color:var(--text-muted)">วิเคราะห์ธุรกรรมรายชั่วโมง</span>
+                            </div>
+                            <div style="padding: 0.5rem 0;">
+                                <div class="heatmap-row">
+                                    <div class="heatmap-label">ยืม</div>
+                                    <div class="heatmap-grid" id="heatmapBorrows"></div>
+                                </div>
+                                <div class="heatmap-row">
+                                    <div class="heatmap-label">คืน</div>
+                                    <div class="heatmap-grid" id="heatmapReturns"></div>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--text-muted); margin-top: 0.5rem; padding: 0 5px;">
+                                    <span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rapid Actions -->
+                        <div class="admin-box">
+                            <div class="admin-box-title">
+                                <span>📬 รายการดำเนินงานด่วน (Action Items)</span>
+                                <span class="badge red" style="font-size:0.7rem;" id="actionItemsBadge">3 รายการ</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 0.6rem;" id="adminOverviewActions">
+                                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--input-bg); padding:0.6rem; border-radius:8px;">
+                                    <span style="font-size:0.8rem;">📦 <b>ดช.มานะ</b> ยืม กีตาร์โปร่ง #012</span>
+                                    <button class="oad-btn oad-btn-blue" onclick="goTo('borrows')">จัดการ ➡️</button>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--input-bg); padding:0.6rem; border-radius:8px;">
+                                    <span style="font-size:0.8rem;">🔧 <b>ขลุ่ย #007</b> ส่งซ่อมคีย์ค้าง</span>
+                                    <button class="oad-btn oad-btn-blue" onclick="goTo('repairs')">จัดการ ➡️</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-grid-2">
+                        <!-- Top students -->
+                        <div class="admin-box">
+                            <div class="admin-box-title">🥇 นักดนตรีที่มีเวลาซ้อมสูงสุด</div>
+                            <table class="oad-table">
+                                <thead>
+                                    <tr><th>อันดับ</th><th>ชื่อ-นามสกุล</th><th>เวลาซ้อมสะสม</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>🥇 1</td><td><b>ดญ.อรอุมา รักดี</b></td><td>120 นาที</td></tr>
+                                    <tr><td>🥈 2</td><td><b>ดช.นพดล สุขใจ</b></td><td>85 นาที</td></tr>
+                                    <tr><td>🥉 3</td><td><b>ดช.สมชาย ใจดี</b></td><td>65 นาที</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Top Badges -->
+                        <div class="admin-box">
+                            <div class="admin-box-title">🏆 ผู้ปลดล็อกเหรียญตราสูงสุด</div>
+                            <table class="oad-table">
+                                <thead>
+                                    <tr><th>อันดับ</th><th>ชื่อ-นามสกุล</th><th>จำนวนเหรียญ</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>🥇 1</td><td><b>ดญ.อรอุมา รักดี</b></td><td>12 เหรียญ</td></tr>
+                                    <tr><td>🥈 2</td><td><b>ดช.นพดล สุขใจ</b></td><td>10 เหรียญ</td></tr>
+                                    <tr><td>🥉 3</td><td><b>ดช.สมชาย ใจดี</b></td><td>8 เหรียญ</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 2: Borrows -->
+                <div class="admin-panel" id="admin-panel-borrows">
+                    <div class="admin-panel-header">
+                        <h2>📦 อนุมัติรายการยืมคืนเครื่องดนตรี</h2>
+                    </div>
+
+                    <div class="admin-box" id="adminPendingSection">
+                        <div class="admin-box-title">📬 รายการรออนุมัติยืมเครื่องดนตรี</div>
+                        <div id="adminPendingBorrowsTableWrap"></div>
+                    </div>
+
+                    <div class="admin-box">
+                        <div class="admin-box-title">⏳ รายการกำลังยืมดนตรี (Active) และตรวจสอบเวลาคืน</div>
+                        <div id="adminActiveBorrowsTableWrap"></div>
+                    </div>
+                </div>
+
+                <!-- Panel 3: Repairs -->
+                <div class="admin-panel" id="admin-panel-repairs">
+                    <div class="admin-panel-header">
+                        <h2>🔧 แผงควบคุมรายการแจ้งซ่อม</h2>
+                    </div>
+                    <div class="admin-box">
+                        <div class="admin-box-title">🛠️ รายการแจ้งซ่อมที่รอตรวจสอบและดำเนินการ</div>
+                        <div id="adminRepairsTableWrap"></div>
+                    </div>
+                </div>
+
+                <!-- Panel 4: Users -->
+                <div class="admin-panel" id="admin-panel-users">
+                    <div class="admin-panel-header">
+                        <h2>👤 จัดการสิทธิ์นักเรียน & มอบรางวัล</h2>
+                    </div>
+                    <div class="admin-box">
+                        <div class="admin-box-title">👤 รายชื่อนักเรียนในระบบและการจัดการสิทธิ์</div>
+                        <div style="margin-bottom: 1rem; display:flex; gap:0.5rem;">
+                            <input class="input-field" placeholder="🔎 ค้นหาชื่อ หรือ ชั้นเรียน..." style="margin-bottom:0; flex:1;" id="adminUserSearch" oninput="filterAdminUsers(this.value)">
+                        </div>
+                        <div id="adminUsersTableWrap"></div>
+                    </div>
+                </div>
+
+                <!-- Panel 5: Recovery -->
+                <div class="admin-panel" id="admin-panel-recovery">
+                    <div class="admin-panel-header">
+                        <h2>🔄 คำขอกู้คืนบัญชีนักเรียน</h2>
+                    </div>
+                    <div class="admin-box">
+                        <div class="admin-box-title">🔄 รายการขอกู้คืนอีเมลหรือรหัสผ่านจากระบบของโรงเรียน</div>
+                        <div id="adminRecoveryTableWrap"></div>
+                    </div>
+                </div>
+
+                <!-- Panel 6: Bosses -->
+                <div class="admin-panel" id="admin-panel-bosses">
+                    <div class="admin-panel-header">
+                        <h2>🐉 จัดการการสอบล่าบอส (Raid Exam)</h2>
+                    </div>
+                    <div class="admin-grid-2">
+                        <div class="admin-box">
+                            <div class="admin-box-title">🐉 รายชื่อบอสในระบบดนตรี</div>
+                            <div style="display:flex; flex-direction:column; gap:0.6rem;">
+                                <div style="background:var(--input-bg); padding:0.75rem; border-radius:8px; border:1px solid var(--input-border)">
+                                    <div style="display:flex; justify-content:space-between; font-weight:700;">
+                                        <span>🐉 มังกรไฟ (ระดับกลาง)</span>
+                                        <span style="color:var(--purple)">HP: 1,000 / 1,000</span>
+                                    </div>
+                                    <div style="font-size:0.75rem; color:var(--text-muted); margin:0.3rem 0;">ภารกิจ: สอบเพลงลาวดวงเดือน 3 ท่อน</div>
+                                    <button class="oad-btn oad-btn-ghost" style="padding:0.25rem 0.5rem; font-size:0.7rem;" onclick="toast('⚙️ อยู่ระหว่างจำลองระบบบอส', 'info')">แก้ไขบอส ⚙️</button>
+                                </div>
+                                <div style="background:var(--input-bg); padding:0.75rem; border-radius:8px; border:1px solid var(--input-border)">
+                                    <div style="display:flex; justify-content:space-between; font-weight:700;">
+                                        <span>🦅 นกอินทรี (ระดับต้น)</span>
+                                        <span style="color:var(--success)">HP: 400 / 400</span>
+                                    </div>
+                                    <div style="font-size:0.75rem; color:var(--text-muted); margin:0.3rem 0;">ภารกิจ: สอบ C Major Scale 2 Octave</div>
+                                    <button class="oad-btn oad-btn-ghost" style="padding:0.25rem 0.5rem; font-size:0.7rem;" onclick="toast('⚙️ อยู่ระหว่างจำลองระบบบอส', 'info')">แก้ไขบอส ⚙️</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="admin-box">
+                            <div class="admin-box-title">🎥 คิววิดีโอส่งสอบที่รอกลั่นกรอง</div>
+                            <div id="adminBossSubmissionsWrap"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 7: Knowledge & Loops Curation -->
+                <div class="admin-panel" id="admin-panel-knowledge">
+                    <div class="admin-panel-header">
+                        <h2>📚 การตรวจสอบเนื้อหาคลังความรู้ & Loops</h2>
+                    </div>
+                    <div class="admin-grid-2">
+                        <div class="admin-box">
+                            <div class="admin-box-title">🎥 คลิปวิดีโอที่แชร์โดยนักเรียน (รออนุมัติ)</div>
+                            <div id="adminKnowledgeSubmissionsWrap"></div>
+                        </div>
+                        <div class="admin-box">
+                            <div class="admin-box-title">🎧 เพลง Launchpad ที่นักเรียนแชร์ในกลุ่ม</div>
+                            <div style="display:flex; flex-direction:column; gap:0.6rem;">
+                                <div style="background:var(--input-bg); padding:0.75rem; border-radius:8px; border:1px solid var(--input-border); display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <div style="font-weight:700; font-size:0.85rem;">Summer Remix Beats</div>
+                                        <div style="font-size:0.75rem; color:var(--text-muted);">แชร์โดย: ดช.วิชัย · 120 BPM</div>
+                                    </div>
+                                    <button class="oad-btn oad-btn-red" onclick="toast('🗑️ ลบเพลงสำเร็จ', 'success'); this.parentElement.remove();">ลบ 🗑️</button>
+                                </div>
+                                <div style="background:var(--input-bg); padding:0.75rem; border-radius:8px; border:1px solid var(--input-border); display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <div style="font-weight:700; font-size:0.85rem;">Loy Krathong Lo-fi Trap</div>
+                                        <div style="font-size:0.75rem; color:var(--text-muted);">แชร์โดย: ดญ.สุชาดา · 90 BPM</div>
+                                    </div>
+                                    <button class="oad-btn oad-btn-red" onclick="toast('🗑️ ลบเพลงสำเร็จ', 'success'); this.parentElement.remove();">ลบ 🗑️</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 8: Settings -->
+                <div class="admin-panel" id="admin-panel-settings">
+                    <div class="admin-panel-header">
+                        <h2>⚙️ ตั้งค่าและควบคุมระบบ</h2>
+                    </div>
+                    <div class="admin-box">
+                        <div class="admin-box-title">⚡ ระบบการปรับตัวคูณแต้มและกิจกรรมพิเศษ</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding: 0.5rem 0;">
+                            <div>
+                                <div style="font-weight:700;">🔥 กิจกรรมคูณแต้มเรียนรู้สองเท่า (Double XP)</div>
+                                <div style="font-size:0.75rem; color:var(--text-muted);">เมื่อเปิดใช้งาน นักเรียนจะได้ XP การซ้อมดนตรีและการเรียนรู้เพิ่มขึ้น 2 เท่า</div>
+                            </div>
+                            <button class="btn primary" id="doubleXpToggleBtn" onclick="toggleDoubleXP()">เปิดใช้งานกิจกรรม</button>
+                        </div>
+                    </div>
+                    <div class="admin-box" style="border-color: var(--danger)">
+                        <div class="admin-box-title" style="color:var(--danger)">⚠️ โซนอันตราย (Danger Zone)</div>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;">ระบบล้างประวัติยืมคืนทั้งหมดเพื่อเข้าสู่วิกิปีการศึกษาถัดไป (Yearly Reset)</p>
+                        <button class="btn danger" onclick="doYearlyReset()">ล้างข้อมูลประจำปีการศึกษา ⚠️</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <!-- /#browserFrame -->
+
+    <!-- ─────── CONTROL PANEL (Right Sidebar) ─────── -->
     <aside class="control-panel">
         <h2>🎵 ระบบยืมคืนเครื่องดนตรี v6.0</h2>
-        <p class="lead">Interactive Demo สำหรับการประกวดสื่อและนวัตกรรม — ลองคลิกได้ทุกปุ่ม!</p>
+        <p class="lead">Interactive Demo เพื่อแสดงโครงสร้างทั้งฝั่ง <b>แอปพลิเคชันนักเรียน</b> และ <b>แดชบอร์ดแอดมิน</b></p>
 
-        <div class="mode-tabs">
+        <!-- Role Switcher -->
+        <div style="margin-bottom: 1.25rem;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.4rem;">🎭 สลับโหมดจำลอง:</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <button class="mode-tab active" id="roleBtnStudent" onclick="switchRole('student')">👨‍🎓 นักเรียน (App)</button>
+                <button class="mode-tab" id="roleBtnAdmin" onclick="switchRole('admin')">⚙️ ผู้ดูแล (Web)</button>
+            </div>
+        </div>
+
+        <div class="mode-tabs" style="display:none;">
             <button class="mode-tab active" id="modeTour" onclick="setMode('tour')">🎬 โหมดทัวร์</button>
             <button class="mode-tab" id="modeFree" onclick="setMode('free')">🖱️ สำรวจเอง</button>
         </div>
@@ -966,14 +1661,7 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 
         <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.4rem;">⚡ ข้ามไปยังหน้า:</div>
         <div class="feature-jumps">
-            <button class="jump-btn" onclick="jumpTo('login')" title="เข้าสู่ระบบ">🔐</button>
-            <button class="jump-btn" onclick="jumpTo('dashboard')" title="หน้าหลัก">🏠</button>
-            <button class="jump-btn" onclick="jumpTo('borrow')" title="ยืมเครื่อง">🎺</button>
-            <button class="jump-btn" onclick="jumpTo('learning')" title="คลังความรู้">📚</button>
-            <button class="jump-btn" onclick="jumpTo('share')" title="แชร์คลิป">🎬</button>
-            <button class="jump-btn" onclick="jumpTo('boss')" title="ล่าบอส">🐉</button>
-            <button class="jump-btn" onclick="jumpTo('repair')" title="แจ้งซ่อม">🛠️</button>
-            <button class="jump-btn" onclick="jumpTo('badges')" title="เหรียญตรา">🏆</button>
+            <!-- Rendered dynamically inside JS -->
         </div>
 
         <div class="theme-row">
@@ -983,7 +1671,7 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
         </div>
 
         <div style="margin-top: 1rem; padding: 0.75rem; background: var(--input-bg); border-radius: 0.75rem; font-size: 0.78rem; color: var(--text-muted); line-height: 1.5;">
-            💡 <b>Tip:</b> สามารถจำลอง push notification ได้โดยกด <b>🔔</b> มุมขวาบน หรือเปลี่ยนธีม 3 แบบ (Light/Dark/Rainbow) ตามใจ
+            💡 <b>Tip:</b> ลองเปลี่ยนโหมดจำลองด้านบนเพื่อดูการทำงานของเครื่องมือผู้สอน/นักเรียน ที่เชื่อมต่อข้อมูลแบบ Live!
         </div>
     </aside>
 </div>
@@ -999,43 +1687,112 @@ label.field-label { display: block; font-size: 0.8rem; font-weight: 600; margin-
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// 🎬 TOUR DATA — 12 storyline steps
+// 🎬 STORYLINE DATA (Updated Student Tour & New Admin Tour)
 // ═══════════════════════════════════════════════════════════════
-const TOUR = [
-    { screen: 'login', title: '👋 ยินดีต้อนรับ', body: 'นี่คือหน้าเข้าสู่ระบบของระบบยืมคืนเครื่องดนตรี v6.0 — รองรับทั้ง Email/รหัสผ่าน และ Google OAuth ใช้งานง่าย ปลอดภัย เหมาะกับนักเรียนยุคดิจิทัล' },
-    { screen: 'dashboard', title: '🏠 หน้าหลักของนักเรียน', body: 'แสดง XP, Level, Streak การซ้อม และภารกิจวันนี้ — ออกแบบเป็น <b>Gamification</b> ทำให้นักเรียนรู้สึกเหมือนเล่นเกม สร้างแรงจูงใจในการเรียน', after: 800 },
-    { screen: 'dashboard', title: '🔥 ระบบ Streak (ซ้อมต่อเนื่อง)', body: 'ซ้อมติดต่อกัน 7 วัน → ได้รับ EXP×2 ทั้งวัน — กระตุ้นให้นักเรียนซ้อมสม่ำเสมอ ไม่เลิกกลางคัน' },
-    { screen: 'borrow', title: '🎺 ยืมเครื่องดนตรีด้วย QR', body: 'ระบบสแกน QR Code ติดอยู่บนเครื่องดนตรีทุกชิ้น — ครูประหยัดเวลา <b>ไม่ต้องจดมือ</b> ระบบเก็บประวัติอัตโนมัติทั้งหมด' },
-    { screen: 'borrow', title: '🔍 ค้นหาขั้นสูง', body: 'Filter หลายชั้น: ประเภท, สภาพ, สถานะ, ผู้ยืมปัจจุบัน + Sort ตามเงื่อนไข — ครูตามหาเครื่องในคลังได้ในไม่กี่วินาที' },
-    { screen: 'learning', title: '📚 Learning Feed', body: 'รวม video tutorial จากครู + คลิปจากเพื่อน — <b>ดูคลิปแล้วได้ EXP จริง</b> เปลี่ยนการเรียนรู้ให้น่าตื่นเต้น เหมือน TikTok สำหรับการเรียนดนตรี' },
-    { screen: 'share', title: '🎬 นักเรียนเป็นผู้ผลิตเนื้อหา', body: 'แชร์คลิปการเรียนรู้ของตัวเอง → ครูตรวจสอบ → ได้ +100 XP — สร้าง <b>Community Learning</b> นักเรียนช่วยกันเรียนรู้' },
-    { screen: 'boss', title: '🐉 ระบบ Boss Raid (Innovation!)', body: 'จุดเด่นของระบบ — เปลี่ยน "การสอบ" ให้เป็น "การล่าบอส" นักเรียนจับกลุ่ม 4 คน เข้าห้องด้วยรหัส 4 หลัก สอบพร้อมกัน Real-time' },
-    { screen: 'boss', title: '⚔️ Multiplayer ผ่าน Realtime', body: 'ใช้ Supabase Realtime — ครูเห็นนักเรียนเข้าห้องแบบ Live ตัดสินผลพร้อมกันทั้งกลุ่ม ทำให้การสอบ <b>ยุติธรรม รวดเร็ว สนุก</b>' },
-    { screen: 'repair', title: '🛠️ แจ้งซ่อม + ติดตามสถานะ', body: 'นักเรียนแจ้งซ่อมพร้อมรูปภาพ → ติดตามสถานะ Real-time แบบ Timeline ตั้งแต่รับคำร้อง → กำลังซ่อม → เสร็จ' },
-    { screen: 'badges', title: '🏆 Achievement System', body: '24 เหรียญตรา + Leaderboard ระดับห้อง/ชุมนุม/รายเดือน — สร้างการแข่งขันเชิงบวก กระตุ้นให้นักเรียนพัฒนาตัวเอง' },
-    { screen: 'dashboard', title: '🚀 พร้อมใช้งานจริง!', body: 'ระบบทั้งหมดนี้ <b>เปิดใช้งานจริง</b> ที่ <b>music-borrow.vercel.app</b> — Push Notification, PWA, Offline-first, Multi-theme พร้อมขยายไปยังโรงเรียนอื่น' }
+const STUDENT_TOUR = [
+    { screen: 'login', title: '👋 ยินดีต้อนรับนักเรียน', body: 'นี่คือหน้าล็อกอินของระบบยืมคืนเครื่องดนตรี v6.0 รองรับการเข้าสู่ระบบแบบ Email และ Google OAuth สะดวกและรัดกุม' },
+    { screen: 'dashboard', title: '🏠 หน้าหลัก (Gamified Dashboard)', body: 'นักเรียนสามารถเข้าดูข้อมูล เลเวล EXP ความคืบหน้าของตนเอง พร้อมรับภารกิจซ้อมและสะสมแต้มประจำวัน' },
+    { screen: 'dashboard', title: '🔥 ระบบซ้อมสะสม Streak', body: 'กระตุ้นการซ้อมดนตรีอย่างต่อเนื่อง หากซ้อมต่อเนื่อง 7 วันติด จะได้รับ EXP คูณสอง เพื่อเป็นของรางวัลสร้างแรงบันดาลใจ' },
+    { screen: 'practice', title: '🎛️ Practice Studio (เครื่องมือซ้อม)', body: 'คลังซ้อมดนตรีส่วนตัว ประกอบด้วย <b>เครื่องตั้งสาย (Tuner)</b>, <b>เมโทรโนม (Metronome)</b> และ<b>ระบบบันทึกเวลาซ้อมจริง</b> เพื่อส่งคะแนน' },
+    { screen: 'games', title: '🎮 มินิเกมกิจกรรมและดนตรี', body: 'มีมินิเกมฝึกหัด เช่น <b>Staff Wars (ห้องโน้ต)</b> และ <b>Rhythm Core (ห้องจังหวะ)</b> เสริมทักษะ และเป็นศูนย์รวมสร้างเพลง Launchpad' },
+    { screen: 'games', title: '🎧 ฟีดแชร์เพลง Launchpad', body: 'นักเรียนสร้างผลงานเพลงผ่าน Launchpad Creator แล้วกดแชร์แบ่งปันในกลุ่ม เพื่อน ๆ สามารถทดลองกดฟัง หรือ Remix ต่อได้' },
+    { screen: 'borrow', title: '🎺 ระบบยืมคืนเครื่องด้วย QR', body: 'นักเรียนสแกน QR Code บนกล่องหรือบนตัวเครื่องดนตรี เพื่อกดยืมดนตรีออนไลน์อย่างง่ายดาย ครูไม่ต้องจดลงสมุดรายวัน' },
+    { screen: 'learning', title: '📚 คลังเรียนรู้ออนไลน์', body: 'รวบรวมคลิปวิดีโอคู่มือการบรรเลงเบื้องต้นและขั้นสูงจากครูดนตรี ดูแล้วระบบจะมอบ EXP ให้ตัวละครนักเรียน' },
+    { screen: 'share', title: '🎬 นักเรียนแชร์วิดีโอเรียนรู้', body: 'นักเรียนสามารถส่งลิงก์การเป่าขลุ่ย/ฟลู้ทของตัวเอง เพื่อส่งให้ครูประเมิน เมื่อประเมินผ่านรับ +100 EXP ทันที' },
+    { screen: 'boss', title: '🐉 ระบบสอบบอส (Multiplayer Exam)', body: 'นวัตกรรมระบบสอบ! เปลี่ยนการสอบดนตรีแบบเดิมให้เป็นการสอบลุยบอส บรรเลงเพลงดนตรีที่กำหนดตามเงื่อนไขเพื่อโค่นบอส' },
+    { screen: 'repair', title: '🛠️ แจ้งซ่อมเครื่องดนตรี', body: 'กรณีกีตาร์สายขาด หรือ ขลุ่ยคีย์เสียงค้าง สามารถแจ้งครูผ่านแอป และตรวจสอบขั้นตอนซ่อมผ่านหน้า Timeline แบบ Realtime' },
+    { screen: 'badges', title: '🏆 รางวัล & ตารางอันดับ', body: 'รวมเหรียญตรา (Badges) ปลดล็อกตามความสำเร็จ และ Leaderboard รายเดือน กระตุ้นให้นักเรียนขยันฝึกซ้อมเชิงบวก' }
+];
+
+const ADMIN_TOUR = [
+    { screen: 'overview', title: '📊 ภาพรวมแดชบอร์ดแอดมิน', body: 'แผงวิเคราะห์และสถิติคลังเครื่องดนตรีของโรงเรียนทั้งหมด แสดงจำนวนคำขอค้างที่ต้องการการประเมิน หรือยอดชั่วโมงที่เด็ก ๆ เข้าฝึกซ้อม' },
+    { screen: 'overview', title: '📈 แผนภูมิและการวิเคราะห์ช่วงเวลา', body: 'ระบบบันทึกข้อมูล Heatmap รายชั่วโมง แสดงช่วงเวลาธุรกรรมยืม/คืนสูงสุด เพื่อช่วยจัดอัตราเวรบริการคลังได้อย่างแม่นยำ' },
+    { screen: 'borrows', title: '📦 ตรวจสอบคำขอสแกนยืมเครื่อง', body: 'เมื่อนักเรียนกดยืม จะแสดงผลคำขอที่ค้างไว้ (Pending) แอดมินสามารถสกรีนรายละเอียดและกด <b>อนุมัติ (Approve)</b> ทันที' },
+    { screen: 'borrows', title: '⏳ รายการยืม active & Live Timers', body: 'หน้าประวัติกำลังยืม มีนาฬิกานับเวลาถอยหลังถอยหลังยืมแบบ Live และจะขึ้นเตือนสีแดง (Overdue) หากเด็กส่งคืนช้ากว่าที่กำหนด' },
+    { screen: 'repairs', title: '🔧 ติดตามการแจ้งซ่อม (Repairs)', body: 'เมื่อตรวจสอบใบแจ้งซ่อม แอดมินอัปเกรดสถานะ (แจ้งซ่อม → กำลังซ่อม → ซ่อมเสร็จ) เพื่อให้นักเรียนเข้ามารับเครื่องดนตรีคืน' },
+    { screen: 'recovery', title: '🔄 อนุมัติการกู้คืนบัญชีนักเรียน', body: 'หมดปัญหาเด็กทำรหัสผ่านหาย หรือต้องการรีเซ็ตอีเมล แอดมินตรวจบัญชีโรงเรียนและกดอนุมัติเพื่อกู้คืนสิทธิ์บัญชีใหม่' },
+    { screen: 'users', title: '👤 บริหารจัดการบัญชีนักเรียน', body: 'สามารถแมนนวลจัดการรายชื่อนักเรียน ค้นหาตามห้องเรียน ปรับแต่งค่า XP, Stars, หรือกดมอบเหรียญตราเกียรติยศ และบล็อกกรณีทำผิดระเบียบ' },
+    { screen: 'bosses', title: '🐉 จัดการสอบบอส & ประเมินผล', body: 'ตรวจสอบวิดีโอคลิปสอบ (Raid Exam) ที่นักเรียนส่งมา กดเปิดเช็กการบรรเลงและตัดสินการสอบได้ทันที' },
+    { screen: 'knowledge', title: '📚 จัดการสื่อ & เพลง Launchpad', body: 'คัดกรองเนื้อหาที่แชร์เข้ามาในระบบ เพื่อลบโพสต์หรือเพลงที่ไม่เหมาะสม รักษามาตรฐานการเรียนรู้ในโรงเรียน' },
+    { screen: 'settings', title: '⚙️ จัดกิจกรรมและล้างระบบ', body: 'ตั้งค่าการเปิดใช้ Double XP พิเศษ และการกด Yearly Reset เพื่อเปลี่ยนผ่านสู่ปีการศึกษาใหม่สำหรับปีถัดไป' }
 ];
 
 // ═══════════════════════════════════════════════════════════════
-// 🌐 STATE
+// 🌐 STATE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════
-let mode = 'tour';
+let currentRole = 'student';
+let currentTour = STUDENT_TOUR;
 let stepIdx = 0;
 let autoPlaying = false;
 let autoTimer = null;
 const themes = ['light', 'dark', 'rainbow'];
 let themeIdx = 0;
+let activeTab = 'overview'; // for admin panel
 
-document.getElementById('stepTotal').textContent = TOUR.length;
+// Mock database state
+let adminPendingBorrows = [
+    { id: 1, student: 'ดช.มานะ ดีใจ', class: 'ม.2/3', instrument: 'กีตาร์โปร่ง #012', type: 'กีตาร์', date: 'วันนี้ 12:45 น.' }
+];
+let adminActiveBorrows = [
+    { id: 2, student: 'ดช.สมชาย ใจดี', class: 'ม.2/3', instrument: 'ฟลู้ท #003', type: 'เครื่องลม', date: 'วันนี้ 14:15 น.', start: new Date(Date.now() - 900000).toISOString(), due: new Date(Date.now() + 86400000 * 6).toISOString() },
+    { id: 3, student: 'ดญ.อรอุมา รักดี', class: 'ม.2/1', instrument: 'ขลุ่ยเพียงออ #007', type: 'ดนตรีไทย', date: '3 วันก่อน', start: new Date(Date.now() - 86400000 * 3).toISOString(), due: new Date(Date.now() - 86400000 * 1).toISOString() }
+];
+let adminRepairs = [
+    { id: 1, instrument: 'ขลุ่ยเพียงออ #007', symptom: 'คีย์เสียงติดขัด กดยาก', status: 'กำลังซ่อม', student: 'ดช.สมชาย ใจดี', date: '10/พ.ค. 09:30' }
+];
+let adminUsers = [
+    { id: 1, name: 'ดช.สมชาย ใจดี', class: 'ม.2/3', group: 'ดนตรีไทย', level: 7, xp: 1300, stars: 5, status: 'ปกติ', badges: ['🥇 มือใหม่', '🔥 7 วันติด', '🐉 ปราบบอส'] },
+    { id: 2, name: 'ดญ.อรอุมา รักดี', class: 'ม.2/1', group: 'ดนตรีไทย', level: 9, xp: 2840, stars: 12, status: 'ปกติ', badges: ['🥇 มือใหม่', '🔥 7 วันติด', '👑 ผู้ควบคุม', '💎 นักดนตรี'] },
+    { id: 3, name: 'ดช.นพดล สุขใจ', class: 'ม.2/3', group: 'ดนตรีสากล', level: 8, xp: 2180, stars: 8, status: 'ปกติ', badges: ['🥇 มือใหม่', '🎬 นักเรียน', '⭐ ดาวรุ่ง'] },
+    { id: 4, name: 'ดช.อนันต์ แสงงาม', class: 'ม.2/2', group: 'ดนตรีสากล', level: 4, xp: 650, stars: 2, status: 'ปกติ', badges: ['🥇 มือใหม่'] },
+    { id: 5, name: 'ดช.วิชัย เรืองเดช', class: 'ม.2/3', group: 'ดนตรีสากล', level: 6, xp: 1100, stars: 4, status: 'ปกติ', badges: ['🥇 มือใหม่', '📚 นักแชร์'] }
+];
+let adminRecovery = [
+    { id: 1, studentId: '10482', oldName: 'ดช.อนันต์ แสงงาม', oldEmail: 'anant.s@school.ac.th', newEmail: 'anant.new@gmail.com', date: 'วันนี้ 09:15 น.' }
+];
+let adminBossSubmissions = [
+    { id: 1, student: 'ดช.มานะ ดีใจ', boss: 'มังกรไฟ (ระดับกลาง)', song: 'เพลงลาวดวงเดือน 3 ท่อน', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', date: 'เมื่อวานนี้' }
+];
+let adminKnowledgeSubmissions = [
+    { id: 1, student: 'ดช.นพดล สุขใจ', title: 'เทคนิคการตั้งสายกีตาร์เบื้องต้น', url: 'https://youtu.be/...', type: 'กีตาร์', date: '2 วันก่อน' }
+];
+let doubleXPActive = false;
 
 // ═══════════════════════════════════════════════════════════════
-// 🧭 NAVIGATION
+// 🧭 NAVIGATION & ROLE SYSTEM
 // ═══════════════════════════════════════════════════════════════
 function goTo(screen) {
+    if (currentRole === 'admin') {
+        activeTab = screen;
+        // Switch admin tab panels
+        document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
+        const panel = document.getElementById('admin-panel-' + screen);
+        if (panel) panel.style.display = 'block';
+        
+        // Toggle active class on sidebar buttons
+        document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === screen);
+        });
+        
+        // Re-render corresponding data
+        if (screen === 'borrows') renderAdminBorrowsTable();
+        else if (screen === 'repairs') renderAdminRepairsTable();
+        else if (screen === 'users') renderAdminUsersTable();
+        else if (screen === 'recovery') renderAdminRecoveryTable();
+        else if (screen === 'bosses') renderAdminBossesTable();
+        else if (screen === 'knowledge') renderAdminKnowledgeTable();
+        return;
+    }
+
+    // Student mode navigation
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const target = document.getElementById('screen-' + screen);
     if (target) target.classList.add('active');
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.target === screen));
+    
+    document.querySelectorAll('.nav-item').forEach(n => {
+        n.classList.toggle('active', n.dataset.target === screen);
+    });
+
     if (screen !== 'login') {
         document.getElementById('appBar').style.display = 'flex';
         document.getElementById('bottomNav').style.display = 'grid';
@@ -1044,24 +1801,90 @@ function goTo(screen) {
         document.getElementById('bottomNav').style.display = 'none';
     }
 }
+
 function jumpTo(screen) { stopAuto(); goTo(screen); closeTour(); }
+
+function switchRole(role) {
+    currentRole = role;
+    stopAuto();
+    closeTour();
+
+    const stage = document.getElementById('demoStage');
+    const studentBtn = document.getElementById('roleBtnStudent');
+    const adminBtn = document.getElementById('roleBtnAdmin');
+    
+    studentBtn.classList.toggle('active', role === 'student');
+    adminBtn.classList.toggle('active', role === 'admin');
+
+    if (role === 'student') {
+        stage.classList.remove('admin-mode');
+        document.getElementById('phoneFrame').style.display = 'block';
+        document.getElementById('browserFrame').style.display = 'none';
+        
+        currentTour = STUDENT_TOUR;
+        document.getElementById('stepTotal').textContent = STUDENT_TOUR.length;
+        stepIdx = 0;
+        
+        renderFeatureJumps('student');
+        goTo('dashboard');
+    } else {
+        stage.classList.add('admin-mode');
+        document.getElementById('phoneFrame').style.display = 'none';
+        document.getElementById('browserFrame').style.display = 'flex';
+        
+        currentTour = ADMIN_TOUR;
+        document.getElementById('stepTotal').textContent = ADMIN_TOUR.length;
+        stepIdx = 0;
+        
+        renderFeatureJumps('admin');
+        renderAdminHeatmaps();
+        updateAdminBadgesCount();
+        goTo('overview');
+    }
+}
+
+function renderFeatureJumps(role) {
+    const container = document.querySelector('.feature-jumps');
+    if (role === 'student') {
+        container.innerHTML = `
+            <button class="jump-btn" onclick="jumpTo('login')" title="เข้าสู่ระบบ">🔐</button>
+            <button class="jump-btn" onclick="jumpTo('dashboard')" title="หน้าหลัก">🏠</button>
+            <button class="jump-btn" onclick="jumpTo('practice')" title="ห้องซ้อม">🎛️</button>
+            <button class="jump-btn" onclick="jumpTo('games')" title="เกม & Loops">🎮</button>
+            <button class="jump-btn" onclick="jumpTo('borrow')" title="ยืมเครื่อง">🎺</button>
+            <button class="jump-btn" onclick="jumpTo('learning')" title="คลังความรู้">📚</button>
+            <button class="jump-btn" onclick="jumpTo('share')" title="แชร์คลิป">🎬</button>
+            <button class="jump-btn" onclick="jumpTo('boss')" title="สอบบอส">🐉</button>
+            <button class="jump-btn" onclick="jumpTo('repair')" title="แจ้งซ่อม">🛠️</button>
+            <button class="jump-btn" onclick="jumpTo('badges')" title="เหรียญตรา">🏆</button>
+        `;
+    } else {
+        container.innerHTML = `
+            <button class="jump-btn" onclick="jumpTo('overview')" title="ภาพรวม">📊</button>
+            <button class="jump-btn" onclick="jumpTo('borrows')" title="อนุมัติการยืม">📦</button>
+            <button class="jump-btn" onclick="jumpTo('repairs')" title="คิวแจ้งซ่อม">🔧</button>
+            <button class="jump-btn" onclick="jumpTo('users')" title="จัดการผู้ใช้">👤</button>
+            <button class="jump-btn" onclick="jumpTo('recovery')" title="กู้คืนบัญชี">🔄</button>
+            <button class="jump-btn" onclick="jumpTo('bosses')" title="สอบบอส">🐉</button>
+            <button class="jump-btn" onclick="jumpTo('knowledge')" title="ผลงาน & สื่อ">📚</button>
+            <button class="jump-btn" onclick="jumpTo('settings')" title="ตั้งค่าระบบ">⚙️</button>
+        `;
+    }
+}
+
 function doLogin() { goTo('dashboard'); toast('✅ เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ดช.สมชาย!', 'success'); }
 
 // ═══════════════════════════════════════════════════════════════
-// 🎬 TOUR ENGINE
+// 🎬 TOUR SYSTEM
 // ═══════════════════════════════════════════════════════════════
 function setMode(m) {
-    mode = m;
-    document.getElementById('modeTour').classList.toggle('active', m === 'tour');
-    document.getElementById('modeFree').classList.toggle('active', m === 'free');
-    document.getElementById('tourSection').style.display = m === 'tour' ? 'block' : 'none';
     if (m === 'free') { stopAuto(); closeTour(); }
 }
 function showStep(i) {
     if (i < 0) i = 0;
-    if (i >= TOUR.length) i = TOUR.length - 1;
+    if (i >= currentTour.length) i = currentTour.length - 1;
     stepIdx = i;
-    const step = TOUR[i];
+    const step = currentTour[i];
     goTo(step.screen);
     showCallout(step, i);
     updateProgress();
@@ -1071,37 +1894,47 @@ function showCallout(step, i) {
     document.getElementById('tourOverlay').classList.add('active');
     callout.style.display = 'block';
     callout.innerHTML = `
-        <span class="tour-callout-num">ขั้นตอน ${i + 1} / ${TOUR.length}</span>
+        <span class="tour-callout-num">ขั้นตอน ${i + 1} / ${currentTour.length}</span>
         <h4>${step.title}</h4>
         <p>${step.body}</p>
         <div class="actions">
             <button class="skip" onclick="closeTour()">ข้าม</button>
             <div style="display: flex; gap: 0.4rem;">
                 ${i > 0 ? '<button class="skip" onclick="prevStep()" style="color:#475569;">← ก่อน</button>' : ''}
-                <button class="next" onclick="nextStep()">${i === TOUR.length - 1 ? 'จบทัวร์ ✨' : 'ต่อไป →'}</button>
+                <button class="next" onclick="nextStep()">${i === currentTour.length - 1 ? 'จบทัวร์ ✨' : 'ต่อไป →'}</button>
             </div>
         </div>
     `;
-    // Position center-top for desktop overlay (callout is fixed)
-    const phone = document.getElementById('phoneFrame').getBoundingClientRect();
-    callout.style.top = (phone.top + 60) + 'px';
-    callout.style.left = (phone.left + (phone.width / 2) - 160) + 'px';
+    
+    // Position adjustments
+    const containerId = currentRole === 'student' ? 'phoneFrame' : 'browserFrame';
+    const target = document.getElementById(containerId).getBoundingClientRect();
+    callout.style.top = (target.top + 60) + 'px';
+    callout.style.left = (target.left + (target.width / 2) - 160) + 'px';
     if (callout.getBoundingClientRect().left < 10) callout.style.left = '10px';
     if (callout.getBoundingClientRect().right > window.innerWidth - 10) {
         callout.style.left = (window.innerWidth - 330) + 'px';
     }
-    // Update info panel
+    
     document.getElementById('tourInfo').innerHTML = `<b>${step.title}</b><br>${step.body}`;
     document.getElementById('stepNum').textContent = i + 1;
 }
-function nextStep() { if (stepIdx >= TOUR.length - 1) { closeTour(); stopAuto(); toast('🎉 จบทัวร์แล้ว — ขอบคุณที่รับชม!', 'success'); return; } showStep(stepIdx + 1); }
+function nextStep() {
+    if (stepIdx >= currentTour.length - 1) {
+        closeTour();
+        stopAuto();
+        toast('🎉 จบทัวร์ระบบแล้ว — ขอบคุณสำหรับการรับชม!', 'success');
+        return;
+    }
+    showStep(stepIdx + 1);
+}
 function prevStep() { if (stepIdx > 0) showStep(stepIdx - 1); }
 function closeTour() {
     document.getElementById('tourOverlay').classList.remove('active');
     document.getElementById('tourCallout').style.display = 'none';
 }
 function updateProgress() {
-    const pct = ((stepIdx + 1) / TOUR.length) * 100;
+    const pct = ((stepIdx + 1) / currentTour.length) * 100;
     document.getElementById('tourProgress').style.width = pct + '%';
 }
 function toggleAutoPlay() {
@@ -1113,7 +1946,11 @@ function startAuto() {
     document.getElementById('playBtn').textContent = '⏸ หยุด';
     showStep(0);
     autoTimer = setInterval(() => {
-        if (stepIdx >= TOUR.length - 1) { stopAuto(); toast('🎉 จบทัวร์อัตโนมัติ!', 'success'); return; }
+        if (stepIdx >= currentTour.length - 1) {
+            stopAuto();
+            toast('🎉 จบทัวร์อัตโนมัติ!', 'success');
+            return;
+        }
         showStep(stepIdx + 1);
     }, 5500);
 }
@@ -1124,7 +1961,813 @@ function stopAuto() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 🎨 THEME
+// 🎙️ STUDENT PRACTICE STUDIO LOGIC
+// ═══════════════════════════════════════════════════════════════
+let tunerActive = false;
+let tunerInterval = null;
+function toggleTuner() {
+    const needle = document.getElementById('tunerNeedle');
+    const btn = document.getElementById('tunerBtn');
+    const cents = document.getElementById('tunerCents');
+    const note = document.getElementById('tunerNote');
+    
+    tunerActive = !tunerActive;
+    if (tunerActive) {
+        btn.textContent = '⏸ หยุดตั้งสาย';
+        btn.classList.add('ghost');
+        btn.classList.remove('primary');
+        needle.classList.add('tuning');
+        
+        let notes = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
+        tunerInterval = setInterval(() => {
+            let n = notes[Math.floor(Math.random() * notes.length)];
+            note.textContent = n;
+            let centsErr = Math.floor(Math.random() * 20) - 10;
+            cents.textContent = `440.0 Hz (${centsErr > 0 ? '+' + centsErr : centsErr} cents)`;
+        }, 1200);
+        toast('🎙️ เปิดใช้งานไมโครโฟนเพื่อตั้งสายเครื่องดนตรี...', 'info');
+    } else {
+        btn.textContent = '🎙️ เริ่มการตั้งสาย';
+        btn.classList.add('primary');
+        btn.classList.remove('ghost');
+        needle.classList.remove('tuning');
+        needle.style.transform = 'rotate(0deg)';
+        note.textContent = 'A';
+        cents.textContent = '440.0 Hz (ตรงคีย์)';
+        if (tunerInterval) clearInterval(tunerInterval);
+    }
+}
+
+let metroActive = false;
+let metroBPM = 120;
+function updateBPM(val) {
+    metroBPM = val;
+    document.getElementById('bpmDisplay').textContent = val + ' BPM';
+    if (metroActive) {
+        const arm = document.getElementById('metroArm');
+        arm.style.animationDuration = (60 / metroBPM) + 's';
+    }
+}
+function toggleMetro() {
+    const arm = document.getElementById('metroArm');
+    const btn = document.getElementById('metroBtn');
+    
+    metroActive = !metroActive;
+    if (metroActive) {
+        btn.textContent = '⏸ หยุดเคาะจังหวะ';
+        btn.classList.add('ghost');
+        btn.classList.remove('primary');
+        arm.classList.add('swinging');
+        arm.style.animationDuration = (60 / metroBPM) + 's';
+        toast('🥁 Metronome เริ่มส่งสัญญาณเสียงจังหวะ...', 'info');
+    } else {
+        btn.textContent = '▶ เริ่มเคาะจังหวะ';
+        btn.classList.add('primary');
+        btn.classList.remove('ghost');
+        arm.classList.remove('swinging');
+        arm.style.transform = 'rotate(0deg)';
+    }
+}
+
+let practiceActive = false;
+let practiceSeconds = 0;
+let practiceTimer = null;
+function togglePracticeTimer() {
+    const btn = document.getElementById('practiceTimerBtn');
+    const submitBtn = document.getElementById('practiceSubmitBtn');
+    const display = document.getElementById('practiceTimerDisplay');
+    
+    practiceActive = !practiceActive;
+    if (practiceActive) {
+        btn.textContent = '⏸ หยุดชั่วคราว';
+        btn.classList.add('danger');
+        btn.classList.remove('ghost');
+        submitBtn.disabled = true;
+        
+        practiceTimer = setInterval(() => {
+            practiceSeconds++;
+            let m = Math.floor(practiceSeconds / 60);
+            let s = practiceSeconds % 60;
+            display.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }, 1000);
+        toast('⏱️ เริ่มจับเวลาการฝึกซ้อมดนตรีแล้ว ซ้อมให้เต็มที่นะ!', 'info');
+    } else {
+        btn.textContent = '⏱️ ซ้อมต่อ';
+        btn.classList.add('ghost');
+        btn.classList.remove('danger');
+        submitBtn.disabled = false;
+        if (practiceTimer) clearInterval(practiceTimer);
+    }
+}
+function submitPracticeTime() {
+    const display = document.getElementById('practiceTimerDisplay');
+    const submitBtn = document.getElementById('practiceSubmitBtn');
+    const btn = document.getElementById('practiceTimerBtn');
+    
+    let mins = Math.max(1, Math.round(practiceSeconds / 60));
+    let xp = mins * 10;
+    
+    gainEXP(xp);
+    toast(`🎉 บันทึกการซ้อมสะสมสำเร็จ ${mins} นาที รับ +${xp} XP`, 'success');
+    
+    practiceSeconds = 0;
+    practiceActive = false;
+    display.textContent = '00:00';
+    btn.textContent = '⏱️ เริ่มซ้อม';
+    btn.className = 'btn ghost';
+    submitBtn.disabled = true;
+    if (practiceTimer) clearInterval(practiceTimer);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🎮 STUDENT GAMES & LOOPS FEED
+// ═══════════════════════════════════════════════════════════════
+function launchGame(name) {
+    toast(`🎮 กำลังเชื่อมต่อเข้าสู่เซิร์ฟเวอร์มินิเกม ${name}...`, 'info');
+    setTimeout(() => {
+        Swal.fire({
+            title: `🎮 จำลองมินิเกม: ${name}`,
+            html: `
+                <div style="padding: 1rem; text-align:center;">
+                    <div style="font-size: 4.5rem; animation: pulse 1s infinite; margin-bottom: 1rem;">🕹️</div>
+                    <p style="font-size: 1rem;">คุณเล่นจบรอบเรียบร้อยแล้ว!</p>
+                    <div style="font-size: 1.5rem; font-weight:800; color:var(--primary-blue); margin: 0.5rem 0;">คะแนนที่ทำได้: 92 คะแนน</div>
+                </div>
+            `,
+            confirmButtonText: 'บันทึก & รับรางวัล (+50 XP)',
+            confirmButtonColor: '#3b82f6'
+        }).then(() => {
+            gainEXP(50);
+            toast('🏆 บันทึกคะแนนกิจกรรมและเหรียญตราเรียบร้อย!', 'success');
+        });
+    }, 1200);
+}
+
+function launchCreator() {
+    toast('🎛️ กำลังเปิดระบบสร้างสรรค์เสียงดนตรี (Launchpad Creator)...', 'info');
+    setTimeout(() => {
+        Swal.fire({
+            title: '🎛️ Music Loop Creator',
+            html: `
+                <div style="text-align: left; padding: 0.5rem;">
+                    <label class="field-label">📝 ตั้งชื่อเพลงของคุณ</label>
+                    <input class="input-field" id="newLoopTitle" value="My Epic Remix">
+                    <label class="field-label">⚡ ความเร็ว (BPM)</label>
+                    <select class="input-field" id="newLoopBPM">
+                        <option>90</option><option selected>120</option><option>140</option>
+                    </select>
+                    <label class="field-label">🥁 สไตล์ดนตรี</label>
+                    <select class="input-field" id="newLoopStyle">
+                        <option>Lo-fi</option><option>Synthwave</option><option selected>Trap</option>
+                    </select>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '📤 แชร์ลงฟีดกลุ่มดนตรี',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#a855f7'
+        }).then((res) => {
+            if (res.isConfirmed) {
+                const title = document.getElementById('newLoopTitle').value;
+                const bpm = document.getElementById('newLoopBPM').value;
+                const style = document.getElementById('newLoopStyle').value;
+                
+                const feed = document.getElementById('loopsFeedContainer');
+                const newCard = document.createElement('div');
+                newCard.style.cssText = `background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 1rem; padding: 0.85rem; position: relative; border-color: #a855f7;`;
+                newCard.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
+                        <div style="width: 38px; height: 38px; border-radius: 50%; background: var(--accent-bg); color: white; display: grid; place-items: center; font-weight: 800; font-size: 0.95rem;">ส</div>
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.8rem;">ดช.สมชาย ใจดี (คุณ)</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">เผยแพร่เมื่อ สักครู่นี้</div>
+                        </div>
+                    </div>
+                    <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 0.25rem;">${title}</div>
+                    <div style="display: flex; gap: 0.4rem; margin-bottom: 0.6rem;">
+                        <span class="badge purple">⚡ BPM: ${bpm}</span>
+                        <span class="badge blue">🥁 ${style}</span>
+                    </div>
+                    <div style="display: flex; gap: 0.4rem; justify-content: space-between; align-items: center;">
+                        <button class="btn primary" onclick="toggleLoopPlay(this, 'custom')" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;">▶ ฟังเพลง</button>
+                        <button class="btn danger" onclick="deleteLoop(this)" style="padding: 0.3rem 0.60rem; font-size: 0.7rem; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2)">🗑️ ลบ</button>
+                    </div>
+                `;
+                feed.insertBefore(newCard, feed.firstChild);
+                gainEXP(100);
+                toast('🎉 แชร์ผลงานและเพิ่มการแจ้งเตือนแอดมินเรียบร้อย! (+100 XP)', 'success');
+            }
+        });
+    }, 1000);
+}
+
+function toggleLoopPlay(btn, track) {
+    if (btn.textContent.includes('▶')) {
+        document.querySelectorAll('#loopsFeedContainer button').forEach(b => {
+            if (b.textContent.includes('⏸')) {
+                b.textContent = '▶ ฟังเพลง';
+                b.classList.remove('ghost');
+                b.classList.add('primary');
+            }
+        });
+        btn.textContent = '⏸ หยุดฟัง';
+        btn.classList.add('ghost');
+        btn.classList.remove('primary');
+        toast(`🎧 กำลังมิกซ์ทำนองสไตล์ ${track}...`, 'info');
+    } else {
+        btn.textContent = '▶ ฟังเพลง';
+        btn.classList.add('primary');
+        btn.classList.remove('ghost');
+    }
+}
+function remixLoop(name) {
+    toast(`🎛️ นำเข้าแทร็กเพลง "${name}" เข้าห้องตัดต่อ Launchpad...`, 'info');
+    setTimeout(() => {
+        goTo('games');
+        toast('✅ พร้อมมิกซ์เพลงแล้ว!', 'success');
+    }, 1000);
+}
+function deleteLoop(btn) {
+    if (confirm('ยืนยันเพื่อลบแทร็กเสียงนี้ออกจากฟีดดนตรีกลุ่ม?')) {
+        btn.closest('div').parentElement.remove();
+        toast('🗑️ ลบผลงานเสียงเรียบร้อย', 'success');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 💻 ADMIN WORKSPACE RENDERS
+// ═══════════════════════════════════════════════════════════════
+function renderAdminHeatmaps() {
+    const gridB = document.getElementById('heatmapBorrows');
+    const gridR = document.getElementById('heatmapReturns');
+    if(!gridB || !gridR) return;
+
+    let bHtml = '';
+    let rHtml = '';
+    // Peak hours: 12:00 and 16:00
+    for(let h=0; h<24; h++) {
+        let bIntensity = 0.05;
+        let rIntensity = 0.05;
+        
+        if (h === 8 || h === 15) { bIntensity = 0.3; rIntensity = 0.1; }
+        else if (h === 12) { bIntensity = 0.9; rIntensity = 0.8; }
+        else if (h === 16 || h === 17) { bIntensity = 0.95; rIntensity = 0.85; }
+        
+        bHtml += `<div class="heatmap-cell" style="background: rgba(59, 130, 246, ${bIntensity})" title="เวลา ${h}:00 | ยืมสะสม"></div>`;
+        rHtml += `<div class="heatmap-cell" style="background: rgba(16, 185, 129, ${rIntensity})" title="เวลา ${h}:00 | คืนสะสม"></div>`;
+    }
+    gridB.innerHTML = bHtml;
+    gridR.innerHTML = rHtml;
+}
+
+function updateAdminBadgesCount() {
+    const pendingB = adminPendingBorrows.length;
+    const pendingR = adminRepairs.filter(r => r.status !== 'เสร็จสิ้น').length;
+    const pendingRec = adminRecovery.length;
+    const pendingBoss = adminBossSubmissions.length;
+    const actionItems = pendingB + pendingR + pendingRec;
+
+    document.getElementById('adminBorrowsBadge').textContent = pendingB;
+    document.getElementById('adminBorrowsBadge').style.display = pendingB > 0 ? 'inline-block' : 'none';
+    
+    document.getElementById('adminRepairsBadge').textContent = pendingR;
+    document.getElementById('adminRepairsBadge').style.display = pendingR > 0 ? 'inline-block' : 'none';
+    
+    document.getElementById('adminRecoveryBadge').textContent = pendingRec;
+    document.getElementById('adminRecoveryBadge').style.display = pendingRec > 0 ? 'inline-block' : 'none';
+
+    document.getElementById('adminBossesBadge').textContent = pendingBoss;
+    document.getElementById('adminBossesBadge').style.display = pendingBoss > 0 ? 'inline-block' : 'none';
+
+    if(document.getElementById('kpiActiveBorrows')) {
+        document.getElementById('kpiActiveBorrows').textContent = adminActiveBorrows.length + ' เครื่อง';
+        document.getElementById('kpiPendingBorrows').textContent = pendingB + ' รายการ';
+        document.getElementById('kpiRepairs').textContent = pendingR + ' เครื่อง';
+        document.getElementById('actionItemsBadge').textContent = actionItems + ' รายการ';
+    }
+}
+
+function renderAdminBorrowsTable() {
+    const pendingWrap = document.getElementById('adminPendingBorrowsTableWrap');
+    const activeWrap = document.getElementById('adminActiveBorrowsTableWrap');
+    if (!pendingWrap || !activeWrap) return;
+
+    // 1. Pending table
+    if (adminPendingBorrows.length === 0) {
+        pendingWrap.innerHTML = '<div class="empty-state"><div class="icon">✨</div>ไม่มีรายการคำขอยืมเครื่องที่รอดำเนินการ</div>';
+    } else {
+        pendingWrap.innerHTML = `
+            <table class="oad-table">
+                <thead>
+                    <tr><th>นักเรียน</th><th>ชั้นเรียน</th><th>เครื่องดนตรี</th><th>เวลาทำคำขอ</th><th>จัดการคำขอ</th></tr>
+                </thead>
+                <tbody>
+                    ${adminPendingBorrows.map(b => `
+                        <tr>
+                            <td><b>${b.student}</b></td>
+                            <td>${b.class}</td>
+                            <td><span class="badge blue">${b.instrument}</span></td>
+                            <td>${b.date}</td>
+                            <td>
+                                <button class="oad-btn oad-btn-green" onclick="approveBorrow(${b.id})">✅ อนุมัติยืม</button>
+                                <button class="oad-btn oad-btn-red" onclick="rejectBorrow(${b.id})">❌ ปฏิเสธ</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    // 2. Active borrows table
+    if (adminActiveBorrows.length === 0) {
+        activeWrap.innerHTML = '<div class="empty-state"><div class="icon">📭</div>ไม่มีประวัติการยืมในขณะนี้</div>';
+    } else {
+        activeWrap.innerHTML = `
+            <table class="oad-table">
+                <thead>
+                    <tr><th>ผู้ยืม</th><th>เครื่องดนตรี</th><th>เวลายืม</th><th>เวลาคืนสะสม (Live)</th><th>กำหนดคืน</th><th>จัดการ</th></tr>
+                </thead>
+                <tbody>
+                    ${adminActiveBorrows.map(b => {
+                        const elapsed = fmtElapsed(b.start);
+                        const countdown = fmtCountdown(b.due);
+                        return `
+                            <tr>
+                                <td><b>${b.student}</b> <span style="font-size:0.75rem; color:var(--text-muted)">(${b.class})</span></td>
+                                <td><span class="badge purple">${b.instrument}</span></td>
+                                <td>${b.date}</td>
+                                <td><strong style="color:var(--primary-blue)">${elapsed}</strong></td>
+                                <td>${countdown}</td>
+                                <td>
+                                    <button class="oad-btn oad-btn-red" onclick="forceReturn(${b.id})">📥 ส่งคืนเครื่อง</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+}
+
+// Live timer functions
+function fmtElapsed(startIso) {
+    const diff = Math.max(0, Date.now() - new Date(startIso).getTime());
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function fmtCountdown(dueIso) {
+    const diff = new Date(dueIso).getTime() - Date.now();
+    if (diff < 0) {
+        const od = Math.abs(diff);
+        const d = Math.floor(od / 86400000);
+        const h = Math.floor((od % 86400000) / 3600000);
+        return `<span style="color:var(--danger); font-weight:700;">⚠️ เกินกำหนด ${d > 0 ? d + ' วัน ' : ''}${h} ชม.</span>`;
+    }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    return `<span style="color:var(--success); font-weight:600;">🕐 เหลือ ${d > 0 ? d + ' วัน ' : ''}${h} ชม.</span>`;
+}
+
+function approveBorrow(id) {
+    const item = adminPendingBorrows.find(b => b.id === id);
+    if (!item) return;
+    
+    adminPendingBorrows = adminPendingBorrows.filter(b => b.id !== id);
+    adminActiveBorrows.push({
+        id: Date.now(),
+        student: item.student,
+        class: item.class,
+        instrument: item.instrument,
+        type: item.type,
+        date: 'วันนี้ สักครู่นี้',
+        start: new Date().toISOString(),
+        due: new Date(Date.now() + 86400000 * 7).toISOString()
+    });
+
+    // Update Student view if instrument state changed
+    if (item.instrument.includes('012')) {
+        const bd = document.getElementById('badge-guitar-012');
+        if (bd) { bd.textContent = 'ยืมอยู่'; bd.className = 'badge blue'; }
+    }
+
+    toast(`✅ อนุมัติการยืมเครื่อง ${item.instrument} สำเร็จ`, 'success');
+    updateAdminBadgesCount();
+    renderAdminBorrowsTable();
+}
+
+function rejectBorrow(id) {
+    const item = adminPendingBorrows.find(b => b.id === id);
+    adminPendingBorrows = adminPendingBorrows.filter(b => b.id !== id);
+    toast(`❌ ปฏิเสธคำขอยืมเครื่อง ${item.instrument} เรียบร้อย`, 'warning');
+    updateAdminBadgesCount();
+    renderAdminBorrowsTable();
+}
+
+function forceReturn(id) {
+    const item = adminActiveBorrows.find(b => b.id === id);
+    adminActiveBorrows = adminActiveBorrows.filter(b => b.id !== id);
+    
+    // Update Student view
+    if (item.instrument.includes('003')) {
+        const bd = document.getElementById('badge-flute-003');
+        if (bd) { bd.textContent = 'พร้อม'; bd.className = 'badge green'; }
+    } else if (item.instrument.includes('012')) {
+        const bd = document.getElementById('badge-guitar-012');
+        if (bd) { bd.textContent = 'พร้อม'; bd.className = 'badge green'; }
+    }
+
+    toast(`✅ คืนเครื่อง ${item.instrument} กลับสู่คลังดนตรีสำเร็จ`, 'success');
+    updateAdminBadgesCount();
+    renderAdminBorrowsTable();
+}
+
+function renderAdminRepairsTable() {
+    const wrap = document.getElementById('adminRepairsTableWrap');
+    if (!wrap) return;
+
+    if (adminRepairs.length === 0) {
+        wrap.innerHTML = '<div class="empty-state"><div class="icon">✨</div>ไม่มีรายการเครื่องชำรุดในคิว</div>';
+    } else {
+        wrap.innerHTML = `
+            <table class="oad-table">
+                <thead>
+                    <tr><th>เครื่องดนตรี</th><th>อาการชำรุด</th><th>ผู้แจ้ง</th><th>วันที่แจ้ง</th><th>สถานะในระบบ</th><th>ปรับสถานะดำเนินการ</th></tr>
+                </thead>
+                <tbody>
+                    ${adminRepairs.map(r => `
+                        <tr>
+                            <td><b>${r.instrument}</b></td>
+                            <td><span style="color:var(--danger)">${r.symptom}</span></td>
+                            <td>${r.student}</td>
+                            <td>${r.date}</td>
+                            <td>
+                                <span class="badge ${r.status === 'เสร็จสิ้น' ? 'green' : 'amber'}">${r.status}</span>
+                            </td>
+                            <td>
+                                ${r.status !== 'เสร็จสิ้น' ? `
+                                    <button class="oad-btn oad-btn-green" onclick="progressRepair(${r.id}, 'เสร็จสิ้น')">✅ ซ่อมเสร็จแล้ว</button>
+                                    <button class="oad-btn oad-btn-ghost" onclick="progressRepair(${r.id}, 'กำลังซ่อม')">🔧 กำลังซ่อม</button>
+                                ` : '—'}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+}
+
+function progressRepair(id, newStatus) {
+    const item = adminRepairs.find(r => r.id === id);
+    if (!item) return;
+    
+    item.status = newStatus;
+    toast(`🛠️ ปรับเปลี่ยนสถานะงานซ่อมเป็น: ${newStatus}`, 'success');
+
+    // Update Student Timeline
+    if (newStatus === 'เสร็จสิ้น') {
+        const step3 = document.getElementById('repairTimelineStep3');
+        const step4 = document.getElementById('repairTimelineStep4');
+        if (step3 && step4) {
+            step3.innerHTML = `<div class="timeline-dot done"></div><div class="timeline-title">🔧 ซ่อมเสร็จสิ้น</div><div class="timeline-time">วันนี้</div>`;
+            step4.innerHTML = `<div class="timeline-dot done"></div><div class="timeline-title">✅ พร้อมส่งมอบคืนนักเรียน</div><div class="timeline-time">พร้อมรับเครื่อง</div>`;
+        }
+    }
+    
+    updateAdminBadgesCount();
+    renderAdminRepairsTable();
+}
+
+function renderAdminUsersTable() {
+    const wrap = document.getElementById('adminUsersTableWrap');
+    if (!wrap) return;
+
+    wrap.innerHTML = `
+        <table class="oad-table">
+            <thead>
+                <tr><th>ชื่อนักเรียน</th><th>กลุ่มดนตรี</th><th>เลเวล</th><th>คะแนน XP</th><th>จำนวนบอส</th><th>เหรียญตรา</th><th>จัดการผู้ใช้</th></tr>
+            </thead>
+            <tbody id="adminUsersTbody">
+                ${adminUsers.map(u => `
+                    <tr data-name="${u.name.toLowerCase()}" data-class="${u.class.toLowerCase()}">
+                        <td><b>${u.name}</b> <span style="font-size:0.75rem; color:var(--text-muted)">(${u.class})</span></td>
+                        <td>${u.group}</td>
+                        <td>🎯 <strong style="color:var(--primary-deep)">Lv. ${u.level}</strong></td>
+                        <td>${u.xp.toLocaleString()} XP</td>
+                        <td>⭐ ${u.stars}</td>
+                        <td>
+                            <div style="display:flex; gap:0.25rem; flex-wrap:wrap; max-width:200px;">
+                                ${u.badges.map(b => `<span class="badge purple" style="font-size:0.65rem; padding:0.1rem 0.3rem">${b}</span>`).join('')}
+                            </div>
+                        </td>
+                        <td>
+                            <button class="oad-btn oad-btn-ghost" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="adminGiveXP(${u.id})">⚡ +50 XP</button>
+                            <button class="oad-btn oad-btn-ghost" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="adminAwardBadge(${u.id})">🏅 แจกเหรียญ</button>
+                            <button class="oad-btn oad-btn-red" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="adminBlockUser(${u.id})">🚫 บล็อก</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function filterAdminUsers(val) {
+    const q = val.toLowerCase();
+    document.querySelectorAll('#adminUsersTbody tr').forEach(tr => {
+        const name = tr.dataset.name;
+        const cls = tr.dataset.class;
+        if (name.includes(q) || cls.includes(q)) {
+            tr.style.display = '';
+        } else {
+            tr.style.display = 'none';
+        }
+    });
+}
+
+function adminGiveXP(id) {
+    const user = adminUsers.find(u => u.id === id);
+    if (!user) return;
+    user.xp += 50;
+    
+    // If it's our mock student, update student profile views!
+    if (user.name.includes('สมชาย')) {
+        const curXp = parseInt(document.getElementById('xpVal').textContent.replace(/,/g, ''));
+        document.getElementById('xpVal').textContent = (curXp + 50).toLocaleString();
+        document.getElementById('xpFill').style.width = Math.min(((curXp + 50) / 2000) * 100, 100) + '%';
+        document.getElementById('xpRemain').textContent = `เหลือ ${Math.max(2000 - (curXp + 50), 0)} XP → Lv.8`;
+    }
+
+    toast(`⚡ มอบ +50 XP ให้แก่ ${user.name} สำเร็จ!`, 'success');
+    renderAdminUsersTable();
+}
+
+function adminAwardBadge(id) {
+    const user = adminUsers.find(u => u.id === id);
+    if (!user) return;
+
+    Swal.fire({
+        title: '🏅 มอบเหรียญตราพิเศษ',
+        input: 'select',
+        inputOptions: {
+            '👑 ผู้ควบคุม': 'ผู้ควบคุมวง (Leader)',
+            '💎 นักดนตรี': 'นักดนตรีดีเด่น (Artist)',
+            '🌟 ขยันซ้อม': 'ดาวรุ่งขยันซ้อม (Practice Master)'
+        },
+        inputPlaceholder: 'เลือกเหรียญตราที่ต้องการมอบ',
+        showCancelButton: true,
+        confirmButtonText: '🏆 มอบเหรียญ',
+        confirmButtonColor: '#3b82f6',
+        cancelButtonText: 'ยกเลิก'
+    }).then((res) => {
+        if(res.isConfirmed && res.value) {
+            const b = res.value;
+            if (user.badges.includes(b)) {
+                toast('❌ นักเรียนมีเหรียญตรานี้อยู่แล้ว', 'error');
+                return;
+            }
+            user.badges.push(b);
+            
+            // Update student view
+            if (user.name.includes('สมชาย')) {
+                const grid = document.getElementById('studentBadgesGrid');
+                const nextLock = grid.querySelector('.medal-card.locked');
+                if (nextLock) {
+                    nextLock.className = 'medal-card unlocked';
+                    nextLock.innerHTML = `<div class="medal-icon">${b.split(' ')[0]}</div><div class="medal-name">${b.split(' ')[1]}</div>`;
+                }
+            }
+
+            toast(`🏆 มอบเหรียญ ${b} ให้แก่ ${user.name} สำเร็จ!`, 'success');
+            renderAdminUsersTable();
+        }
+    });
+}
+
+function adminBlockUser(id) {
+    const user = adminUsers.find(u => u.id === id);
+    Swal.fire({
+        title: `🚫 ระงับการใช้งานสิทธิ์?`,
+        text: `คุณต้องการบล็อกบัญชี ${user.name} ใช่หรือไม่? นักเรียนจะไม่สามารถสแกนยืมเครื่องดนตรีได้ชั่วคราว`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'บล็อกบัญชี',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#ef4444'
+    }).then(res => {
+        if(res.isConfirmed) {
+            toast(`🚫 ระงับบัญชีผู้ใช้งาน ${user.name} เรียบร้อย`, 'error');
+        }
+    });
+}
+
+function renderAdminRecoveryTable() {
+    const wrap = document.getElementById('adminRecoveryTableWrap');
+    if (!wrap) return;
+
+    if (adminRecovery.length === 0) {
+        wrap.innerHTML = '<div class="empty-state"><div class="icon">✨</div>ไม่มีคำขอกู้คืนบัญชีในขณะนี้</div>';
+    } else {
+        wrap.innerHTML = `
+            <table class="oad-table">
+                <thead>
+                    <tr><th>รหัสนักเรียน</th><th>ชื่อผู้ใช้</th><th>อีเมลเดิมในระบบ</th><th>อีเมลใหม่ที่ร้องขอ</th><th>วันที่ยื่น</th><th>การจัดการคำขอ</th></tr>
+                </thead>
+                <tbody>
+                    ${adminRecovery.map(r => `
+                        <tr>
+                            <td><b>${r.studentId}</b></td>
+                            <td>${r.oldName}</td>
+                            <td>${r.oldEmail}</td>
+                            <td><span style="color:var(--primary-deep); font-weight:700;">${r.newEmail}</span></td>
+                            <td>${r.date}</td>
+                            <td>
+                                <button class="oad-btn oad-btn-green" onclick="approveRecovery(${r.id})">✅ อนุมัติสิทธิ์</button>
+                                <button class="oad-btn oad-btn-red" onclick="rejectRecovery(${r.id})">❌ ปฏิเสธ</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+}
+
+function approveRecovery(id) {
+    adminRecovery = adminRecovery.filter(r => r.id !== id);
+    toast('✅ อนุมัติความปลอดภัยและเปลี่ยนแปลงข้อมูลการล็อกอินแล้ว', 'success');
+    updateAdminBadgesCount();
+    renderAdminRecoveryTable();
+}
+function rejectRecovery(id) {
+    adminRecovery = adminRecovery.filter(r => r.id !== id);
+    toast('❌ ปฏิเสธการเปลี่ยนแปลงสิทธิ์บัญชี', 'warning');
+    updateAdminBadgesCount();
+    renderAdminRecoveryTable();
+}
+
+function renderAdminBossesTable() {
+    const wrap = document.getElementById('adminBossSubmissionsWrap');
+    if (!wrap) return;
+
+    if (adminBossSubmissions.length === 0) {
+        wrap.innerHTML = '<div class="empty-state"><div class="icon">🏆</div>ไม่มีผลการสอบที่รอการประเมินในคิว</div>';
+    } else {
+        wrap.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:0.6rem;">
+                ${adminBossSubmissions.map(s => `
+                    <div style="background:var(--input-bg); padding:0.75rem; border-radius:8px; border:1px solid var(--input-border)">
+                        <div style="font-weight:700; font-size:0.85rem;">👤 ${s.student}</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin:0.25rem 0;">สอบห้องบอส: <b>${s.boss}</b></div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">ผลงาน: <i>${s.song}</i></div>
+                        <div style="display:flex; gap:0.4rem;">
+                            <button class="oad-btn oad-btn-blue" onclick="reviewExamVideo(${s.id})" style="padding:0.25rem 0.5rem; font-size:0.7rem;">🎥 เปิดประเมินบรรเลง</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+}
+
+function reviewExamVideo(id) {
+    const sub = adminBossSubmissions.find(s => s.id === id);
+    Swal.fire({
+        title: `🎥 การประเมินผล: ${sub.student}`,
+        html: `
+            <div style="text-align: left; padding: 0.25rem;">
+                <p style="font-size: 0.85rem; margin-bottom:0.75rem;">บอส: <b>${sub.boss}</b><br>บททดสอบ: <i>${sub.song}</i></p>
+                <div style="background:#000; height:180px; border-radius:8px; display:grid; place-items:center; color:#fff; font-size:2.5rem; font-weight:900;">
+                    🎬 VIDEO PLAYBACK
+                </div>
+                <div style="margin-top:1rem;">
+                    <label class="field-label">✏️ คอมเมนต์เพิ่มเติมจากผู้สอน</label>
+                    <input class="input-field" value="เป่าโน้ตได้ตรงตามจังหวะ ควบคุมลมได้เสถียรดีมาก ผ่านเกณฑ์ครับ" id="examComment">
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: '✅ ผ่านการประเมิน (Pass)',
+        confirmButtonColor: '#10b981',
+        cancelButtonText: 'ให้กลับไปซ้อม (Fail)',
+        cancelButtonColor: '#ef4444'
+    }).then(res => {
+        if(res.isConfirmed) {
+            adminBossSubmissions = adminBossSubmissions.filter(s => s.id !== id);
+            toast('🎉 ตรวจสอบคลิปการสอบบอส ผ่านเกณฑ์การประเมินแล้ว!', 'success');
+            
+            // Give student rewards
+            const user = adminUsers.find(u => u.name.includes('สมชาย'));
+            if(user) {
+                user.xp += 200;
+                user.stars += 3;
+            }
+            // Update student view
+            const curXp = parseInt(document.getElementById('xpVal').textContent.replace(/,/g, ''));
+            document.getElementById('xpVal').textContent = (curXp + 200).toLocaleString();
+            document.getElementById('xpFill').style.width = Math.min(((curXp + 200) / 2000) * 100, 100) + '%';
+            
+            updateAdminBadgesCount();
+            renderAdminBossesTable();
+        } else if (res.dismiss === Swal.DismissReason.cancel) {
+            adminBossSubmissions = adminBossSubmissions.filter(s => s.id !== id);
+            toast('📋 ส่งคำแนะนำแจ้งเตือนความคืบหน้าให้เด็กกลับไปฝึกฝนเพิ่มคีย์เสียงสะดุด', 'warning');
+            updateAdminBadgesCount();
+            renderAdminBossesTable();
+        }
+    });
+}
+
+function renderAdminKnowledgeTable() {
+    const wrap = document.getElementById('adminKnowledgeSubmissionsWrap');
+    if (!wrap) return;
+
+    if (adminKnowledgeSubmissions.length === 0) {
+        wrap.innerHTML = '<div class="empty-state"><div class="icon">🎬</div>ไม่มีวิดีโอส่งพิจารณาในคิว</div>';
+    } else {
+        wrap.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:0.6rem;">
+                ${adminKnowledgeSubmissions.map(s => `
+                    <div style="background:var(--input-bg); padding:0.75rem; border-radius:8px; border:1px solid var(--input-border); display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-weight:700; font-size:0.85rem;">🎬 ${s.title}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted);">ผู้ส่ง: ${s.student} · เครื่อง: ${s.type}</div>
+                        </div>
+                        <div style="display:flex; gap:0.25rem;">
+                            <button class="oad-btn oad-btn-green" onclick="approveKnowledge(${s.id})" style="padding:0.25rem 0.5rem; font-size:0.7rem;">อนุมัติ</button>
+                            <button class="oad-btn oad-btn-red" onclick="rejectKnowledge(${s.id})" style="padding:0.25rem 0.5rem; font-size:0.7rem;">ลบ</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+}
+
+function approveKnowledge(id) {
+    adminKnowledgeSubmissions = adminKnowledgeSubmissions.filter(s => s.id !== id);
+    toast('✅ อนุมัติคลิปวิดีโอแชร์ลงคลังความรู้กลุ่มการเรียนสำเร็จ!', 'success');
+    renderAdminKnowledgeTable();
+}
+function rejectKnowledge(id) {
+    adminKnowledgeSubmissions = adminKnowledgeSubmissions.filter(s => s.id !== id);
+    toast('🗑️ ลบคำขอโพสต์วิดีโอนี้เรียบร้อย', 'warning');
+    renderAdminKnowledgeTable();
+}
+
+function toggleDoubleXP() {
+    doubleXPActive = !doubleXPActive;
+    const btn = document.getElementById('doubleXpToggleBtn');
+    if (doubleXPActive) {
+        btn.textContent = '⏸ ปิดกิจกรรม';
+        btn.className = 'btn danger';
+        toast('🔥 กิจกรรมคูณแต้มเรียนรู้สองเท่า (Double XP) เริ่มทำงาน!', 'success');
+    } else {
+        btn.textContent = 'เปิดใช้งานกิจกรรม';
+        btn.className = 'btn primary';
+        toast('❌ กิจกรรมแต้มสะสม Double XP สิ้นสุดการทำงาน', 'info');
+    }
+}
+
+function doYearlyReset() {
+    Swal.fire({
+        title: '⚠️ ยืนยันคำสั่ง Yearly Reset?',
+        html: `การดำเนินการนี้จะ<b>ล้างประวัติการยืมเครื่องและการซ้อมทั้งหมดในระบบ</b> เพื่อเตรียมย้ายระบบขึ้นปีการศึกษาใหม่ถัดไป<br><br>โปรดพิมพ์ <strong>RESET</strong> เพื่อยืนยันคำสั่ง`,
+        icon: 'warning',
+        input: 'text',
+        inputPlaceholder: 'พิมพ์ RESET ที่นี่',
+        showCancelButton: true,
+        confirmButtonText: 'ล้างระบบประจำปี',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#ef4444'
+    }).then(res => {
+        if(res.value === 'RESET') {
+            adminActiveBorrows = [];
+            adminPendingBorrows = [];
+            adminRepairs = [];
+            
+            toast('🏛️ ล้างฐานข้อมูลและเตรียมระเบียบชั้นเรียนพร้อมเริ่มเทอมดนตรีถัดไปเรียบร้อย!', 'success');
+            updateAdminBadgesCount();
+            renderAdminBorrowsTable();
+            renderAdminRepairsTable();
+        }
+    });
+}
+
+// Tick timers every second
+setInterval(() => {
+    if (currentRole === 'admin' && activeTab === 'borrows') {
+        renderAdminBorrowsTable();
+    }
+}, 1000);
+
+// ═══════════════════════════════════════════════════════════════
+// 🎨 THEME & MOCK MUTE FEEDBACKS
 // ═══════════════════════════════════════════════════════════════
 function setTheme(t) {
     themeIdx = themes.indexOf(t);
@@ -1133,9 +2776,6 @@ function setTheme(t) {
 }
 function cycleTheme() { themeIdx = (themeIdx + 1) % themes.length; setTheme(themes[themeIdx]); toast('🎨 เปลี่ยนธีม: ' + themes[themeIdx].toUpperCase(), 'info'); }
 
-// ═══════════════════════════════════════════════════════════════
-// 🔔 INTERACTIONS — mock realistic feedback
-// ═══════════════════════════════════════════════════════════════
 function toast(msg, type) {
     const t = document.createElement('div');
     t.className = 'toast ' + (type || 'success');
@@ -1152,7 +2792,7 @@ function pushNotif(title, body, icon) {
 }
 function showNotifications() {
     pushNotif('🐉 บอสตัวใหม่!', 'ครูเปิดบอส "นกอินทรี" แล้ว — เข้าห้องด้วยรหัส 4 หลัก', '🐉');
-    setTimeout(() => pushNotif('⏰ ใกล้คืนเครื่องแล้ว', 'ฟลู้ท #003 — กำหนดคืน 2 วัน', '🎺'), 800);
+    setTimeout(() => pushNotif('⏰ ใกล้คืนเครื่องแล้ว', 'ฟลู้ท #003 — กำหนดคืนใน 2 วัน', '🎺'), 800);
 }
 function gainEXP(amt) {
     const o = document.createElement('div');
@@ -1161,7 +2801,6 @@ function gainEXP(amt) {
     document.body.appendChild(o);
     setTimeout(() => o.remove(), 1500);
 
-    // Animate XP bar
     const cur = parseInt(document.getElementById('xpVal').textContent.replace(/,/g, ''));
     const next = cur + amt;
     document.getElementById('xpVal').textContent = next.toLocaleString();
@@ -1173,31 +2812,97 @@ function scanQR() {
     setTimeout(() => toast('✅ สแกนสำเร็จ! เลือกเครื่องด้านล่างเพื่อยืม', 'success'), 1200);
 }
 function confirmBorrow(name) {
-    if (!confirm(`ยืม ${name} ?\n\nจะกำหนดคืน: ภายใน 7 วัน`)) return;
-    toast(`✅ ยืม ${name} สำเร็จ! ครูได้รับการแจ้งเตือน`, 'success');
-    setTimeout(() => pushNotif('🎺 ยืมสำเร็จ', name + ' — กำหนดคืน 19/พ.ค.', '🎺'), 600);
+    if (!confirm(`ยืนยันการทำคำร้องยืม ${name} ?\n\nระบบจะกำหนดคืนใน 7 วัน`)) return;
+    toast(`✅ ส่งคำร้องยืม ${name} แล้ว! รออาจารย์อนุมัติ`, 'success');
+    
+    // Add pending item to admin state
+    adminPendingBorrows.push({
+        id: Date.now(),
+        student: 'ดช.สมชาย ใจดี',
+        class: 'ม.2/3',
+        instrument: name,
+        type: name.includes('ฟลู้ท') ? 'เครื่องลม' : name.includes('กีตาร์') ? 'เครื่องสาย' : 'ดนตรีไทย',
+        date: 'วันนี้ สักครู่นี้'
+    });
+    updateAdminBadgesCount();
+    
+    setTimeout(() => pushNotif('🎺 ยื่นคำร้องยืมแล้ว', name + ' รอแอดมินอนุมัติสิทธิ์', '🎺'), 600);
 }
 function watchVideo() {
-    toast('🎬 เปิดคลิป... (mock)', 'info');
-    setTimeout(() => { gainEXP(50); toast('🎉 เรียนจบ! +50 XP', 'success'); }, 1500);
-    setTimeout(() => pushNotif('🏆 ได้เหรียญใหม่!', 'ปลดล็อก "นักเรียนรู้" — 10 คลิป', '🏅'), 3000);
+    toast('🎬 เปิดคลิปการเรียนรู้...', 'info');
+    setTimeout(() => { gainEXP(50); toast('🎉 เรียนจบคลิปสะสม! +50 XP', 'success'); }, 1500);
 }
-function submitClip() { toast('📤 ส่งคลิปสำเร็จ! ครูจะตรวจภายใน 24 ชม.', 'success'); }
+function submitClip() {
+    const title = document.getElementById('shareTitle').value || 'คลิปของฉัน';
+    const type = document.getElementById('shareType').value;
+    const url = document.getElementById('shareUrl').value || 'https://youtu.be/...';
+    
+    // Add to admin submissions
+    adminKnowledgeSubmissions.push({
+        id: Date.now(),
+        student: 'ดช.สมชาย ใจดี',
+        title: title,
+        url: url,
+        type: type,
+        date: 'วันนี้ สักครู่นี้'
+    });
+    
+    toast('📤 ส่งลิงก์ผลงานการเล่นแล้ว ครูแอดมินจะคัดกรองใน 24 ชม.', 'success');
+    document.getElementById('shareTitle').value = '';
+    document.getElementById('shareUrl').value = '';
+    
+    updateAdminBadgesCount();
+}
 function joinLobby() {
-    const code = prompt('🔑 ใส่รหัสห้อง 4 หลัก:', 'A7K3');
-    if (code) toast('✅ เข้าห้องสอบสำเร็จ! กำลังรอครู...', 'success');
+    const code = prompt('🔑 ใส่รหัสปาร์ตี้ร่วมสอบบอส 4 หลัก:', 'A7K3');
+    if (code) toast('✅ เข้าร่วมล็อบบี้สอบบอสสำเร็จ! รอคิวประเมินผลจากครูผู้คุม', 'success');
 }
 function submitVideo() {
-    toast('🎥 ส่งคลิปสอบแล้ว!', 'success');
-    setTimeout(() => pushNotif('🐉 ผ่านบอส!', 'มังกรไฟ — รับ +200 XP, +3⭐️', '🎉'), 1500);
-    setTimeout(() => gainEXP(200), 1700);
+    toast('🎥 ส่งคลิปวิดีโอบรรเลงสอบแล้ว!', 'success');
+    
+    adminBossSubmissions.push({
+        id: Date.now(),
+        student: 'ดช.สมชาย ใจดี',
+        boss: 'มังกรไฟ (ระดับกลาง)',
+        song: 'เพลงลาวดวงเดือน 3 ท่อน',
+        videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        date: 'วันนี้ สักครู่นี้'
+    });
+    
+    updateAdminBadgesCount();
+    setTimeout(() => pushNotif('🐉 วิดีโอส่งสอบแล้ว', 'กรุณารอแอดมินประเมินการบรรเลงผ่านระบบไลฟ์', '🎉'), 1500);
 }
-function submitRepair() { toast('🛠️ ส่งคำร้องแจ้งซ่อมสำเร็จ ครูได้รับแจ้งเตือนแล้ว', 'success'); }
+function submitRepair() {
+    const sym = document.getElementById('repairSymptom').value || 'คีย์ค้าง';
+    const inst = document.getElementById('repairSelect').value;
 
-// Init
+    adminRepairs.push({
+        id: Date.now(),
+        instrument: inst,
+        symptom: sym,
+        status: 'แจ้งซ่อม',
+        student: 'ดช.สมชาย ใจดี',
+        date: 'วันนี้ สักครู่นี้'
+    });
+    
+    toast('🛠️ ยื่นคำแจ้งซ่อมแล้ว อาจารย์ช่างจะตรวจสอบเพื่อดำเนินซ่อม', 'success');
+    document.getElementById('repairSymptom').value = '';
+    
+    // Update timeline step 3
+    const step3 = document.getElementById('repairTimelineStep3');
+    if(step3) {
+        step3.innerHTML = `<div class="timeline-dot active"></div><div class="timeline-title">🛠️ รับคำแจ้งซ่อมใหม่</div><div class="timeline-time">วันนี้ สักครู่นี้</div>`;
+    }
+
+    updateAdminBadgesCount();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ⚙️ INITIALIZATION
+// ═══════════════════════════════════════════════════════════════
+switchRole('student');
+setTheme('light');
 showStep(0);
-setMode('tour');
 </script>
-
 </body>
 </html>
