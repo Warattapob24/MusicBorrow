@@ -1047,7 +1047,7 @@ const VIEWS = {
         render() {
             return `
                 ${renderUnifiedCard({ emoji: '🎮', title: 'ศูนย์ฝึกทักษะ', subtitle: 'เล่นเกมเพื่อพัฒนาทักษะการอ่านโน้ตและจังหวะ' })}
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 2.5rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 2rem;">
                     <button id="launch-game-btn" class="sd-app-btn">
                         <span class="icon">🎼</span>
                         <span>ห้องโน้ต<br>(Staff Wars)</span>
@@ -1061,6 +1061,37 @@ const VIEWS = {
                         <span>เครื่องสร้างเพลง<br>(DJ Studio)</span>
                     </button>
                 </div>
+                
+                <!-- 📈 กราฟแสดงสถิติและพัฒนาการการฝึกซ้อมดนตรี -->
+                <div style="margin-bottom: 2rem; background: var(--card-bg, #ffffff); border-radius: 16px; padding: 1.25rem; border: 1px solid var(--input-border, #cbd5e1); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <h4 style="margin-top: 0; margin-bottom: 1rem; font-weight: 700; color: var(--text-main, #0f172a); display: flex; align-items: center; gap: 0.5rem;">
+                        <span>📈 พัฒนาการของฉัน (My Practice Trends)</span>
+                    </h4>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem; margin-bottom: 1.25rem;">
+                        <div style="background: var(--input-bg, #f1f5f9); padding: 0.75rem; border-radius: 12px; text-align: center; border: 1px solid var(--input-border, #e2e8f0);">
+                            <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 0.25rem; color: var(--text-main);">จำนวนรอบที่เล่น</div>
+                            <div id="game-stats-total" style="font-size: 1.4rem; font-weight: 800; color: var(--pico-primary, #3b82f6);">-</div>
+                        </div>
+                        <div style="background: var(--input-bg, #f1f5f9); padding: 0.75rem; border-radius: 12px; text-align: center; border: 1px solid var(--input-border, #e2e8f0);">
+                            <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 0.25rem; color: var(--text-main);">เวลาซ้อมรวม (นาที)</div>
+                            <div id="game-stats-time" style="font-size: 1.4rem; font-weight: 800; color: var(--pico-primary, #3b82f6);">-</div>
+                        </div>
+                        <div style="background: var(--input-bg, #f1f5f9); padding: 0.75rem; border-radius: 12px; text-align: center; border: 1px solid var(--input-border, #e2e8f0);">
+                            <div style="font-size: 0.7rem; opacity: 0.8; margin-bottom: 0.25rem; color: var(--text-main);">สูงสุด Staff Wars</div>
+                            <div id="game-stats-staff-high" style="font-size: 1.4rem; font-weight: 800; color: #06b6d4;">-</div>
+                        </div>
+                        <div style="background: var(--input-bg, #f1f5f9); padding: 0.75rem; border-radius: 12px; text-align: center; border: 1px solid var(--input-border, #e2e8f0);">
+                            <div style="font-size: 0.7rem; opacity: 0.8; margin-bottom: 0.25rem; color: var(--text-main);">สูงสุด Rhythm Core</div>
+                            <div id="game-stats-rhythm-high" style="font-size: 1.4rem; font-weight: 800; color: #f97316;">-</div>
+                        </div>
+                    </div>
+
+                    <div style="position: relative; width: 100%; height: 260px;">
+                        <canvas id="game-progress-chart"></canvas>
+                    </div>
+                </div>
+
                 <div>
                     <h3 class="sd-section-title">🏆 อันดับคะแนนเกม</h3>
                     <div id="staffwars-leaderboard" aria-busy="true" class="sd-list-container" style="margin-bottom:1rem; padding: 1rem;"></div>
@@ -1091,6 +1122,7 @@ const VIEWS = {
             });
 
             await renderGameLeaderboards();
+            await renderGameProgressChart(user.id);
         }
     },
 
@@ -4759,6 +4791,155 @@ export async function renderGameLeaderboards() {
     if (rcEl) {
         rcEl.innerHTML = (rcRes.status==='fulfilled' && !rcRes.value?.error) ? createLeaderboardHtml('🥁 Rhythm Core', rcRes.value.data) : `<p>🥁 Rhythm Core: เกิดข้อผิดพลาด</p>`;
         rcEl.removeAttribute('aria-busy');
+    }
+}
+
+export async function renderGameProgressChart(userId) {
+    const totalEl = document.getElementById('game-stats-total');
+    const timeEl = document.getElementById('game-stats-time');
+    const staffHighEl = document.getElementById('game-stats-staff-high');
+    const rhythmHighEl = document.getElementById('game-stats-rhythm-high');
+    const canvas = document.getElementById('game-progress-chart');
+
+    if (!canvas) return;
+
+    try {
+        const { data: sessions, error } = await gamesExt.getUserSessions(userId, 30);
+        if (error) throw error;
+
+        if (!sessions || sessions.length === 0) {
+            if (totalEl) totalEl.textContent = '0';
+            if (timeEl) timeEl.textContent = '0';
+            if (staffHighEl) staffHighEl.textContent = '0';
+            if (rhythmHighEl) rhythmHighEl.textContent = '0';
+            
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#64748b';
+                ctx.font = '14px Kanit, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('เริ่มเล่นเกมแรกของคุณเพื่อเริ่มสะสมพัฒนาการ 🚀', canvas.width / 2, canvas.height / 2);
+            }
+            return;
+        }
+
+        let totalSessions = sessions.length;
+        let totalMins = 0;
+        let staffHigh = 0;
+        let rhythmHigh = 0;
+
+        sessions.forEach(s => {
+            if (s.duration_minutes) totalMins += Number(s.duration_minutes);
+            const scoreVal = Number(s.score || 0);
+            if (s.game_name === 'staffwars') {
+                if (scoreVal > staffHigh) staffHigh = scoreVal;
+            } else if (s.game_name === 'rhythm_core' || s.game_name === 'rhythmcore') {
+                if (scoreVal > rhythmHigh) rhythmHigh = scoreVal;
+            }
+        });
+
+        if (totalEl) totalEl.textContent = totalSessions;
+        if (timeEl) timeEl.textContent = totalMins;
+        if (staffHighEl) staffHighEl.textContent = staffHigh;
+        if (rhythmHighEl) rhythmHighEl.textContent = rhythmHigh;
+
+        const chronoSessions = [...sessions].reverse();
+        const staffData = [];
+        const rhythmData = [];
+        const labels = [];
+
+        chronoSessions.forEach((s, idx) => {
+            const dateStr = s.created_at ? new Date(s.created_at).toLocaleDateString('th-TH', { month: 'short', day: 'numeric' }) : `รอบที่ ${idx + 1}`;
+            labels.push(dateStr);
+
+            const scoreVal = Number(s.score || 0);
+            if (s.game_name === 'staffwars') {
+                staffData.push(scoreVal);
+                rhythmData.push(null);
+            } else {
+                rhythmData.push(scoreVal);
+                staffData.push(null);
+            }
+        });
+
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js is not loaded');
+            return;
+        }
+
+        if (window.__myProgressChartInstance) {
+            window.__myProgressChartInstance.destroy();
+        }
+
+        const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+        const gridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+        const textColor = isDarkTheme ? '#cbd5e1' : '#1e293b';
+
+        window.__myProgressChartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '🎼 Staff Wars',
+                        data: staffData,
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#06b6d4',
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.35,
+                        spanGaps: true
+                    },
+                    {
+                        label: '🥁 Rhythm Core',
+                        data: rhythmData,
+                        borderColor: '#f97316',
+                        backgroundColor: 'rgba(249, 115, 22, 0.15)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#f97316',
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.35,
+                        spanGaps: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: textColor,
+                            font: { family: 'Kanit, sans-serif', size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        titleFont: { family: 'Kanit, sans-serif' },
+                        bodyFont: { family: 'Kanit, sans-serif' }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, font: { family: 'Kanit, sans-serif', size: 10 } }
+                    },
+                    y: {
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, font: { family: 'Kanit, sans-serif', size: 10 } },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    } catch (err) {
+        console.error('Error rendering progress chart:', err);
     }
 }
 

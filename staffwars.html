@@ -132,7 +132,7 @@
             </div>
             <div class="flex items-center space-x-4">
                 <div class="text-xl font-bold">Level: <span id="level">1</span></div>
-                <div class="text-xl font-bold">คะแนน: <span id="score">0</span></div>
+                <div class="text-xl font-bold">คะแนน: <span id="score">0</span> <span id="combo-badge" class="hidden text-sm bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded-full font-bold ml-1 animate-bounce">x0</span></div>
                 <div class="text-xl font-bold">เวลา: <span id="timer">60</span></div>
                 <button id="mute-btn" class="p-2 rounded-full bg-slate-700 hover:bg-slate-600">🔊</button>
                 <button id="close-game-btn" class="p-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-xl">X</button>
@@ -203,8 +203,9 @@
                  <h2 class="text-4xl font-bold mb-2">หมดเวลา!</h2>
                  <p class="text-lg text-slate-300 mb-4">คะแนนสุดท้ายของคุณคือ</p>
                  <p id="final-score" class="text-6xl font-bold text-cyan-400 mb-6">0</p>
-                 <button id="restart-btn" class="w-full bg-cyan-500 text-slate-900 font-bold py-3 px-6 rounded-lg">เล่นอีกครั้ง</button>
-                    <button id="exit-game-over-btn" style="background-color: #7f1d1d; margin-top: 10px; padding: 10px 20px; border-radius: 8px; color: white;">ออก</button>
+                  <button id="restart-btn" class="w-full bg-cyan-500 text-slate-900 font-bold py-3 px-6 rounded-lg mb-3">เล่นอีกครั้ง (เริ่มทันที)</button>
+                  <button id="setup-btn" class="w-full bg-slate-700 text-white font-bold py-3 px-6 rounded-lg mb-3 hover:bg-slate-600 transition-colors">ปรับแต่งการตั้งค่าใหม่</button>
+                  <button id="exit-game-over-btn" class="w-full bg-red-800 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">ออก</button>
                 </div>
         </div>
     </div>
@@ -260,7 +261,7 @@
                 const ids = [
                     'score', 'timer', 'staff-container', 'feedback-panel', 'feedback-text', 'tuner-ui',
                     'tuner-indicator', 'modal-overlay', 'modal-content', 'start-screen', 'game-over-screen',
-                    'start-btn', 'restart-btn', 'final-score', 'clef-select', 'mode-select', 'mute-btn',
+                    'start-btn', 'restart-btn', 'setup-btn', 'final-score', 'clef-select', 'mode-select', 'mute-btn',
                     'accidental-selector', 'keyboard-options-modal', 'in-game-show-labels-toggle',
                     'sound-feedback-container', 'keyboard-wrapper', 'keyboard-container', 'transposition-select'
                 ];
@@ -339,7 +340,8 @@
 
             bindEvents() {
                 this.els.startBtn.addEventListener('click', () => this.startGame());
-                this.els.restartBtn.addEventListener('click', () => this.resetGame());
+                this.els.restartBtn.addEventListener('click', () => this.restartGame());
+                this.els.setupBtn.addEventListener('click', () => this.resetGame());
                 this.els.muteBtn.addEventListener('click', () => this.toggleMute());
                 this.els.modeSelect.addEventListener('change', () => this.handleModeChange());
                 this.els.clefSelect.addEventListener('change', (e) => this.handleClefChange(e));
@@ -355,18 +357,19 @@
                 if (this.state.timerInterval) clearInterval(this.state.timerInterval);
                 if (this.audio.bgMusic) this.audio.bgMusic.pause();
                 
-            this.state = {
-                score: 0,
-                timeLeft: this.config.INITIAL_TIME,
-                currentNoteKey: null,
-                isGameActive: false,
-                isChecking: false,
-                correctPitchStartTime: null, // <--- เพิ่มตัวนี้กลับมา
-                timerInterval: null,
-                audioContext: null,
-                analyser: null,
-                mediaStream: null,
-                pitchLoopId: null,
+                this.state = {
+                    score: 0,
+                    combo: 0,
+                    timeLeft: this.config.INITIAL_TIME,
+                    currentNoteKey: null,
+                    isGameActive: false,
+                    isChecking: false,
+                    correctPitchStartTime: null,
+                    timerInterval: null,
+                    audioContext: null,
+                    analyser: null,
+                    mediaStream: null,
+                    pitchLoopId: null,
                 };
                 
                 this.els.gameOverScreen.classList.add('hidden');
@@ -375,10 +378,44 @@
                 
                 this.els.score.textContent = '0';
                 this.els.timer.textContent = this.config.INITIAL_TIME;
+                const comboBadge = document.getElementById('combo-badge');
+                if (comboBadge) comboBadge.classList.add('hidden');
                 this.setControlsDisabled(false);
                 this.handleModeChange();
                 this.setAccidentalPreference('accidentals');
                 this.els.staffContainer.innerHTML = '';
+            },
+
+            async restartGame() {
+                if (this.state.timerInterval) clearInterval(this.state.timerInterval);
+                this.stopPitchDetection();
+                if (this.audio.bgMusic) this.audio.bgMusic.pause();
+
+                const prevAudioContext = this.state.audioContext;
+                this.state = {
+                    score: 0,
+                    combo: 0,
+                    timeLeft: this.config.INITIAL_TIME,
+                    currentNoteKey: null,
+                    isGameActive: false,
+                    isChecking: false,
+                    correctPitchStartTime: null,
+                    timerInterval: null,
+                    audioContext: prevAudioContext,
+                    analyser: null,
+                    mediaStream: null,
+                    pitchLoopId: null,
+                };
+
+                this.els.gameOverScreen.classList.add('hidden');
+                this.els.modalOverlay.classList.add('hidden');
+                
+                this.els.score.textContent = '0';
+                this.els.timer.textContent = this.config.INITIAL_TIME;
+                const comboBadge = document.getElementById('combo-badge');
+                if (comboBadge) comboBadge.classList.add('hidden');
+
+                this.startGame();
             },
 
             async startGame() {
@@ -618,8 +655,21 @@
             if (!this.state.isGameActive) return;
             this.state.isChecking = true; // ตั้งสถานะว่ากำลังตรวจสอบคำตอบ (เกมหยุดชั่วคราว)
 
+            const comboBadge = document.getElementById('combo-badge');
+
             if (isCorrect) {
                 this.state.score++;
+                this.state.combo = (this.state.combo || 0) + 1;
+
+                if (comboBadge) {
+                    if (this.state.combo >= 2) {
+                        comboBadge.textContent = `x${this.state.combo}`;
+                        comboBadge.classList.remove('hidden');
+                    } else {
+                        comboBadge.classList.add('hidden');
+                    }
+                }
+
                 const timeBonus = this.state.currentMode === 'sound' ? 2 : 1;
                 this.state.timeLeft += timeBonus;
                 
@@ -630,19 +680,23 @@
                 const noteEl = this.els.staffContainer.querySelector('.note-wrapper');
                 if(noteEl) noteEl.classList.add('correct');
                 
-                // หน่วงเวลาเล็กน้อยแล้วสร้างโน้ตตัวต่อไป
+                // หน่วงเวลาเล็กน้อยแล้วสร้างโน้ตตัวต่อไป (400ms เพื่อความลื่นไหล)
                 setTimeout(() => {
                     if (this.state.isGameActive) this.generateNewNote();
-                }, 600); // เพิ่ม delay เล็กน้อยเพื่อให้เห็น feedback ชัดขึ้น
+                }, 400); 
             } else {
+                this.state.combo = 0;
+                if (comboBadge) comboBadge.classList.add('hidden');
+
                 this.state.timeLeft -= 2;
                 if (this.state.timeLeft < 0) this.state.timeLeft = 0;
                 this.els.timer.textContent = this.state.timeLeft;
                 
+                // หน่วงเวลาสำหรับโน้ตผิดลดลง (800ms เพื่อไม่ให้ขาดตอนนาน)
                 setTimeout(() => {
                     this.state.isChecking = false; // คืนสถานะให้เกมดำเนินต่อ
                     if (this.state.isGameActive) this.generateNewNote();
-                }, 1200);
+                }, 800);
             }
         },
 
@@ -778,7 +832,7 @@
 
                 if (this.state.correctPitchStartTime === null) {
                     this.state.correctPitchStartTime = Date.now();
-                } else if (Date.now() - this.state.correctPitchStartTime >= 500) {
+                } else if (Date.now() - this.state.correctPitchStartTime >= 400) {
                     this.state.isChecking = true; // <--- เพิ่มบรรทัดนี้เพื่อ "เหยียบเบรก" ให้เกม
                     this.handleCorrectAnswer();
                 }
