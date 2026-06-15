@@ -141,15 +141,47 @@
 
         <div id="staff-container" class="staff-container"></div>
         
-        <div id="feedback-panel" class="text-center min-h-[200px] pt-4">
-            <div id="sound-feedback-container">
-                 <p id="feedback-text" class="text-xl font-bold h-8 mb-2 text-cyan-400"></p>
-                 <div id="tuner-ui">
-                     <div class="relative w-full h-2 bg-slate-700 rounded-full overflow-hidden">
-                         <div class="absolute w-0.5 h-full bg-white/50 left-1/2 -translate-x-1/2"></div>
-                         <div id="tuner-indicator" class="absolute top-0 w-2 h-full bg-amber-400 rounded-full" style="left: 50%; transform: translateX(-50%);"></div>
+        <div id="feedback-panel" class="text-center min-h-[220px] pt-2">
+            <div id="sound-feedback-container" class="flex flex-col items-center justify-center">
+                 <!-- แผงแสดงตัวโน้ตขนาดใหญ่ (Target & Heard Display) -->
+                 <div class="flex items-center justify-center space-x-8 mb-4">
+                     <!-- โน้ตเป้าหมาย (Target Note) -->
+                     <div class="flex flex-col items-center">
+                         <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1">โน้ตเป้าหมาย</span>
+                         <div id="target-note-display" class="w-16 h-16 rounded-2xl bg-cyan-950/60 border border-cyan-500/50 flex items-center justify-center text-3xl font-extrabold text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.15)]">-</div>
                      </div>
-                     <div class="flex justify-between text-xs px-1 text-slate-400"><span>ต่ำไป</span><span>ตรงกลาง</span><span>สูงไป</span></div>
+                     
+                     <!-- ลูกศรชี้ทาง -->
+                     <div class="text-slate-500 text-2xl font-bold">➡️</div>
+                     
+                     <!-- เสียงที่เป่าได้ (Heard Note) -->
+                     <div class="flex flex-col items-center">
+                         <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1">เสียงที่เป่าได้</span>
+                         <div id="heard-note-circle" class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-700/80 flex items-center justify-center text-3xl font-extrabold text-slate-500 transition-all duration-150 shadow-lg">-</div>
+                     </div>
+                 </div>
+
+                 <!-- ข้อความแนะนำเข้าใจง่าย -->
+                 <p id="feedback-text" class="text-base font-semibold h-7 mb-3 text-slate-300"></p>
+                 
+                 <!-- จูนเนอร์เกจแบบพรีเมียม (Interactive Needle Gauge) -->
+                 <div id="tuner-ui" class="w-full max-w-md px-4">
+                      <div class="relative w-full h-4 bg-slate-800/80 rounded-full border border-slate-700/50 shadow-inner flex items-center overflow-hidden">
+                          <!-- จุดกึ่งกลาง (Perfect Zone) -->
+                          <div class="absolute left-1/2 -translate-x-1/2 w-8 h-full bg-green-500/20 border-x border-green-500/30"></div>
+                          <!-- เส้นมาร์คเกอร์กึ่งกลาง -->
+                          <div class="absolute left-1/2 -translate-x-1/2 w-0.5 h-full bg-white/40"></div>
+                          
+                          <!-- เข็มชี้ความละเอียดสูง (Tuner Indicator Pin) -->
+                          <div id="tuner-indicator" class="absolute top-0 w-2.5 h-full bg-amber-400 rounded-full transition-all duration-100 ease-out shadow-[0_0_8px_currentColor]" style="left: 50%; transform: translateX(-50%);"></div>
+                      </div>
+                      
+                      <!-- ป้ายกำกับอธิบายง่ายๆ -->
+                      <div class="flex justify-between text-[11px] px-2 mt-1.5 text-slate-500 font-medium">
+                          <span class="flex items-center gap-0.5">🔽 ต่ำไป (Flat)</span>
+                          <span class="text-green-400 font-bold">✨ ตรงคีย์ (In Tune) ✨</span>
+                          <span class="flex items-center gap-0.5">สูงไป (Sharp) 🔼</span>
+                      </div>
                  </div>
             </div>
             <div id="keyboard-wrapper" class="hidden">
@@ -211,11 +243,9 @@
     </div>
 
     <script type="module">
-        // 1. ค้นหาช่วงบรรทัด 144 และแทนที่การรับค่าแบบเดิมด้วยชุดนี้
         let currentUserData = null;
         let gameStartTime = null;
 
-        // ดึงข้อมูลผู้เล่นที่ Dashboard ฝากไว้ทันทีที่โหลดหน้าเสร็จ
         const savedUser = localStorage.getItem('sd_game_user');
         if (savedUser) {
             currentUserData = JSON.parse(savedUser);
@@ -224,12 +254,7 @@
         }
 
         const PitchCommandGame = {
-
-            els: {},
-            state: {},
-            audio: {},
-            keyPressHandler: null,
-
+            els: {}, state: {}, audio: {}, keyPressHandler: null,
             config: {
                 INITIAL_TIME: 60,
                 NOTE_NAMES: ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"],
@@ -248,23 +273,14 @@
                     'c-tenor': { path: `<g><path d="M 325.9,546.8 C 325.8,548.7 324.7,550.7 322.8,551.5 C 321.1,552.1 319.1,552.2 317.6,551 C 316.6,550.2 316.2,548.4 317.3,547.5 C 318.3,546.5 320.4,547.4 320.3,548.9 C 320.7,549.9 318.5,550.5 319.7,551.3 C 321,551.6 322.3,550.5 322.6,549.3 C 323.1,547.5 323.1,545.6 322.7,543.8 C 322.4,542.9 321.9,541.5 320.7,541.9 C 319.2,542.2 318.3,543.8 317.9,545.1 C 317.6,543.2 316.4,541.5 315,540.2 C 315,544.1 315,548 315,551.9 L 314.1,551.9 C 314.1,543.9 314.1,535.7 314.1,527.7 L 315,527.7 C 315,531.5 315,535.5 315,539.4 C 316.4,538.1 317.6,536.4 317.8,534.5 C 318.3,535.9 319.3,537.5 321,537.8 C 322.2,537.8 322.5,536.3 322.8,535.4 C 323.1,533.7 323.1,531.8 322.6,530.1 C 322.2,529 320.9,528 319.6,528.3 C 318.6,529 320.6,529.6 320.3,530.6 C 320.5,532 318.8,533 317.6,532.3 C 316.3,531.6 316.4,529.7 317.4,528.8 C 318,528.1 319.3,527.7 320.3,527.7 C 321.2,527.7 321.8,527.7 322.6,528 C 324.6,528.7 325.7,530.7 325.9,532.7 C 326.2,534.9 324.9,537.3 322.8,538.2 C 321.5,538.7 319.9,538.3 318.8,537.3 C 318.7,538.3 318.2,539.2 317.7,539.9 C 318.1,540.6 318.6,541.8 318.8,542.1 C 320.1,540.9 322.5,540.8 323.8,542 C 325.2,543.1 326.1,545 325.9,546.8 z"/><path d="m 312.2,551.9 -2.8,0 0,-24.2 2.8,0 0,24.2 z"/></g>`, viewBox: '309 527 18 25' }
                 }
             },
-
             init() {
                 this.cacheDOMElements();
-                this.precalculateFrequencies();
                 this.setupAudio();
                 this.bindEvents();
                 this.resetGame();
             },
-
             cacheDOMElements() {
-                const ids = [
-                    'score', 'timer', 'staff-container', 'feedback-panel', 'feedback-text', 'tuner-ui',
-                    'tuner-indicator', 'modal-overlay', 'modal-content', 'start-screen', 'game-over-screen',
-                    'start-btn', 'restart-btn', 'setup-btn', 'final-score', 'clef-select', 'mode-select', 'mute-btn',
-                    'accidental-selector', 'keyboard-options-modal', 'in-game-show-labels-toggle',
-                    'sound-feedback-container', 'keyboard-wrapper', 'keyboard-container', 'transposition-select'
-                ];
+                const ids = ['score', 'timer', 'staff-container', 'feedback-panel', 'feedback-text', 'tuner-ui', 'tuner-indicator', 'modal-overlay', 'modal-content', 'start-screen', 'game-over-screen', 'start-btn', 'restart-btn', 'setup-btn', 'final-score', 'clef-select', 'mode-select', 'mute-btn', 'accidental-selector', 'keyboard-options-modal', 'in-game-show-labels-toggle', 'sound-feedback-container', 'keyboard-wrapper', 'keyboard-container', 'transposition-select', 'target-note-display', 'heard-note-circle'];
                 ids.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) {
@@ -273,7 +289,6 @@
                     }
                 });
             },
-
             setupAudio() {
                 this.audio.bgMusic = new Audio('https://cdn.pixabay.com/audio/2025/05/03/audio_327c570a65.mp3');
                 this.audio.bgMusic.loop = true;
@@ -287,57 +302,29 @@
                 this.audio.end = new Audio('https://cdn.pixabay.com/audio/2025/06/26/audio_0ef82a1331.mp3');
                 this.audio.end.volume = 0.7;
             },
-
             playSound(sound) {
                 if (!sound || (this.state.isMuted && sound !== this.audio.start)) return;
                 sound.currentTime = 0;
                 sound.play().catch(() => {});
             },
-
             toggleMute() {
                 this.state.isMuted = !this.state.isMuted;
                 this.els.muteBtn.textContent = this.state.isMuted ? '🔇' : '🔊';
                 if (this.audio.bgMusic) this.audio.bgMusic.muted = this.state.isMuted;
             },
-
             playPianoNote(noteName) {
-            // สร้าง AudioContext ถ้ายังไม่มี (จำเป็นสำหรับ Web Audio API)
-            if (!this.state.audioContext) {
-                this.state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            // จัดการกรณีที่เบราว์เซอร์บล็อกเสียงก่อนผู้ใช้จะคลิก
-            if (this.state.audioContext.state === 'suspended') {
-                this.state.audioContext.resume();
-            }
-
-            const freq = this.config.NOTE_FREQUENCIES[noteName];
-            // ถ้าหาความถี่ไม่เจอ หรือปิดเสียงอยู่ ให้หยุดทำงาน
-            if (!freq || this.state.isMuted) return;
-
-            // 1. สร้างต้นกำเนิดเสียง (Oscillator)
-            const oscillator = this.state.audioContext.createOscillator();
-            // 2. สร้างตัวควบคุมความดัง (GainNode) เพื่อทำให้เสียงไม่แข็งทื่อ
-            const gainNode = this.state.audioContext.createGain();
-
-            // 3. ต่อวงจรเสียง: Oscillator -> Gain -> ลำโพง
-            oscillator.connect(gainNode);
-            gainNode.connect(this.state.audioContext.destination);
-
-            // 4. ตั้งค่าเสียง
-            oscillator.type = 'triangle'; // ใช้คลื่นเสียงทรงสามเหลี่ยม จะได้เสียงคล้ายๆ Electric Piano
-            oscillator.frequency.setValueAtTime(freq, this.state.audioContext.currentTime);
-
-            // 5. สร้างซองเสียง (Envelope) ให้เหมือนการกดคีย์เปียโน (กดแล้วเสียงค่อยๆ หายไป)
-            const now = this.state.audioContext.currentTime;
-            gainNode.gain.setValueAtTime(0, now);
-            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01); // Attack: เสียงดังขึ้นอย่างรวดเร็ว
-            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.5); // Decay: เสียงค่อยๆ เบาลงจนเงียบ
-
-            // 6. เริ่มเล่นและตั้งเวลาหยุด
-            oscillator.start(now);
-            oscillator.stop(now + 0.5);
-        },
-
+                if (!this.state.audioContext) this.state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (this.state.audioContext.state === 'suspended') this.state.audioContext.resume();
+                const freq = this.config.NOTE_FREQUENCIES[noteName];
+                if (!freq || this.state.isMuted) return;
+                const osc = this.state.audioContext.createOscillator();
+                const gain = this.state.audioContext.createGain();
+                osc.connect(gain); gain.connect(this.state.audioContext.destination);
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(freq, this.state.audioContext.currentTime);
+                const now = this.state.audioContext.currentTime;
+                gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.3, now + 0.01); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+                osc.start(now); osc.stop(now + 0.5);
+            },
             bindEvents() {
                 this.els.startBtn.addEventListener('click', () => this.startGame());
                 this.els.restartBtn.addEventListener('click', () => this.restartGame());
@@ -346,186 +333,93 @@
                 this.els.modeSelect.addEventListener('change', () => this.handleModeChange());
                 this.els.clefSelect.addEventListener('change', (e) => this.handleClefChange(e));
                 this.els.accidentalSelector.addEventListener('click', (e) => {
-                    if (e.target.tagName === 'BUTTON') {
-                        this.setAccidentalPreference(e.target.dataset.value);
-                    }
+                    if (e.target.tagName === 'BUTTON') this.setAccidentalPreference(e.target.dataset.value);
                 });
                 this.els.inGameShowLabelsToggle.addEventListener('change', () => this.createKeyboard());
             },
-
             resetGame() {
                 if (this.state.timerInterval) clearInterval(this.state.timerInterval);
                 if (this.audio.bgMusic) this.audio.bgMusic.pause();
-                
-                this.state = {
-                    score: 0,
-                    combo: 0,
-                    timeLeft: this.config.INITIAL_TIME,
-                    currentNoteKey: null,
-                    isGameActive: false,
-                    isChecking: false,
-                    correctPitchStartTime: null,
-                    timerInterval: null,
-                    audioContext: null,
-                    analyser: null,
-                    mediaStream: null,
-                    pitchLoopId: null,
-                };
-                
+                this.state = { score: 0, combo: 0, timeLeft: this.config.INITIAL_TIME, currentNoteKey: null, isGameActive: false, isChecking: false, correctPitchStartTime: null, timerInterval: null, audioContext: null, analyser: null, mediaStream: null, pitchLoopId: null };
                 this.els.gameOverScreen.classList.add('hidden');
                 this.els.startScreen.classList.remove('hidden');
                 this.els.modalOverlay.classList.remove('hidden');
-                
                 this.els.score.textContent = '0';
                 this.els.timer.textContent = this.config.INITIAL_TIME;
-                const comboBadge = document.getElementById('combo-badge');
-                if (comboBadge) comboBadge.classList.add('hidden');
                 this.setControlsDisabled(false);
                 this.handleModeChange();
                 this.setAccidentalPreference('accidentals');
                 this.els.staffContainer.innerHTML = '';
             },
-
             async restartGame() {
                 if (this.state.timerInterval) clearInterval(this.state.timerInterval);
                 this.stopPitchDetection();
                 if (this.audio.bgMusic) this.audio.bgMusic.pause();
-
                 const prevAudioContext = this.state.audioContext;
-                this.state = {
-                    score: 0,
-                    combo: 0,
-                    timeLeft: this.config.INITIAL_TIME,
-                    currentNoteKey: null,
-                    isGameActive: false,
-                    isChecking: false,
-                    correctPitchStartTime: null,
-                    timerInterval: null,
-                    audioContext: prevAudioContext,
-                    analyser: null,
-                    mediaStream: null,
-                    pitchLoopId: null,
-                };
-
+                this.state = { score: 0, combo: 0, timeLeft: this.config.INITIAL_TIME, currentNoteKey: null, isGameActive: false, isChecking: false, correctPitchStartTime: null, timerInterval: null, audioContext: prevAudioContext, analyser: null, mediaStream: null, pitchLoopId: null };
                 this.els.gameOverScreen.classList.add('hidden');
                 this.els.modalOverlay.classList.add('hidden');
-                
                 this.els.score.textContent = '0';
                 this.els.timer.textContent = this.config.INITIAL_TIME;
-                const comboBadge = document.getElementById('combo-badge');
-                if (comboBadge) comboBadge.classList.add('hidden');
-
                 this.startGame();
             },
-
             async startGame() {
                 if (this.state.isGameActive) return;
-                // หากข้อมูลผู้ใช้ยังไม่มา (Undefined) ให้รอ 500ms แล้วลองใหม่ แทนการปล่อยให้พัง
-                if (!currentUserData) {
-                    setTimeout(() => this.startGame(), 500);
-                    return;
-                }
+                if (!currentUserData) { setTimeout(() => this.startGame(), 500); return; }
                 this.playSound(this.audio.start);
                 this.els.startBtn.disabled = true;
-                
                 this.state.currentClef = this.els.clefSelect.value;
                 this.state.currentMode = this.els.modeSelect.value;
                 this.state.transposition = parseInt(this.els.transpositionSelect.value, 10);
-                
                 if (this.state.currentMode === 'sound') {
                     const micReady = await this.setupPitchDetection();
-                    if (!micReady) {
-                        alert('ไม่สามารถเข้าถึงไมโครโฟนได้ โปรดตรวจสอบการตั้งค่า');
-                        this.resetGame(); // กลับไปหน้าแรก
-                        return;
-                    }
+                    if (!micReady) { alert('ไม่สามารถเข้าถึงไมโครโฟนได้'); this.resetGame(); return; }
                 }
-                
                 this.state.isGameActive = true;
                 this.els.modalOverlay.classList.add('hidden');
                 this.setControlsDisabled(true);
                 if (!this.state.isMuted) this.playSound(this.audio.bgMusic);
-
                 this.drawStaff();
                 this.generateNewNote();
                 this.state.timerInterval = setInterval(() => this.updateTimer(), 1000);
-                
-                if (this.state.currentMode === 'sound') {
-                    this.getPitch();
-                }
+                if (this.state.currentMode === 'sound') this.getPitch();
                 this.els.startBtn.disabled = false;
-                gameStartTime = Date.now(); // Record start time                
+                gameStartTime = Date.now();
             },
-
             async endGame() {
                 this.state.isGameActive = false;
                 if(this.state.timerInterval) clearInterval(this.state.timerInterval);
-                this.state.timerInterval = null;
                 this.stopPitchDetection();
                 if (this.audio.bgMusic) this.audio.bgMusic.pause();
                 this.playSound(this.audio.end);
-                
                 this.els.finalScore.textContent = this.state.score;
                 this.els.startScreen.classList.add('hidden');
                 this.els.gameOverScreen.classList.remove('hidden');
                 this.els.modalOverlay.classList.remove('hidden');
-
-                if (!currentUserData) return;
-
-                // 1. Calculate and log practice time
-                const gameEndTime = Date.now();
-                const durationMs = gameEndTime - gameStartTime;
-                
-                // อุดช่องโหว่การปั๊มเวลา: ใช้ Math.floor และบังคับให้เวลาเป็น 0 หากเล่นไม่ถึง 30 วินาที
-                let durationInMinutes = Math.floor(durationMs / 60000);
-                if (durationMs < 30000) {
-                    durationInMinutes = 0; // ตัดสิทธิ์การได้เวลาหากซ้อมน้อยกว่า 30 วินาที
-                } else if (durationInMinutes === 0) {
-                    durationInMinutes = 1; // อนุโลมให้ 1 นาที หากตั้งใจเล่นผ่านช่วง 30-59 วินาทีแรกมาได้
-                }
-
-                // ส่งคะแนนกลับไปที่แท็บ Dashboard (opener) อย่างปลอดภัย
                 const targetWindow = window.opener || window.parent;
-                if (targetWindow) {
-                    targetWindow.postMessage({
-                        type: 'GAME_OVER',
-                        payload: { gameName: 'staffwars', score: this.state.score, duration: durationInMinutes }
-                    }, '*');
-                }
+                if (targetWindow) targetWindow.postMessage({ type: 'GAME_OVER', payload: { gameName: 'staffwars', score: this.state.score } }, '*');
             },
-            
             updateTimer() {
                 if (!this.state.isGameActive) return;
                 this.state.timeLeft--;
                 this.els.timer.textContent = this.state.timeLeft;
-                if (this.state.timeLeft <= 0) {
-                    this.endGame();
-                }
+                if (this.state.timeLeft <= 0) this.endGame();
             },
-            
             setControlsDisabled(disabled) {
                 this.els.clefSelect.disabled = disabled;
                 this.els.transpositionSelect.disabled = disabled;
                 this.els.modeSelect.disabled = disabled;
                 this.els.accidentalSelector.querySelectorAll('button').forEach(btn => btn.disabled = disabled);
             },
-            
             handleModeChange() {
-                const mode = this.els.modeSelect.value;
-                const isSoundMode = mode === 'sound';
+                const isSoundMode = this.els.modeSelect.value === 'sound';
                 this.els.transpositionSelect.style.display = isSoundMode ? 'block' : 'none';
             },
-            
             handleClefChange(e) {
                 this.state.currentClef = e.target.value;
-                if (this.state.isGameActive) {
-                    this.drawStaff();
-                    this.generateNewNote();
-                } else {
-                     this.drawStaff();
-                }
+                if (this.state.isGameActive) { this.drawStaff(); this.generateNewNote(); }
+                else this.drawStaff();
             },
-            
             drawStaff() {
                 this.els.staffContainer.innerHTML = '';
                 const clefData = this.config.CLEF_DATA[this.state.currentClef];
@@ -533,18 +427,17 @@
                 clefSvg.setAttribute('class', 'clef');
                 clefSvg.setAttribute('viewBox', clefData.viewBox);
                 clefSvg.innerHTML = clefData.path;
-
-            if (this.state.currentClef === 'c-alto') clefSvg.style.transform = 'translateY(-50%) translateX(-28%) scale(0.29)';
-            else if (this.state.currentClef === 'c-tenor') clefSvg.style.transform = 'translateY(-57%) translateX(-28%) scale(0.29)';
-            else if (this.state.currentClef === 'f') clefSvg.style.transform = 'translateY(-52.5%) translateX(-28%) scale(0.25)';
-            else if (this.state.currentClef === 'g') clefSvg.style.transform = 'translateY(-50%) translateX(-30%) scale(0.65)';
-                
+                if (this.state.currentClef === 'c-alto') clefSvg.style.transform = 'translateY(-50%) translateX(-28%) scale(0.29)';
+                else if (this.state.currentClef === 'c-tenor') clefSvg.style.transform = 'translateY(-57%) translateX(-28%) scale(0.29)';
+                else if (this.state.currentClef === 'f') clefSvg.style.transform = 'translateY(-52.5%) translateX(-28%) scale(0.25)';
+                else if (this.state.currentClef === 'g') clefSvg.style.transform = 'translateY(-50%) translateX(-30%) scale(0.65)';
                 this.els.staffContainer.appendChild(clefSvg);
-            for (let i = 0; i < 5; i++) {
-                const line = document.createElement('div');
-                line.className = 'staff-line';
-                line.style.top = `${60 + i * 20}px`; // ใช้ค่า pixel แบบคงที่
-                this.els.staffContainer.appendChild(line);
+                for (let i = 0; i < 5; i++) {
+                    const line = document.createElement('div');
+                    line.className = 'staff-line';
+                    line.style.top = `${60 + i * 20}px`;
+                    this.els.staffContainer.appendChild(line);
+                }
             }
         },
 
@@ -806,6 +699,19 @@
 
             if (frequency !== -1 && !this.state.isChecking) {
                 this.checkPitch(frequency);
+            } else if (frequency === -1 && !this.state.isChecking) {
+                // รีเซ็ตการแสดงผลเมื่อเงียบเสียงลง
+                const heardDisplay = document.getElementById('heard-note-circle');
+                if (heardDisplay) {
+                    heardDisplay.textContent = '-';
+                    heardDisplay.className = "w-16 h-16 rounded-2xl bg-slate-900 border border-slate-700/80 flex items-center justify-center text-3xl font-extrabold text-slate-500 transition-all duration-150";
+                }
+                const tunerInd = this.els.tunerIndicator;
+                if (tunerInd) {
+                    tunerInd.style.left = '50%';
+                    tunerInd.classList.remove('correct-pitch');
+                }
+                this.updateFeedback('รอรับสัญญาณเสียง...', 'slate');
             }
 
             this.state.pitchLoopId = requestAnimationFrame(() => this.getPitch());
@@ -822,29 +728,62 @@
             const tunerOffset = Math.max(-50, Math.min(50, cents));
             if (this.els.tunerIndicator) this.els.tunerIndicator.style.left = `calc(50% + ${tunerOffset}%)`;
 
-            let feedbackMessage = `เสียงที่ได้ยิน: ${heardNoteName}`;
+            // ดึงป้ายแสดงโน้ตและอัปเดตแบบเรียลไทม์
+            const cleanHeard = heardNoteName.replace(/\d/, '').replace('#', '♯');
+            const heardDisplay = document.getElementById('heard-note-circle');
+
+            let feedbackMessage = '';
             let feedbackColor = 'amber';
 
-            if (Math.abs(cents) < 20) {
-                if(this.els.tunerIndicator) this.els.tunerIndicator.classList.add('correct-pitch');
-                feedbackMessage += ' (ยอดเยี่ยม!)';
-                feedbackColor = 'green';
+            const isCorrectNote = (heardNoteName.slice(0, -1) === this.state.currentNoteKey.slice(0, -1) || 
+                                   this.config.ENHARMONIC_MAP[heardNoteName.slice(0, -1)] === this.state.currentNoteKey.slice(0, -1) ||
+                                   this.config.ENHARMONIC_MAP[this.state.currentNoteKey.slice(0, -1)] === heardNoteName.slice(0, -1));
 
-                if (this.state.correctPitchStartTime === null) {
-                    this.state.correctPitchStartTime = Date.now();
-                } else if (Date.now() - this.state.correctPitchStartTime >= 400) {
-                    this.state.isChecking = true; // <--- เพิ่มบรรทัดนี้เพื่อ "เหยียบเบรก" ให้เกม
-                    this.handleCorrectAnswer();
+            if (heardDisplay) {
+                heardDisplay.textContent = cleanHeard;
+                if (isCorrectNote) {
+                    if (Math.abs(cents) < 20) {
+                        heardDisplay.className = "w-16 h-16 rounded-2xl bg-green-950 border border-green-400 flex items-center justify-center text-3xl font-extrabold text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all duration-150";
+                    } else {
+                        heardDisplay.className = "w-16 h-16 rounded-2xl bg-amber-950 border border-amber-500/70 flex items-center justify-center text-3xl font-extrabold text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all duration-150";
+                    }
+                } else {
+                    heardDisplay.className = "w-16 h-16 rounded-2xl bg-slate-900 border border-slate-700/80 flex items-center justify-center text-3xl font-extrabold text-slate-400 transition-all duration-150";
+                }
+            }
+
+            if (isCorrectNote) {
+                if (Math.abs(cents) < 20) {
+                    if (this.els.tunerIndicator) {
+                        this.els.tunerIndicator.classList.add('correct-pitch');
+                    }
+                    feedbackMessage = 'ตรงคีย์แล้ว! เป่าค้างไว้แป๊บนึง 🌟';
+                    feedbackColor = 'green';
+
+                    if (this.state.correctPitchStartTime === null) {
+                        this.state.correctPitchStartTime = Date.now();
+                    } else if (Date.now() - this.state.correctPitchStartTime >= 400) {
+                        this.state.isChecking = true;
+                        this.handleCorrectAnswer();
+                    }
+                } else {
+                    if (this.els.tunerIndicator) {
+                        this.els.tunerIndicator.classList.remove('correct-pitch');
+                    }
+                    this.state.correctPitchStartTime = null;
+                    if (cents > 20) {
+                        feedbackMessage = 'เสียงสูงไปนิดนึง ผ่อนลมลงหน่อย 🔽';
+                    } else {
+                        feedbackMessage = 'เสียงต่ำไปนิดนึง เพิ่มแรงลมอีกหน่อย 🔼';
+                    }
                 }
             } else {
-                if(this.els.tunerIndicator) this.els.tunerIndicator.classList.remove('correct-pitch');
-                this.state.correctPitchStartTime = null;
-
-                if (cents > 20) {
-                    feedbackMessage += ' (สูงไป 🔼)';
-                } else if (cents < -20) {
-                    feedbackMessage += ' (ต่ำไป 🔽)';
+                if (this.els.tunerIndicator) {
+                    this.els.tunerIndicator.classList.remove('correct-pitch');
                 }
+                this.state.correctPitchStartTime = null;
+                feedbackMessage = 'เป่าโน้ตอื่นอยู่ ลองปรับลมดูนะ 🎺';
+                feedbackColor = 'amber';
             }
             
             this.updateFeedback(feedbackMessage, feedbackColor);
