@@ -913,6 +913,25 @@ function buildShell() {
                 <div class="oad-table-wrap" id="oad-uni-kits"></div>
             </div>
 
+            <div class="oad-panel" id="oad-sizegrid-panel">
+                <div class="oad-panel-title">
+                    📏 กรอกไซส์เร็ว
+                    <span id="oad-sizegrid-save" style="margin-left:auto;font-size:.8rem;font-weight:400;color:var(--oad-muted);"></span>
+                </div>
+                <div style="display:flex; gap:.8rem; flex-wrap:wrap; align-items:center; margin-bottom:.8rem;">
+                    <label style="font-size:.87rem;">
+                        <input type="checkbox" id="oad-sg-onlyempty"> เฉพาะที่ยังกรอกไม่ครบ
+                    </label>
+                    <button class="oad-btn" id="oad-sg-jump">⤵️ ไปช่องว่างถัดไป</button>
+                    <span id="oad-sg-progress" style="font-size:.87rem;"></span>
+                </div>
+                <p style="font-size:.8rem;color:var(--oad-muted);margin:0 0 .8rem;">
+                    บันทึกอัตโนมัติ · <kbd>Enter</kbd> / <kbd>↓</kbd> ลงช่องล่างคอลัมน์เดิม ·
+                    <kbd>↑</kbd> ขึ้น · พิมพ์ตัวเลขหรือตัวอักษรเพื่อเลือกได้เลยไม่ต้องกดเปิด
+                </p>
+                <div class="oad-table-wrap" id="oad-sizegrid" style="max-height:65vh;overflow:auto;"></div>
+            </div>
+
             <div class="oad-panel">
                 <div class="oad-panel-title">📊 รายงานไซส์และสภาพ</div>
                 <div id="oad-uni-report"></div>
@@ -5482,7 +5501,16 @@ function wireListeners() {
         _renderKitTable();
     });
     document.getElementById('oad-uni-card')?.addEventListener('click', () => window.__oadPrintKitCards());
-    document.getElementById('oad-uni-sizes')?.addEventListener('click', () => window.__oadBulkSizes());
+    document.getElementById('oad-uni-sizes')?.addEventListener('click', () => {
+        document.getElementById('oad-sizegrid-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.__oadSizeJump();
+    });
+    document.getElementById('oad-sg-onlyempty')?.addEventListener('change', () => renderSizeGrid());
+    document.getElementById('oad-sg-jump')?.addEventListener('click', () => window.__oadSizeJump());
+    // กันปิดหน้าทั้งที่ยังบันทึกไม่เสร็จ
+    window.addEventListener('beforeunload', e => {
+        if (_sg.dirty.size) { e.preventDefault(); e.returnValue = ''; }
+    });
     document.getElementById('oad-uni-newkits')?.addEventListener('click', () => window.__oadNewKits());
     document.getElementById('oad-uni-refresh')?.addEventListener('click', () => renderUniformsTab());
     document.getElementById('oad-uni-filter')?.addEventListener('change', () => _renderKitTable());
@@ -6239,6 +6267,7 @@ async function renderUniformsTab() {
     }
 
     await Promise.all([_renderKitTable(), _renderPartTypeTable(), _renderUniformReport()]);
+    renderSizeGrid();   // ต้องรอ _renderKitTable ให้ _uni.kits มีข้อมูลก่อน
 }
 
 async function _renderKitTable() {
@@ -6494,50 +6523,7 @@ window.__oadKitSizes = async (kitId) => {
     if (error) return toast(error.message, 'error');
     toast('บันทึกไซส์แล้ว');
     _renderKitTable();
-};
-
-// ── กรอกไซส์แบบรวดเดียวทั้งประเภทชุด ───────────────────────────────────────
-window.__oadBulkSizes = async () => {
-    const kits = _uni.kits;
-    if (!kits.length) return toast('ยังไม่มีถุงชุด', 'error');
-
-    const types = (kits[0].parts || []).map(p => ({ id: p.type_id, name: p.type_name, icon: p.icon }));
-    if (!types.length) return toast('ยังไม่มีชิ้นส่วน', 'error');
-
-    const { value, isConfirmed } = await Swal.fire({
-        title: '📏 กรอกไซส์รวดเดียว',
-        width: 680,
-        html: `<div style="text-align:left;font-size:.85rem;max-height:60vh;overflow:auto;">
-                 <p style="margin:0 0 .6rem;opacity:.75;">กรอกเฉพาะช่องที่ต้องการ — ช่องที่เว้นว่างจะไม่ถูกแก้</p>
-                 <table style="width:100%;border-collapse:collapse;">
-                   <thead><tr>
-                     <th style="text-align:left;padding:.3rem;">ชุด</th>
-                     ${types.map(t => `<th style="padding:.3rem;">${t.icon || ''} ${escapeHtml(t.name)}</th>`).join('')}
-                   </tr></thead>
-                   <tbody>
-                   ${kits.map(k => `<tr>
-                     <td style="padding:.25rem;white-space:nowrap;">
-                       <strong>#${k.kit_no}</strong>
-                       <span style="opacity:.6;">${escapeHtml(k.owner_nickname || k.owner_name || '')}</span>
-                     </td>
-                     ${types.map(t => {
-                        const p = (k.parts || []).find(x => x.type_id === t.id);
-                        return `<td style="padding:.15rem;">${p ? _sizeField(p, 74, 'bulk-size') : '—'}</td>`;
-                     }).join('')}
-                   </tr>`).join('')}
-                   </tbody>
-                 </table>
-               </div>`,
-        showCancelButton: true, confirmButtonText: 'บันทึกทั้งหมด', cancelButtonText: 'ยกเลิก',
-        preConfirm: () => [...document.querySelectorAll('.bulk-size')]
-            .map(i => ({ part_id: Number(i.dataset.part), size: i.value.trim() }))
-    });
-    if (!isConfirmed) return;
-
-    const { data, error } = await uniformApi.setPartSizes(value);
-    if (error) return toast(error.message, 'error');
-    toast(`บันทึกไซส์ ${data?.updated ?? 0} ชิ้น`);
-    _renderKitTable();
+    renderSizeGrid();
 };
 
 // ── เพิ่มถุงชุด / เพิ่ม-ลดอุปกรณ์ ────────────────────────────────────────────
@@ -7271,4 +7257,191 @@ window.__oadEditSizeOptions = async (partTypeId, name, current) => {
     if (error) return toast(error.message, 'error');   // เช่น ยังมีชิ้นใช้ไซส์ที่จะลบอยู่
     toast(`บันทึก ${data?.count ?? 0} ตัวเลือกแล้ว`);
     renderUniformsTab();
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📏 กรอกไซส์เร็ว — ตารางเดียวจบทั้ง 60 ชุด
+//    เร็วเพราะ: ตั้งทั้งคอลัมน์ได้ · เติมค่าลงล่าง · Enter เลื่อนลง ·
+//    บันทึกอัตโนมัติ (ไม่ต้องกดปุ่ม ไม่มีทางกรอกเสร็จแล้วหาย)
+// ═══════════════════════════════════════════════════════════════════════════
+const _sg = { dirty: new Map(), timer: null, saving: false };
+
+function _sgSetStatus(text, color) {
+    const el = document.getElementById('oad-sizegrid-save');
+    if (el) { el.textContent = text; el.style.color = color || 'var(--oad-muted)'; }
+}
+
+function _sgProgress() {
+    const el = document.getElementById('oad-sg-progress');
+    if (!el) return;
+    const total = _uni.kits.reduce((s, k) => s + (k.parts_total || 0), 0);
+    // นับจากค่าที่แสดงอยู่จริง (รวมที่เพิ่งแก้แต่ยังไม่ถูก reload)
+    let filled = 0;
+    _uni.kits.forEach(k => (k.parts || []).forEach(p => {
+        const v = _sg.dirty.has(p.part_id) ? _sg.dirty.get(p.part_id) : (p.size || '');
+        if (v) filled++;
+    }));
+    const pct = total ? Math.round(filled / total * 100) : 0;
+    el.innerHTML = `กรอกแล้ว <strong style="color:${filled === total ? '#10b981' : '#f59e0b'};">${filled}/${total}</strong> (${pct}%)`;
+}
+
+async function _sgFlush() {
+    if (_sg.saving || !_sg.dirty.size) return;
+    _sg.saving = true;
+    const batch = [..._sg.dirty.entries()].map(([part_id, size]) => ({ part_id, size }));
+    _sgSetStatus('กำลังบันทึก...', '#f59e0b');
+
+    const { error } = await uniformApi.setPartSizes(batch);
+    _sg.saving = false;
+
+    if (error) {
+        _sgSetStatus('บันทึกไม่สำเร็จ — ลองใหม่', '#ef4444');
+        toast(error.message, 'error');
+        return;
+    }
+
+    // อัปเดตข้อมูลในหน่วยความจำให้ตรง โดยไม่ต้องดึงใหม่ทั้งก้อน
+    batch.forEach(({ part_id, size }) => {
+        _uni.kits.forEach(k => (k.parts || []).forEach(p => { if (p.part_id === part_id) p.size = size || null; }));
+    });
+    _uni.kits.forEach(k => {
+        k.parts_sized = (k.parts || []).filter(p => p.size).length;
+    });
+
+    _sg.dirty.clear();
+    _sgSetStatus(`✓ บันทึกแล้ว ${batch.length} ช่อง`, '#10b981');
+    _sgProgress();
+}
+
+function _sgTouch(partId, value) {
+    _sg.dirty.set(partId, value);
+    _sgSetStatus(`มี ${_sg.dirty.size} ช่องรอบันทึก...`);
+    _sgProgress();
+    clearTimeout(_sg.timer);
+    _sg.timer = setTimeout(_sgFlush, 700);
+}
+
+function renderSizeGrid() {
+    const wrap = document.getElementById('oad-sizegrid');
+    if (!wrap) return;
+
+    const onlyEmpty = document.getElementById('oad-sg-onlyempty')?.checked;
+    let kits = _uni.kits.filter(k => (k.parts_total || 0) > 0);
+    if (onlyEmpty) kits = kits.filter(k => k.parts_sized < k.parts_total);
+
+    if (!kits.length) {
+        wrap.innerHTML = `<div class="oad-empty"><span class="oad-empty-icon">${onlyEmpty ? '✅' : '👔'}</span>${
+            onlyEmpty ? 'กรอกไซส์ครบทุกชุดแล้ว' : 'ยังไม่มีถุงชุด'}</div>`;
+        _sgProgress();
+        return;
+    }
+
+    // ประเภทชิ้นเรียงตามลำดับจริง เอาจากถุงที่มีชิ้นครบที่สุด
+    const ref = kits.reduce((a, b) => (b.parts?.length || 0) > (a.parts?.length || 0) ? b : a, kits[0]);
+    const types = (ref.parts || []).map(p => ({
+        id: p.type_id, name: p.type_name, icon: p.icon, options: p.size_options || []
+    }));
+
+    wrap.innerHTML = `
+      <table class="oad-table" style="font-size:.85rem;">
+        <thead>
+          <tr>
+            <th style="position:sticky;left:0;background:var(--oad-surface);z-index:2;">ชุด</th>
+            ${types.map(t => `<th style="text-align:center;min-width:96px;">
+                ${t.icon || ''} ${escapeHtml(t.name)}</th>`).join('')}
+          </tr>
+          <tr>
+            <th style="position:sticky;left:0;background:var(--oad-surface);z-index:2;
+                       font-weight:400;font-size:.75rem;color:var(--oad-muted);">ตั้งทั้งคอลัมน์ →</th>
+            ${types.map(t => `<th style="text-align:center;">
+              ${t.options.length ? `
+                <select class="sg-fillcol" data-type="${t.id}"
+                        style="width:88px;padding:.22rem;border-radius:5px;font-size:.78rem;">
+                  <option value="">— เลือก —</option>
+                  ${t.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
+                </select>` : '<span style="font-size:.72rem;opacity:.5;">พิมพ์อิสระ</span>'}
+            </th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+        ${kits.map((k, rowIdx) => `<tr>
+          <td style="position:sticky;left:0;background:var(--oad-surface);white-space:nowrap;">
+            <strong>#${k.kit_no}</strong>
+            <span style="opacity:.65;font-size:.78rem;">${escapeHtml(k.owner_nickname || k.owner_name || '')}</span>
+          </td>
+          ${types.map((t, colIdx) => {
+            const p = (k.parts || []).find(x => x.type_id === t.id);
+            if (!p) return '<td style="text-align:center;opacity:.35;">—</td>';
+            const cur = _sg.dirty.has(p.part_id) ? _sg.dirty.get(p.part_id) : (p.size || '');
+            const common = `class="sg-cell" data-part="${p.part_id}" data-row="${rowIdx}" data-col="${colIdx}"
+                            style="width:88px;padding:.28rem;border-radius:5px;font-size:.82rem;
+                                   ${cur ? '' : 'background:rgba(245,158,11,.12);'}"`;
+            return `<td style="text-align:center;">${
+              t.options.length
+                ? `<select ${common}>
+                     <option value=""${cur ? '' : ' selected'}>—</option>
+                     ${t.options.map(o => `<option value="${escapeHtml(o)}"${o === cur ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}
+                   </select>`
+                : `<input ${common} value="${escapeHtml(cur)}" placeholder="—">`
+            }</td>`;
+          }).join('')}
+        </tr>`).join('')}
+        </tbody>
+      </table>`;
+
+    const cells = [...wrap.querySelectorAll('.sg-cell')];
+
+    const markCell = el => {
+        el.style.background = el.value ? '' : 'rgba(245,158,11,.12)';
+    };
+
+    cells.forEach(el => {
+        el.addEventListener('change', e => {
+            _sgTouch(Number(e.target.dataset.part), e.target.value);
+            markCell(e.target);
+        });
+        // Enter / ลูกศร = เลื่อนในคอลัมน์เดิม กรอกทีละคอลัมน์ได้เร็วสุด
+        el.addEventListener('keydown', e => {
+            if (!['Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+            e.preventDefault();
+            const row = Number(e.target.dataset.row);
+            const col = Number(e.target.dataset.col);
+            const step = e.key === 'ArrowUp' ? -1 : 1;
+            const next = cells.find(c => Number(c.dataset.row) === row + step && Number(c.dataset.col) === col);
+            if (next) { next.focus(); next.select?.(); }
+        });
+    });
+
+    // ตั้งทั้งคอลัมน์ = เติมให้ทุกแถวที่แสดงอยู่ (เคารพตัวกรอง)
+    wrap.querySelectorAll('.sg-fillcol').forEach(sel => {
+        sel.addEventListener('change', e => {
+            const val = e.target.value;
+            if (!val) return;
+            const typeId = e.target.dataset.type;
+            const colIdx = types.findIndex(t => String(t.id) === typeId);
+            let n = 0;
+            cells.filter(c => Number(c.dataset.col) === colIdx).forEach(c => {
+                c.value = val;
+                _sg.dirty.set(Number(c.dataset.part), val);
+                markCell(c);
+                n++;
+            });
+            e.target.value = '';
+            _sgSetStatus(`มี ${_sg.dirty.size} ช่องรอบันทึก...`);
+            _sgProgress();
+            clearTimeout(_sg.timer);
+            _sg.timer = setTimeout(_sgFlush, 700);
+            toast(`ตั้ง "${val}" ให้ ${n} ชุดแล้ว`);
+        });
+    });
+
+    _sgProgress();
+}
+
+// ⤵️ กระโดดไปช่องว่างถัดไป — ไล่กรอกไม่ต้องหาเอง
+window.__oadSizeJump = () => {
+    const empty = [...document.querySelectorAll('.sg-cell')].find(c => !c.value);
+    if (!empty) return toast('กรอกครบทุกช่องแล้ว 🎉');
+    empty.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    empty.focus();
 };
