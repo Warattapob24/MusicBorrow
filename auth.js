@@ -84,7 +84,7 @@ export async function register(formData) {
             first_name:        formData.get('firstname'),
             last_name:         formData.get('lastname'),
             student_group:     formData.get('group'),
-            student_id:        formData.get('studentid'),
+            student_id:        formData.get('studentid') || null,
             main_instrument:   formData.get('maininstrument'),
             birth_date:        formData.get('birthdate'),
             line_id:           formData.get('lineid'),       

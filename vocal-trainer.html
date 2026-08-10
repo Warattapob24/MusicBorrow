@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pitch Perfect - Vocal Trainer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700;800&family=Nunito:wght@700;800&display=swap');
+        
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background-color: #f8fafc; /* slate-50 */
+            color: #334155; /* slate-700 */
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .font-brand { font-family: 'Nunito', sans-serif; }
+
+        /* Modern Soft UI Panels */
+        .soft-panel {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            border: 2px solid #f1f5f9;
+        }
+
+        /* Toggle Switch (Male/Female) */
+        .toggle-checkbox:checked { right: 0; border-color: #3b82f6; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #bfdbfe; }
+        .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); border-color: white; }
+        .toggle-label { transition: all 0.3s ease; background-color: #fbcfe8; }
+        
+        /* Canvas Area */
+        #practice-arena {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            background-color: #f1f5f9; /* Soft gray for canvas bg */
+            border: 3px solid #e2e8f0;
+        }
+        #pitch-canvas { width: 100%; height: 100%; display: block; }
+
+        /* Mic Meter */
+        .mic-meter-container {
+            width: 12px;
+            height: 100px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-end;
+        }
+        #mic-level-fill {
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #4ade80, #facc15, #f87171);
+            transition: height 0.1s ease-out;
+        }
+
+        /* Fun Buttons */
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            border-bottom: 4px solid #2563eb;
+            transition: all 0.1s;
+        }
+        .btn-primary:active { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
+        
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #475569;
+            border-bottom: 4px solid #cbd5e1;
+            transition: all 0.1s;
+        }
+        .btn-secondary:active { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
+
+        .btn-success {
+            background-color: #22c55e;
+            color: white;
+            border-bottom: 4px solid #16a34a;
+            transition: all 0.1s;
+        }
+        .btn-success:active { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
+
+        .mode-card {
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .mode-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px -5px rgba(0,0,0,0.1); }
+        .mode-card.selected { border-color: #3b82f6; background-color: #eff6ff; }
+        
+        .level-card {
+            cursor: pointer;
+            transition: transform 0.1s;
+            border: 2px solid #e2e8f0;
+        }
+        .level-card:active { transform: scale(0.95); }
+        .level-card.selected { border-color: #3b82f6; background-color: #eff6ff; }
+        
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- Header -->
+    <header class="p-4 bg-white shadow-sm flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-4">
+            <a href="index.html" class="text-slate-400 hover:text-slate-600 transition w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </a>
+            <h1 class="text-2xl font-bold font-brand tracking-wide text-blue-500">Pitch<span class="text-slate-700">Perfect</span></h1>
+        </div>
+        
+        <!-- Voice Range Selector -->
+        <div class="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full border border-slate-200">
+            <span class="text-sm text-pink-500 font-medium"><i class="fas fa-venus"></i> หญิง</span>
+            <div class="relative inline-block w-12 mr-2 align-middle select-none">
+                <input type="checkbox" id="voice-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-slate-200 appearance-none cursor-pointer z-10 transition-transform duration-300" checked/>
+                <label for="voice-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 cursor-pointer"></label>
+            </div>
+            <span class="text-sm text-blue-500 font-medium"><i class="fas fa-mars"></i> ชาย</span>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 py-8 max-w-5xl">
+        
+        <!-- 1. Mode Selection Dashboard -->
+        <section id="view-dashboard" class="animate-fade-in">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-slate-800">เลือกโหมดการเรียนรู้</h2>
+                <p class="text-slate-500 mt-2">ฝึกฝนทักษะการร้องเพลงของคุณทีละขั้นตอน</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Tutorial Mode -->
+                <div class="soft-panel p-6 text-center mode-card" onclick="selectMode('tutorial')">
+                    <div class="w-20 h-20 mx-auto bg-yellow-100 text-yellow-500 rounded-full flex items-center justify-center text-4xl mb-4">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">บทเรียนฝึกสอน</h3>
+                    <p class="text-sm text-slate-500">เรียนรู้ทฤษฎี การหายใจ และเทคนิคการวอร์มเสียงพื้นฐาน</p>
+                </div>
+                
+                <!-- Practice Mode -->
+                <div class="soft-panel p-6 text-center mode-card" onclick="selectMode('practice')">
+                    <div class="w-20 h-20 mx-auto bg-blue-100 text-blue-500 rounded-full flex items-center justify-center text-4xl mb-4">
+                        <i class="fas fa-microphone"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">โหมดฝึกฝน</h3>
+                    <p class="text-sm text-slate-500">ฟังเสียงเปียโนแล้วร้องตาม พร้อมกราฟวิเคราะห์ความแม่นยำ</p>
+                </div>
+                
+                <!-- Test Mode -->
+                <div class="soft-panel p-6 text-center mode-card" onclick="selectMode('test')">
+                    <div class="w-20 h-20 mx-auto bg-purple-100 text-purple-500 rounded-full flex items-center justify-center text-4xl mb-4">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">โหมดทดสอบ</h3>
+                    <p class="text-sm text-slate-500">ทดสอบร้องโดยไม่มีตัวช่วยดูเส้นกราฟ รับคะแนนเมื่อร้องจบ</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. Level Selection (Practice/Test) -->
+        <section id="view-levels" class="hidden animate-fade-in mt-8">
+            <div class="flex justify-between items-end mb-6 border-b-2 border-slate-200 pb-4">
+                <div>
+                    <button onclick="goBackToDashboard()" class="text-blue-500 hover:text-blue-600 font-medium mb-2 inline-block">
+                        <i class="fas fa-arrow-left mr-1"></i> กลับไปเลือกโหมด
+                    </button>
+                    <h2 class="text-2xl font-bold text-slate-800" id="level-selection-title">เลือกบทเรียน</h2>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="level-grid">
+                <!-- Levels injected via JS -->
+            </div>
+            
+            <div class="mt-8 flex justify-center">
+                <button id="start-arena-btn" class="btn-primary font-bold py-3 px-12 rounded-full text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    เริ่ม <i class="fas fa-play ml-1"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- 3. Tutorial View -->
+        <section id="view-tutorial" class="hidden animate-fade-in mt-8">
+            <div class="soft-panel p-8 max-w-3xl mx-auto">
+                <button onclick="goBackToDashboard()" class="text-blue-500 hover:text-blue-600 font-medium mb-6 inline-block">
+                    <i class="fas fa-arrow-left mr-1"></i> กลับ
+                </button>
+                
+                <div id="tutorial-content" class="text-center">
+                    <!-- Slides injected via JS -->
+                </div>
+                
+                <div class="flex justify-between mt-8">
+                    <button id="tut-prev-btn" class="btn-secondary py-2 px-6 rounded-full font-medium">ก่อนหน้า</button>
+                    <div id="tut-progress" class="flex gap-2 items-center">
+                        <!-- Dots injected via JS -->
+                    </div>
+                    <button id="tut-next-btn" class="btn-primary py-2 px-6 rounded-full font-medium">ถัดไป</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Practice/Test Arena -->
+        <section id="view-arena" class="hidden animate-fade-in mt-4">
+            <div class="soft-panel p-6">
+                <!-- Arena Header -->
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <button onclick="stopAndGoBack()" class="text-slate-400 hover:text-red-500 font-medium mr-4">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                        <span id="arena-title" class="text-xl font-bold text-slate-800">Level 1</span>
+                    </div>
+                    
+                    <!-- Arena Controls -->
+                    <div class="flex gap-3 items-center bg-slate-50 p-2 rounded-xl border border-slate-200">
+                        <div id="arena-controls-practice" class="flex gap-3">
+                            <label class="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer">
+                                <input type="checkbox" id="auto-piano-toggle" checked class="rounded text-blue-500">
+                                🎹 กดโจทย์อัตโนมัติ (Auto)
+                            </label>
+                            <button id="manual-play-btn" class="hidden bg-blue-100 text-blue-600 px-3 py-1 rounded-lg text-sm font-bold hover:bg-blue-200 transition">
+                                <i class="fas fa-play"></i> ฟังกดเปียโน
+                            </button>
+                        </div>
+                        
+                        <div id="arena-controls-test" class="hidden flex gap-3">
+                            <label class="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer">
+                                <input type="checkbox" id="test-guide-toggle" checked class="rounded text-blue-500">
+                                🎵 เปิดเสียงคลอนำ (Guide Tone)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canvas Area -->
+                <div class="flex gap-4">
+                    <!-- Left: Mic Meter -->
+                    <div class="flex flex-col items-center justify-center gap-2">
+                        <i class="fas fa-microphone text-slate-400 text-sm"></i>
+                        <div class="mic-meter-container">
+                            <div id="mic-level-fill"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Center: Visualizer -->
+                    <div id="practice-arena" class="flex-grow shadow-inner relative">
+                        <canvas id="pitch-canvas"></canvas>
+                        
+                        <!-- Center Target Line (Dashed) -->
+                        <div class="absolute left-0 right-0 top-1/2 border-t-2 border-slate-300 border-dashed pointer-events-none z-0"></div>
+                        
+                        <!-- Test Mode Blindfold -->
+                        <div id="test-blindfold" class="hidden absolute inset-0 bg-slate-800/90 backdrop-blur-sm flex flex-col items-center justify-center text-white z-10">
+                            <i class="fas fa-eye-slash text-4xl mb-4 text-slate-400"></i>
+                            <h3 class="text-xl font-bold">โหมดทดสอบกำลังทำงาน</h3>
+                            <p class="text-slate-300 mt-2">ร้องตามโจทย์โดยใช้ความจำเสียง (ห้ามดูเส้น)</p>
+                            <div id="test-status-text" class="mt-4 font-bold text-yellow-400 text-2xl">รอสัญญาณ...</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Tuner / Note Indicator -->
+                    <div class="flex flex-col items-center justify-center w-24 bg-slate-50 rounded-2xl border border-slate-200 p-2 shadow-sm">
+                        <div class="text-xs text-slate-400 font-bold mb-2">PITCH</div>
+                        <div id="tuner-note" class="text-3xl font-brand font-bold text-slate-800">-</div>
+                        <div id="tuner-cents" class="text-sm font-medium mt-1 text-slate-500">0</div>
+                    </div>
+                </div>
+
+                <!-- Status & Action Bar -->
+                <div class="mt-6 flex justify-between items-center">
+                    <div id="arena-status" class="text-lg font-bold text-slate-600">
+                        กดปุ่มเริ่มเพื่อฟังโจทย์
+                    </div>
+                    
+                    <div class="flex gap-4">
+                        <button id="action-sing-btn" class="btn-success py-2 px-8 rounded-full font-bold text-lg hidden">
+                            <i class="fas fa-microphone"></i> เริ่มร้อง (Sing)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- End Screen / Results (Hidden initially) -->
+                <div id="results-panel" class="hidden mt-6 bg-blue-50 border border-blue-100 p-6 rounded-2xl text-center">
+                    <h3 class="text-2xl font-bold text-slate-800 mb-2">สรุปผลการร้อง</h3>
+                    <div class="text-5xl font-brand font-black text-blue-600 mb-4" id="score-display">--%</div>
+                    <p class="text-slate-600 mb-6" id="feedback-display">วิเคราะห์ความแม่นยำของเสียง...</p>
+                    
+                    <div class="flex justify-center gap-4">
+                        <button onclick="replayAudio()" class="btn-secondary py-2 px-6 rounded-full font-medium">
+                            <i class="fas fa-headphones"></i> ฟังเสียงตัวเอง
+                        </button>
+                        <button onclick="stopAndGoBack()" class="btn-primary py-2 px-6 rounded-full font-medium">
+                            เสร็จสิ้น / เลือกด่านใหม่
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="vocal-trainer.js"></script>
+</body>
+</html>

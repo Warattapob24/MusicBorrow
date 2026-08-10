@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MusicBorrow - Overworld</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            image-rendering: pixelated;
+        }
+        
+        /* Mobile Controls UI */
+        #dpad-container {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 150px;
+            height: 150px;
+            display: none; /* Shown on mobile via JS */
+            z-index: 50;
+        }
+        .dpad-btn {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5px);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+        .dpad-btn:active { background: rgba(255, 255, 255, 0.5); }
+        #btn-up { top: 0; left: 50px; width: 50px; height: 50px; }
+        #btn-down { bottom: 0; left: 50px; width: 50px; height: 50px; }
+        #btn-left { top: 50px; left: 0; width: 50px; height: 50px; }
+        #btn-right { top: 50px; right: 0; width: 50px; height: 50px; }
+
+        #action-container {
+            position: absolute;
+            bottom: 50px;
+            right: 40px;
+            display: none; /* Shown on mobile via JS */
+            z-index: 50;
+        }
+        #btn-action {
+            width: 70px;
+            height: 70px;
+            border-radius: 35px;
+            background: rgba(14, 165, 233, 0.4);
+            border: 2px solid rgba(14, 165, 233, 0.8);
+            color: white;
+            font-weight: bold;
+            backdrop-filter: blur(5px);
+        }
+        #btn-action:active { background: rgba(14, 165, 233, 0.8); }
+        
+        /* Loading Overlay */
+        #loading {
+            position: absolute; inset: 0; background: #0f172a; z-index: 100;
+            display: flex; justify-content: center; align-items: center; color: white;
+            font-size: 1.5rem; transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading">กำลังโหลดแผนที่...</div>
+    
+    <!-- SCREEN 1: Character Selection -->
+    <div id="screen-select" class="absolute inset-0 flex flex-col h-full p-6 pt-12 items-center justify-center z-50 bg-slate-900" style="display: none;">
+        <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2 text-center">เลือกฮีโร่ของคุณ</h1>
+        <p class="text-slate-300 mb-8 text-center text-sm">ผู้กอบกู้แห่งเสียงดนตรี</p>
+        
+        <p id="save-info" class="text-emerald-400 mt-8 z-10 text-sm font-bold hidden">💾 พบข้อมูลเซฟ: คุณจะเล่นต่อจากด่านที่ X</p>
+        <div class="flex gap-4 mt-2 z-10">
+            <button id="btn-reset-save" onclick="resetSave()" class="text-slate-500 underline text-xs hidden hover:text-rose-400">ลบข้อมูลเซฟเพื่อเริ่มด่าน 1 ใหม่</button>
+            <button onclick="openSettings()" class="text-slate-400 underline text-xs hover:text-cyan-400">⚙️ การตั้งค่า</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 w-full max-w-md mt-8 z-10">
+            <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-cyan-400" onclick="selectHero('hero1.png')">
+                <img src="assets/game/hero1.png" alt="Hero 1" class="h-32 object-contain mb-3" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=hero1&backgroundColor=0ea5e9'">
+                <span class="font-bold text-cyan-400 text-sm text-center">นักปราชญ์ไซเบอร์</span>
+            </div>
+            <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-rose-400" onclick="selectHero('hero2.png')">
+                <img src="assets/game/hero2.png" alt="Hero 2" class="h-32 object-contain mb-3" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=hero2&backgroundColor=e11d48'">
+                <span class="font-bold text-rose-400 text-sm text-center">นักสู้สาวซินธ์</span>
+            </div>
+            <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-purple-400" onclick="selectHero('hero3.png')">
+                <img src="assets/game/hero3.png" alt="Hero 3" class="h-32 object-contain mb-3" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=hero3&backgroundColor=9333ea'">
+                <span class="font-bold text-purple-400 text-sm text-center">มือดาบแห่งเสียง</span>
+            </div>
+            <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-yellow-400" onclick="selectHero('hero4.png')">
+                <img src="assets/game/hero4.png" alt="Hero 4" class="h-32 object-contain mb-3" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=hero4&backgroundColor=ca8a04'">
+                <span class="font-bold text-yellow-400 text-sm text-center">จอมเวทเรโซแนนซ์</span>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Mobile Virtual Joystick (D-Pad) -->
+    <div id="dpad-container">
+        <div id="btn-up" class="dpad-btn">▲</div>
+        <div id="btn-left" class="dpad-btn">◀</div>
+        <div id="btn-right" class="dpad-btn">▶</div>
+        <div id="btn-down" class="dpad-btn">▼</div>
+    </div>
+    <div id="action-container">
+        <button id="btn-action">สำรวจ</button>
+    </div>
+
+    <!-- UI Overlay for Interactions -->
+    <button onclick="resetSave()" class="absolute top-4 right-4 bg-slate-800/80 text-rose-400 border border-slate-700 px-3 py-1 rounded-lg text-xs backdrop-blur z-40 hover:bg-slate-700">ลบข้อมูลเซฟ</button>
+
+    <div id="dialogue-overlay" class="absolute inset-x-4 bottom-4 md:bottom-10 md:inset-x-20 bg-slate-900/90 border-2 border-slate-700 rounded-xl p-4 text-white shadow-2xl hidden z-40 backdrop-blur-md">
+        <h3 id="dialogue-name" class="text-cyan-400 font-bold mb-1 text-sm">NPC</h3>
+        <p id="dialogue-text" class="text-base md:text-lg">สวัสดีนักเดินทาง!</p>
+        <p class="text-slate-400 text-xs mt-2 text-right animate-pulse">กด Spacebar หรือแตะเพื่อไปต่อ ▼</p>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[9999] hidden flex items-center justify-center">
+        <div class="bg-slate-800 border-2 border-slate-700 rounded-3xl p-8 max-w-sm w-full shadow-2xl relative overflow-hidden">
+            <h2 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-6 text-center">การตั้งค่าเกม</h2>
+            
+            <div class="space-y-4">
+                <div class="bg-slate-900/50 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-slate-300 font-semibold"><i data-lucide="music" class="inline w-5 h-5 mr-2 text-cyan-400"></i>เพลงพื้นหลัง (BGM)</span>
+                        <span id="val-bgm" class="text-cyan-400 text-sm font-bold">50%</span>
+                    </div>
+                    <input type="range" id="slider-bgm" min="0" max="100" value="50" class="w-full accent-cyan-400" oninput="updateSettings('bgmVol', this.value)">
+                </div>
+                <div class="bg-slate-900/50 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-slate-300 font-semibold"><i data-lucide="volume-2" class="inline w-5 h-5 mr-2 text-emerald-400"></i>เอฟเฟกต์ (SFX)</span>
+                        <span id="val-sfx" class="text-emerald-400 text-sm font-bold">50%</span>
+                    </div>
+                    <input type="range" id="slider-sfx" min="0" max="100" value="50" class="w-full accent-emerald-400" oninput="updateSettings('sfxVol', this.value)">
+                </div>
+                <div class="bg-slate-900/50 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-slate-300 font-semibold"><i data-lucide="mic" class="inline w-5 h-5 mr-2 text-purple-400"></i>เสียงอ่าน (Voice)</span>
+                        <span id="val-voice" class="text-purple-400 text-sm font-bold">100%</span>
+                    </div>
+                    <input type="range" id="slider-voice" min="0" max="100" value="100" class="w-full accent-purple-400" oninput="updateSettings('voiceVol', this.value)">
+                </div>
+            </div>
+
+            <button onclick="closeSettings()" class="mt-8 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold px-8 py-3 rounded-full hover:scale-105 transition-transform shadow-lg shadow-cyan-500/30 w-full text-lg">
+                ปิด
+            </button>
+        </div>
+        
+        <!-- Game Completed Overlay -->
+        <div id="screen-game-completed" class="absolute inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-slate-900/95 backdrop-blur-sm hidden text-center">
+            <div class="text-6xl mb-4">👑</div>
+            <h2 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500 mb-4">GAME COMPLETED!</h2>
+            <p class="text-lg text-slate-300 mb-2">ยินดีด้วย! คุณสำเร็จหลักสูตรเบื้องต้นทั้งหมดแล้ว</p>
+            <p class="text-slate-400 mb-8">รอติดตามด่านใหม่ๆ ในการอัปเดตครั้งหน้า หรือจะเริ่มเล่นใหม่เพื่อทบทวนความรู้ก็ได้นะ!</p>
+            <button onclick="resetSave()" class="neu-btn px-8 py-3 rounded-full font-bold text-slate-900 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:scale-105 transition-transform shadow-lg shadow-yellow-500/30">
+                เริ่มเล่นใหม่ (Start Over)
+            </button>
+        </div>
+
+        <script src="lesson-data.js?v=51"></script>
+        <!-- Game Script with cache buster -->
+        <script src="explore.js?v=51"></script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ทดสอบ ABC.js (ง่ายกว่า VexFlow)</title>
+    <!-- โหลดไลบรารี ABC.js -->
+    <script src="https://cdn.jsdelivr.net/npm/abcjs@6.3.0/dist/abcjs-basic-min.js"></script>
+    <!-- ใช้ CSS เล็กน้อยเพื่อให้ดูสวยงาม -->
+    <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@1.5.10/css/pico.min.css">
+    <style>
+        #error-log { color: red; font-weight: bold; }
+        .sheet-music { 
+            background: #ffffff;
+            color: #000000; /* บังคับให้สีตัวโน้ตเป็นสีดำเสมอ */
+            padding: 1rem; 
+            border-radius: 8px; 
+            margin-bottom: 2rem;
+            overflow-x: auto;
+            border: 1px solid #e0e0e0;
+        }
+        .notation-code {
+            background: #f4f6f8;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: monospace;
+            color: #333;
+        }
+    </style>
+</head>
+<body class="container">
+    <main>
+        <h1>ทดสอบวาดตัวโน้ตด้วย ABC.js</h1>
+        <p>คุณสามารถลองเปิดไฟล์นี้ในเบราว์เซอร์เพื่อดูความสวยงามของการเรนเดอร์ตัวโน้ต</p>
+
+        <section>
+            <h3>ตัวอย่างที่ 1: กุญแจซอลและตัวโน้ต Middle C</h3>
+            <div class="grid">
+                <div>
+                    <p><strong>ผลลัพธ์:</strong></p>
+                    <div id="paper1" class="sheet-music"></div>
+                </div>
+                <div>
+                    <p><strong>สิ่งที่พิมพ์เข้าไป:</strong></p>
+                    <div class="notation-code">
+                        X:1<br>
+                        K:C<br>
+                        L:1/1<br>
+                        C4 |]
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h3>ตัวอย่างที่ 2: สเกล C Major (กุญแจซอล)</h3>
+            <p>พิมพ์แค่ชื่อตัวโน้ตภาษาอังกฤษ (C D E F G A B c) ระบบจะวาดบรรทัด 5 เส้นพร้อมตัวโน้ตให้ทันที และจัดช่องไฟให้อย่างสวยงาม</p>
+            <div id="paper2" class="sheet-music"></div>
+        </section>
+
+        <section>
+            <h3>ตัวอย่างที่ 3: กุญแจฟา (Bass Clef) พร้อมคอร์ด</h3>
+            <p>สามารถเปลี่ยนกุญแจเสียงเป็นกุญแจฟาได้ง่ายๆ แค่เติม <code>clef=bass</code></p>
+            <div id="paper3" class="sheet-music"></div>
+        </section>
+        </section>
+
+        <section>
+            <h3>🌟 ลองพิมพ์ด้วยตัวคุณเอง (Interactive Editor)</h3>
+            <p>ลองแก้ไขข้อความในกล่องด้านล่าง เช่น พิมพ์ <code>C D E F G A B c</code> แล้วดูบรรทัด 5 เส้นอัปเดตแบบ Real-time ทันทีครับ!</p>
+            <div class="grid">
+                <div>
+                    <textarea id="abc-code" rows="8" style="font-family: monospace; font-size: 1.1rem; width: 100%;">
+X:4
+T:ลองพิมพ์ตัวโน้ตดูสิ!
+K:C
+L:1/4
+C D E F | G A B c |]</textarea>
+                </div>
+                <div id="paper-editor" class="sheet-music" style="margin-bottom: 0; min-height: 150px;"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- ส่วนของการเขียนโน้ต ---
+        
+        // 1. ตัวโน้ต Middle C
+        const music1 = `
+X:1
+K:C
+L:1/1
+C4 |]`;
+
+        // 2. สเกล C Major (กุญแจซอล)
+        // L:1/4 หมายถึง โน้ตตัวดำ
+        const music2 = `
+X:2
+K:C
+L:1/4
+C D E F | G A B c |]`;
+
+        // 3. กุญแจฟา และ คอร์ด
+        const music3 = `
+X:3
+K:C clef=bass
+L:1/4
+C, D, E, F, | [C,E,G,]4 |]`;
+
+        // --- ส่วนของการสั่งวาด ---
+        try {
+            if (typeof abcjs !== "undefined") {
+                window.ABCJS = abcjs;
+            }
+            if (typeof ABCJS === "undefined") {
+                throw new Error("ABCJS library is not loaded. Please check your internet connection or CDN link.");
+            }
+            
+            // ใช้คำสั่งแค่บรรทัดเดียวในการเรนเดอร์
+            ABCJS.renderAbc("paper1", music1, { responsive: "resize" });
+            ABCJS.renderAbc("paper2", music2, { responsive: "resize" });
+            ABCJS.renderAbc("paper3", music3, { responsive: "resize" });
+
+            // --- ส่วนของ Editor Interactive ---
+            const editorTextarea = document.getElementById("abc-code");
+            function updateEditor() {
+                ABCJS.renderAbc("paper-editor", editorTextarea.value, { responsive: "resize" });
+            }
+            
+            updateEditor();
+            editorTextarea.addEventListener("input", updateEditor);
+            
+        } catch (error) {
+            document.body.insertAdjacentHTML('afterbegin', '<div style="background: red; color: white; padding: 20px; font-weight: bold; text-align: center;">เกิดข้อผิดพลาดในการโหลดตัวโน้ต: ' + error.message + '</div>');
+        }
+    </script>
+</body>
+</html>

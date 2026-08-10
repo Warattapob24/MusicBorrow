@@ -1048,6 +1048,10 @@ const VIEWS = {
             return `
                 ${renderUnifiedCard({ emoji: '🎮', title: 'ศูนย์ฝึกทักษะ', subtitle: 'เล่นเกมเพื่อพัฒนาทักษะการอ่านโน้ตและจังหวะ' })}
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 2rem;">
+                    <button id="launch-lessons-btn" class="sd-app-btn" onclick="window.location.href='lesson-player.html'">
+                        <span class="icon">📚</span>
+                        <span>บทเรียนทฤษฎี<br>(Music Theory)</span>
+                    </button>
                     <button id="launch-game-btn" class="sd-app-btn">
                         <span class="icon">🎼</span>
                         <span>ห้องโน้ต<br>(Staff Wars)</span>
@@ -1059,6 +1063,10 @@ const VIEWS = {
                     <button id="launch-music-creator-btn" class="sd-app-btn">
                         <span class="icon">🎛️</span>
                         <span>เครื่องสร้างเพลง<br>(DJ Studio)</span>
+                    </button>
+                    <button id="launch-vocal-trainer-btn" class="sd-app-btn">
+                        <span class="icon">🎤</span>
+                        <span>ห้องฝึกร้องเสียง<br>(Pitch Perfect)</span>
                     </button>
                 </div>
                 
@@ -1119,6 +1127,12 @@ const VIEWS = {
                 // ฝากข้อมูล User ไว้ในเครื่องก่อนเปิดเกม
                 localStorage.setItem('sd_game_user', JSON.stringify(user));
                 window.open('musiccreator.html', '_blank'); // เปิดแท็บใหม่
+            });
+
+            // ตั้งค่าปุ่ม Vocal Pitch Trainer
+            document.getElementById('launch-vocal-trainer-btn')?.addEventListener('click', () => {
+                localStorage.setItem('sd_game_user', JSON.stringify(user));
+                window.open('vocal-trainer.html', '_blank');
             });
 
             await renderGameLeaderboards();
@@ -1295,20 +1309,107 @@ const VIEWS = {
                     
                     /* 🎸 TUNER UPGRADE STYLES */
                     .tuner-controls-panel { background: var(--pico-form-element-background-color); padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid var(--pico-muted-border-color); }
-                    .tuner-string-btn { background: var(--pico-muted-background-color); border: 2px solid transparent; color: var(--pico-color); width: 45px; height: 45px; border-radius: 50%; font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-                    .tuner-string-btn.active { border-color: var(--pico-primary); background: rgba(59,130,246,0.15); color: var(--pico-primary); transform: scale(1.05); }
-                    .tuner-string-btn:active { transform: scale(0.95); }
-                    .tuner-strings-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 1rem; }
+                    .tuner-carousel-wrapper {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 100%;
+                        max-width: 590px;
+                        margin: 1rem auto 0 auto;
+                        gap: 0.35rem;
+                    }
+                    .tuner-nav-arrow {
+                        background: var(--pico-form-element-background-color);
+                        border: 1.5px solid var(--pico-muted-border-color);
+                        color: var(--pico-color);
+                        border-radius: 50%;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                        font-size: 0.8rem;
+                        font-weight: 900;
+                        transition: all 0.2s;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                        user-select: none;
+                        padding: 0;
+                        flex-shrink: 0;
+                    }
+                    .tuner-nav-arrow:hover {
+                        border-color: var(--pico-primary);
+                        background: var(--pico-muted-background-color);
+                    }
+                    .tuner-nav-arrow:active {
+                        transform: scale(0.9);
+                    }
                     
-                    .tuner-mode-toggle { display: flex; background: var(--pico-muted-background-color); border-radius: 99px; padding: 4px; margin-bottom: 1rem; }
-                    .tuner-mode-btn { flex: 1; padding: 0.5rem; border-radius: 99px; font-size: 0.85rem; font-weight: bold; color: var(--pico-muted-color); border: none; background: transparent; cursor: pointer; transition: 0.2s; }
-                    .tuner-mode-btn.active { background: var(--pico-primary); color: white; box-shadow: 0 2px 8px rgba(37,99,235,0.3); }
+                    .tuner-strings-grid { 
+                        display: flex; 
+                        flex-wrap: nowrap;
+                        overflow-x: auto;
+                        gap: 0.5rem; 
+                        padding: 0.3rem 0.1rem;
+                        justify-content: flex-start; 
+                        width: 100%;
+                        max-width: 520px; /* Fits exactly 5 buttons of 96px width + 4 gaps of 8px = 512px */
+                        -webkit-overflow-scrolling: touch;
+                        scroll-behavior: smooth;
+                        /* Hide scrollbar completely for carousel feel */
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                    }
+                    .tuner-strings-grid::-webkit-scrollbar {
+                        display: none;
+                    }
+                    
+                    .tuner-string-btn { 
+                        background: var(--pico-form-element-background-color); 
+                        border: 1.5px solid var(--pico-muted-border-color); 
+                        color: var(--pico-color); 
+                        width: 96px;
+                        height: 36px;
+                        border-radius: 99px; 
+                        display: inline-flex; 
+                        align-items: center; 
+                        justify-content: center; 
+                        cursor: pointer; 
+                        transition: all 0.2s ease; 
+                        white-space: nowrap;
+                        flex-shrink: 0;
+                        font-weight: 800;
+                        font-size: 0.75rem;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+                        padding: 0 0.25rem;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                    .tuner-string-btn.active { 
+                        border-color: #10b981; 
+                        background: rgba(16, 185, 129, 0.12); 
+                        color: #10b981; 
+                        font-weight: 900;
+                        box-shadow: 0 3px 6px rgba(16, 185, 129, 0.12); 
+                    }
+                    .tuner-string-btn.auto-btn.active {
+                        border-color: #3b82f6;
+                        background: rgba(59, 130, 246, 0.12);
+                        color: #3b82f6;
+                        font-weight: 900;
+                        box-shadow: 0 3px 6px rgba(59, 130, 246, 0.12);
+                    }
+                    .tuner-string-btn:hover {
+                        border-color: var(--pico-primary);
+                        background: var(--pico-muted-background-color);
+                    }
+                    .tuner-string-btn:active { 
+                        transform: scale(0.95); 
+                    }
 
                     .tuner-svg-container { width: 100%; max-width: 320px; margin: 0 auto; position: relative; }
                     .tuner-hz-box { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--pico-form-element-background-color); padding: 0.3rem 1rem; border-radius: 99px; border: 1px solid var(--pico-muted-border-color); margin-bottom: 0.5rem; }
-                    .tuner-hz-input { width: 60px; border: none; background: transparent; font-weight: 900; font-size: 1.1rem; color: var(--pico-primary); text-align: center; outline: none; padding: 0; }
-                    
-                    .metro-tempo-text { font-size: 1.2rem; font-weight: 800; color: var(--pico-primary); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.5rem; text-align: center; transition: color 0.2s; }
+                    .tuner-hz-input { width: 60px; border: none; background: transparent; font-weight: 900; font-size: 1.1rem; color: var(--pico-primary); text-align: center; outline: none; padding: 0; }.metro-tempo-text { font-size: 1.2rem; font-weight: 800; color: var(--pico-primary); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.5rem; text-align: center; transition: color 0.2s; }
                     .metro-top-row { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: nowrap; }
                     .metro-btn-circle { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--pico-muted-border-color); background: var(--pico-form-element-background-color); font-size: 1.5rem; font-weight: bold; color: var(--pico-color); cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
                     
@@ -1383,8 +1484,11 @@ const VIEWS = {
                             </div>
                         </div>
 
-                        <div id="tuner-strings-container" class="tuner-strings-grid">
-                            </div>
+                        <div class="tuner-carousel-wrapper">
+                            <button type="button" id="tuner-scroll-left" class="tuner-nav-arrow" title="เลื่อนซ้าย">◀</button>
+                            <div id="tuner-strings-container" class="tuner-strings-grid"></div>
+                            <button type="button" id="tuner-scroll-right" class="tuner-nav-arrow" title="เลื่อนขวา">▶</button>
+                        </div>
                     </div>
 
                     <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
@@ -1393,9 +1497,15 @@ const VIEWS = {
                             <input type="number" class="tuner-hz-input" id="tuner-hz-input" value="440" min="400" max="480">
                             <span style="font-weight:bold; font-size:0.85rem;">Hz</span>
                         </div>
-                        <div class="tuner-hz-box" style="margin-bottom:0;" title="ตัดเสียงรบกวนภายนอก">
-                            <span style="font-weight:bold; font-size:0.85rem;">Noise Gate</span>
-                            <input type="range" id="tuner-noise-gate" min="1" max="15" value="4" style="width: 70px; margin: 0 0.5rem; accent-color: var(--pico-primary);">
+                        <div class="tuner-hz-box" style="margin-bottom:0; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:0.2rem; padding: 0.3rem 0.8rem;" title="ตัดเสียงรบกวนภายนอก">
+                            <div style="display:flex; align-items:center; gap:0.4rem;">
+                                <span style="font-weight:bold; font-size:0.85rem;">Noise Gate</span>
+                                <input type="range" id="tuner-noise-gate" min="1" max="15" value="4" style="width: 70px; margin: 0; accent-color: var(--pico-primary);">
+                            </div>
+                            <div id="tuner-noise-gate-meter-container" style="width: 100%; height: 6px; background: var(--pico-muted-border-color); border-radius: 99px; overflow: hidden; position: relative; display: flex; align-items: center;">
+                                <div id="tuner-noise-gate-signal-fill" style="height: 100%; width: 0%; background: #94a3b8; transition: width 0.05s ease, background-color 0.1s;"></div>
+                                <div id="tuner-noise-gate-threshold-marker" style="position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; left: 20%; transition: left 0.1s ease;"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -1424,6 +1534,9 @@ const VIEWS = {
                         <div style="width:1px; height:15px; background:var(--pico-muted-border-color);"></div>
                         <div id="sd-tuner-cents" style="font-size:0.9rem; font-weight:bold; color:#ef4444;">ปิดการทำงาน</div>
                     </div>
+                    
+                    <!-- Guitar Headstock Visualizer -->
+                    <div id="tuner-headstock-container" style="margin-bottom: 1.5rem; display: flex; justify-content: center; align-items: center; min-height: 100px;"></div>
                     
                     <button id="toggle-tuner-btn" class="sd-btn-primary practice-big-btn">🎙️ เริ่ม (START)</button>
                 </div>
@@ -1544,16 +1657,512 @@ const VIEWS = {
 
             let tuningMode = 'auto'; // 'auto' | 'target'
             let currentTargetMidi = null;
+            let lastActiveMidi = null;
             let pitchHistory = []; 
 
             // 💾 ระบบดึงค่า LocalStorage (Auto-Save)
             const savedHz = localStorage.getItem('sd_tuner_hz');
             if (savedHz) hzInput.value = savedHz;
+            
+            const updateNoiseGateMarker = () => {
+                const gateValue = parseInt(noiseGateSlider.value) || 4;
+                const threshold = gateValue * 0.005;
+                const maxRms = 0.10;
+                const thresholdPercent = Math.min((threshold / maxRms) * 100, 100);
+                const marker = document.getElementById('tuner-noise-gate-threshold-marker');
+                if (marker) marker.style.left = `${thresholdPercent}%`;
+            };
+
             const savedGate = localStorage.getItem('sd_tuner_gate');
             if (savedGate) noiseGateSlider.value = savedGate;
+            updateNoiseGateMarker();
 
             hzInput.addEventListener('change', () => localStorage.setItem('sd_tuner_hz', hzInput.value));
+            noiseGateSlider.addEventListener('input', updateNoiseGateMarker);
             noiseGateSlider.addEventListener('change', () => localStorage.setItem('sd_tuner_gate', noiseGateSlider.value));
+
+            // 🎸 Guitar Headstock Visualizer
+            const updateHeadstockUI = (activeStringIdx = null, centsDiff = null) => {
+                const container = document.getElementById('tuner-headstock-container');
+                if (!container) return;
+
+                const inst = instSelect.value;
+                const preset = presetSelect.value;
+                const strings = TUNING_PRESETS[inst] ? (TUNING_PRESETS[inst][preset] || []) : [];
+                const isStringInst = ["Guitar", "Bass", "Ukulele", "Violin Family"].includes(inst);
+
+                if (!isStringInst || strings.length === 0) {
+                    container.style.display = 'none';
+                    container.innerHTML = '';
+                    return;
+                }
+
+                container.style.display = 'flex';
+                container.style.flexDirection = 'column';
+                container.style.alignItems = 'center';
+                container.style.justifyContent = 'center';
+                container.style.padding = '0.75rem';
+                container.style.background = 'var(--pico-form-element-background-color)';
+                container.style.borderRadius = '16px';
+                container.style.border = '1.5px solid var(--pico-muted-border-color)';
+                container.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)';
+                container.style.maxWidth = '300px';
+                container.style.margin = '0.5rem auto 1.5rem auto';
+
+                const stringsReversed = [...strings].reverse();
+                const numStrings = stringsReversed.length;
+                const cleanNoteName = (noteStr) => noteStr ? noteStr.replace(/[0-9]/g, '') : '';
+
+                let svgHtml = '';
+                if (numStrings === 6) {
+                    const activeIdx = activeStringIdx;
+                    const getLabelStyle = (idx) => {
+                        if (activeIdx === idx) {
+                            const isInTune = centsDiff !== null && Math.abs(centsDiff) <= 8;
+                            return {
+                                circleStroke: isInTune ? '#10b981' : '#3b82f6',
+                                strokeWidth: '2.5',
+                                showCheck: isInTune,
+                                glow: true
+                            };
+                        }
+                        return {
+                            circleStroke: '#4b5563',
+                            strokeWidth: '1.5',
+                            showCheck: false,
+                            glow: false
+                        };
+                    };
+
+                    const l6 = getLabelStyle(5);
+                    const l5 = getLabelStyle(4);
+                    const l4 = getLabelStyle(3);
+                    const l3 = getLabelStyle(2);
+                    const l2 = getLabelStyle(1);
+                    const l1 = getLabelStyle(0);
+
+                    svgHtml = `
+                    <svg width="260" height="200" viewBox="0 0 260 200" style="overflow: visible; font-family: system-ui, -apple-system, sans-serif;">
+                        <defs>
+                            <!-- Chrome metallic gradient for shafts, washers, and posts -->
+                            <linearGradient id="chrome-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#9ca3af" />
+                                <stop offset="25%" stop-color="#f3f4f6" />
+                                <stop offset="50%" stop-color="#4b5563" />
+                                <stop offset="75%" stop-color="#d1d5db" />
+                                <stop offset="100%" stop-color="#374151" />
+                            </linearGradient>
+                            
+                            <!-- Ivory Pearloid tuning knob gradient -->
+                            <radialGradient id="pearloid-grad" cx="40%" cy="40%" r="60%">
+                                <stop offset="0%" stop-color="#ffffff" />
+                                <stop offset="60%" stop-color="#fefce8" />
+                                <stop offset="100%" stop-color="#d9cfa9" />
+                            </radialGradient>
+                            
+                            <!-- Wood/Polished Faceplate gradient -->
+                            <linearGradient id="headstock-body-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#2c2e33" />
+                                <stop offset="40%" stop-color="#1b1c1e" />
+                                <stop offset="100%" stop-color="#0a0a0b" />
+                            </linearGradient>
+
+                            <!-- Shadow filter for 3D realism -->
+                            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.5" />
+                            </filter>
+
+                            <!-- Neon Glow filter for active strings and pegs -->
+                            <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+                                <feGaussianBlur stdDeviation="3" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
+
+                        <!-- Neck Connection underneath nut -->
+                        <rect x="100" y="175" width="60" height="30" fill="#242528" rx="2" />
+                        <rect x="96" y="175" width="68" height="6" fill="#f3f4f6" rx="1" filter="url(#shadow)" /> <!-- White Nut -->
+
+                        <!-- Polished Gibson Headstock Body Shape -->
+                        <path d="M 100 175 C 95 140, 80 90, 75 45 C 85 30, 110 20, 130 35 C 150 20, 175 30, 185 45 C 180 90, 165 140, 160 175 Z" fill="url(#headstock-body-grad)" stroke="#3f3f46" stroke-width="2.5" filter="url(#shadow)" />
+                        
+                        <!-- Truss Rod Cover Plate -->
+                        <polygon points="124,155 136,155 130,135" fill="#111" stroke="#333" stroke-width="1" />
+                        
+                        <!-- 6 Strings wrapping around posts (active string glows green) -->
+                        <line x1="105" y1="180" x2="98" y2="135" stroke="${activeIdx === 5 ? '#10b981' : '#4b5563'}" stroke-width="${activeIdx === 5 ? '2.5' : '1.8'}" ${activeIdx === 5 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="115" y1="180" x2="98" y2="95" stroke="${activeIdx === 4 ? '#10b981' : '#6b7280'}" stroke-width="${activeIdx === 4 ? '2.2' : '1.5'}" ${activeIdx === 4 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="125" y1="180" x2="98" y2="55" stroke="${activeIdx === 3 ? '#10b981' : '#9ca3af'}" stroke-width="${activeIdx === 3 ? '2.0' : '1.2'}" ${activeIdx === 3 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="135" y1="180" x2="162" y2="55" stroke="${activeIdx === 2 ? '#10b981' : '#9ca3af'}" stroke-width="${activeIdx === 2 ? '1.8' : '1.0'}" ${activeIdx === 2 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="145" y1="180" x2="162" y2="95" stroke="${activeIdx === 1 ? '#10b981' : '#6b7280'}" stroke-width="${activeIdx === 1 ? '1.6' : '0.8'}" ${activeIdx === 1 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="155" y1="180" x2="162" y2="135" stroke="${activeIdx === 0 ? '#10b981' : '#4b5563'}" stroke-width="${activeIdx === 0 ? '1.4' : '0.6'}" ${activeIdx === 0 ? 'filter="url(#neon-glow)"' : ''} />
+
+                        <!-- Washers & Peg Posts (Silver Chrome Details) -->
+                        <!-- Left Posts -->
+                        <ellipse cx="98" cy="138" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="96" y="127" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="98" cy="127" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="98" cy="98" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="96" y="87" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="98" cy="87" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="98" cy="58" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="96" y="47" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="98" cy="47" r="1.5" fill="#1f2937" />
+
+                        <!-- Right Posts -->
+                        <ellipse cx="162" cy="58" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="160" y="47" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="162" cy="47" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="162" cy="98" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="160" y="87" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="162" cy="87" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="162" cy="138" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="160" y="127" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="162" cy="127" r="1.5" fill="#1f2937" />
+
+                        <!-- Tuning Peg Shafts (Chrome horizontal rods) -->
+                        <rect x="55" y="133" width="43" height="4" fill="url(#chrome-grad)" />
+                        <rect x="55" y="93" width="43" height="4" fill="url(#chrome-grad)" />
+                        <rect x="55" y="53" width="43" height="4" fill="url(#chrome-grad)" />
+                        
+                        <rect x="162" y="53" width="43" height="4" fill="url(#chrome-grad)" />
+                        <rect x="162" y="93" width="43" height="4" fill="url(#chrome-grad)" />
+                        <rect x="162" y="133" width="43" height="4" fill="url(#chrome-grad)" />
+
+                        <!-- Ivory Pearloid Tuning Knobs -->
+                        <!-- Left knobs (rounded oval shape) -->
+                        <rect x="36" y="126" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="36" y="86" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="36" y="46" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+
+                        <!-- Right knobs -->
+                        <rect x="206" y="46" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="206" y="86" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="206" y="126" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+
+                        <!-- High Contrast Note Indicators (Outer Left & Right) -->
+                        <!-- White note text inside solid dark grey circles (#1f2937) ensures visibility in ALL themes -->
+                        <!-- Left note bubbles (Pegs 6, 5, 4 at cx = 20) -->
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(5)">
+                            <circle cx="20" cy="135" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l6.circleStroke}" stroke-width="${l6.strokeWidth}" ${l6.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="20" y="135" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[5] ? cleanNoteName(stringsReversed[5]) : ''}</text>
+                            ${l6.showCheck ? `<circle cx="31" cy="125" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M29 125 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(4)">
+                            <circle cx="20" cy="95" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l5.circleStroke}" stroke-width="${l5.strokeWidth}" ${l5.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="20" y="95" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[4] ? cleanNoteName(stringsReversed[4]) : ''}</text>
+                            ${l5.showCheck ? `<circle cx="31" cy="85" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M29 85 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(3)">
+                            <circle cx="20" cy="55" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l4.circleStroke}" stroke-width="${l4.strokeWidth}" ${l4.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="20" y="55" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[3] ? cleanNoteName(stringsReversed[3]) : ''}</text>
+                            ${l4.showCheck ? `<circle cx="31" cy="45" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M29 45 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <!-- Right note bubbles (Pegs 3, 2, 1 at cx = 240) -->
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(2)">
+                            <circle cx="240" cy="55" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l3.circleStroke}" stroke-width="${l3.strokeWidth}" ${l3.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="240" y="55" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[2] ? cleanNoteName(stringsReversed[2]) : ''}</text>
+                            ${l3.showCheck ? `<circle cx="251" cy="45" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M249 45 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(1)">
+                            <circle cx="240" cy="95" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l2.circleStroke}" stroke-width="${l2.strokeWidth}" ${l2.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="240" y="95" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[1] ? cleanNoteName(stringsReversed[1]) : ''}</text>
+                            ${l2.showCheck ? `<circle cx="251" cy="85" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M249 85 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(0)">
+                            <circle cx="240" cy="135" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l1.circleStroke}" stroke-width="${l1.strokeWidth}" ${l1.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="240" y="135" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[0] ? cleanNoteName(stringsReversed[0]) : ''}</text>
+                            ${l1.showCheck ? `<circle cx="251" cy="125" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M249 125 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+                    </svg>
+                    `;
+                } else if (numStrings === 5) {
+                    const activeIdx = activeStringIdx;
+                    const getLabelStyle = (idx) => {
+                        if (activeIdx === idx) {
+                            const isInTune = centsDiff !== null && Math.abs(centsDiff) <= 8;
+                            return {
+                                circleStroke: isInTune ? '#10b981' : '#3b82f6',
+                                strokeWidth: '2.5',
+                                showCheck: isInTune,
+                                glow: true
+                            };
+                        }
+                        return {
+                            circleStroke: '#4b5563',
+                            strokeWidth: '1.5',
+                            showCheck: false,
+                            glow: false
+                        };
+                    };
+
+                    const l5 = getLabelStyle(4);
+                    const l4 = getLabelStyle(3);
+                    const l3 = getLabelStyle(2);
+                    const l2 = getLabelStyle(1);
+                    const l1 = getLabelStyle(0);
+
+                    svgHtml = `
+                    <svg width="260" height="200" viewBox="0 0 260 200" style="overflow: visible; font-family: system-ui, -apple-system, sans-serif;">
+                        <defs>
+                            <linearGradient id="chrome-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#9ca3af" />
+                                <stop offset="25%" stop-color="#f3f4f6" />
+                                <stop offset="50%" stop-color="#4b5563" />
+                                <stop offset="75%" stop-color="#d1d5db" />
+                                <stop offset="100%" stop-color="#374151" />
+                            </linearGradient>
+                            <radialGradient id="pearloid-grad" cx="40%" cy="40%" r="60%">
+                                <stop offset="0%" stop-color="#ffffff" />
+                                <stop offset="60%" stop-color="#fefce8" />
+                                <stop offset="100%" stop-color="#d9cfa9" />
+                            </radialGradient>
+                            <linearGradient id="headstock-body-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#2c2e33" />
+                                <stop offset="40%" stop-color="#1b1c1e" />
+                                <stop offset="100%" stop-color="#0a0a0b" />
+                            </linearGradient>
+                            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.5" />
+                            </filter>
+                            <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+                                <feGaussianBlur stdDeviation="3" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
+
+                        <!-- Neck Connection -->
+                        <rect x="100" y="175" width="60" height="30" fill="#242528" rx="2" />
+                        <rect x="96" y="175" width="68" height="6" fill="#f3f4f6" rx="1" filter="url(#shadow)" /> <!-- White Nut -->
+
+                        <!-- Polished Gibson Headstock Body Shape -->
+                        <path d="M 100 175 C 95 140, 80 90, 75 45 C 85 30, 110 20, 130 35 C 150 20, 175 30, 185 45 C 180 90, 165 140, 160 175 Z" fill="url(#headstock-body-grad)" stroke="#3f3f46" stroke-width="2.5" filter="url(#shadow)" />
+                        
+                        <!-- Truss Rod Cover Plate -->
+                        <polygon points="124,155 136,155 130,135" fill="#111" stroke="#333" stroke-width="1" />
+                        
+                        <!-- 5 Strings wrapping around posts (active string glows green) -->
+                        <line x1="106" y1="175" x2="98" y2="135" stroke="${activeIdx === 4 ? '#10b981' : '#4b5563'}" stroke-width="${activeIdx === 4 ? '2.5' : '1.8'}" ${activeIdx === 4 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="117" y1="175" x2="98" y2="95" stroke="${activeIdx === 3 ? '#10b981' : '#6b7280'}" stroke-width="${activeIdx === 3 ? '2.2' : '1.5'}" ${activeIdx === 3 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="128" y1="175" x2="98" y2="55" stroke="${activeIdx === 2 ? '#10b981' : '#9ca3af'}" stroke-width="${activeIdx === 2 ? '2.0' : '1.2'}" ${activeIdx === 2 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="139" y1="175" x2="162" y2="55" stroke="${activeIdx === 1 ? '#10b981' : '#9ca3af'}" stroke-width="${activeIdx === 1 ? '1.8' : '1.0'}" ${activeIdx === 1 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="150" y1="175" x2="162" y2="95" stroke="${activeIdx === 0 ? '#10b981' : '#6b7280'}" stroke-width="${activeIdx === 0 ? '1.6' : '0.8'}" ${activeIdx === 0 ? 'filter="url(#neon-glow)"' : ''} />
+
+                        <!-- Washers & Peg Posts -->
+                        <!-- Left Posts -->
+                        <ellipse cx="98" cy="138" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="96" y="127" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="98" cy="127" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="98" cy="98" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="96" y="87" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="98" cy="87" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="98" cy="58" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="96" y="47" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="98" cy="47" r="1.5" fill="#1f2937" />
+
+                        <!-- Right Posts -->
+                        <ellipse cx="162" cy="58" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="160" y="47" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="162" cy="47" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="162" cy="98" rx="7" ry="4" fill="url(#chrome-grad)" />
+                        <rect x="160" y="87" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="162" cy="87" r="1.5" fill="#1f2937" />
+
+                        <!-- Tuning Peg Shafts -->
+                        <rect x="55" y="133" width="43" height="4" fill="url(#chrome-grad)" />
+                        <rect x="55" y="93" width="43" height="4" fill="url(#chrome-grad)" />
+                        <rect x="55" y="53" width="43" height="4" fill="url(#chrome-grad)" />
+                        
+                        <rect x="162" y="53" width="43" height="4" fill="url(#chrome-grad)" />
+                        <rect x="162" y="93" width="43" height="4" fill="url(#chrome-grad)" />
+
+                        <!-- Ivory Pearloid Tuning Knobs -->
+                        <rect x="36" y="126" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="36" y="86" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="36" y="46" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+
+                        <rect x="206" y="46" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="206" y="86" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+
+                        <!-- Note Indicators -->
+                        <!-- Left note bubbles (Pegs 5, 4, 3 at cx = 20) -->
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(4)">
+                            <circle cx="20" cy="135" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l5.circleStroke}" stroke-width="${l5.strokeWidth}" ${l5.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="20" y="135" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[4] ? cleanNoteName(stringsReversed[4]) : ''}</text>
+                            ${l5.showCheck ? `<circle cx="31" cy="125" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M29 125 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(3)">
+                            <circle cx="20" cy="95" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l4.circleStroke}" stroke-width="${l4.strokeWidth}" ${l4.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="20" y="95" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[3] ? cleanNoteName(stringsReversed[3]) : ''}</text>
+                            ${l4.showCheck ? `<circle cx="31" cy="85" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M29 85 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(2)">
+                            <circle cx="20" cy="55" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l3.circleStroke}" stroke-width="${l3.strokeWidth}" ${l3.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="20" y="55" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[2] ? cleanNoteName(stringsReversed[2]) : ''}</text>
+                            ${l3.showCheck ? `<circle cx="31" cy="45" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M29 45 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <!-- Right note bubbles (Pegs 2, 1 at cx = 240) -->
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(1)">
+                            <circle cx="240" cy="55" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l2.circleStroke}" stroke-width="${l2.strokeWidth}" ${l2.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="240" y="55" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[1] ? cleanNoteName(stringsReversed[1]) : ''}</text>
+                            ${l2.showCheck ? `<circle cx="251" cy="45" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M249 45 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(0)">
+                            <circle cx="240" cy="95" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l1.circleStroke}" stroke-width="${l1.strokeWidth}" ${l1.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="240" y="95" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[0] ? cleanNoteName(stringsReversed[0]) : ''}</text>
+                            ${l1.showCheck ? `<circle cx="251" cy="85" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M249 85 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+                    </svg>
+                    `;
+                } else if (numStrings === 4) {
+                    const activeIdx = activeStringIdx;
+                    const getLabelStyle = (idx) => {
+                        if (activeIdx === idx) {
+                            const isInTune = centsDiff !== null && Math.abs(centsDiff) <= 8;
+                            return {
+                                circleStroke: isInTune ? '#10b981' : '#3b82f6',
+                                strokeWidth: '2.5',
+                                showCheck: isInTune,
+                                glow: true
+                            };
+                        }
+                        return {
+                            circleStroke: '#4b5563',
+                            strokeWidth: '1.5',
+                            showCheck: false,
+                            glow: false
+                        };
+                    };
+
+                    const l4 = getLabelStyle(3);
+                    const l3 = getLabelStyle(2);
+                    const l2 = getLabelStyle(1);
+                    const l1 = getLabelStyle(0);
+
+                    svgHtml = `
+                    <svg width="220" height="180" viewBox="0 0 220 180" style="overflow: visible; font-family: system-ui, -apple-system, sans-serif;">
+                        <defs>
+                            <linearGradient id="chrome-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#9ca3af" />
+                                <stop offset="25%" stop-color="#f3f4f6" />
+                                <stop offset="50%" stop-color="#4b5563" />
+                                <stop offset="75%" stop-color="#d1d5db" />
+                                <stop offset="100%" stop-color="#374151" />
+                            </linearGradient>
+                            <radialGradient id="pearloid-grad" cx="40%" cy="40%" r="60%">
+                                <stop offset="0%" stop-color="#ffffff" />
+                                <stop offset="60%" stop-color="#fefce8" />
+                                <stop offset="100%" stop-color="#d9cfa9" />
+                            </radialGradient>
+                            <linearGradient id="headstock-body-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#2c2e33" />
+                                <stop offset="40%" stop-color="#1b1c1e" />
+                                <stop offset="100%" stop-color="#0a0a0b" />
+                            </linearGradient>
+                            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.5" />
+                            </filter>
+                            <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+                                <feGaussianBlur stdDeviation="3" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
+
+                        <!-- Neck Connection -->
+                        <rect x="85" y="155" width="50" height="30" fill="#242528" rx="2" />
+                        <rect x="81" y="155" width="58" height="6" fill="#f3f4f6" rx="1" filter="url(#shadow)" />
+
+                        <!-- Headstock Body Shape -->
+                        <path d="M 85 155 C 80 125, 70 80, 65 45 C 75 30, 95 20, 110 35 C 125 20, 145 30, 155 45 C 150 80, 140 125, 135 155 Z" fill="url(#headstock-body-grad)" stroke="#3f3f46" stroke-width="2.5" filter="url(#shadow)" />
+                        
+                        <!-- 4 Strings wrapping around posts (active string glows green) -->
+                        <line x1="92" y1="155" x2="86" y2="115" stroke="${activeIdx === 3 ? '#10b981' : '#4b5563'}" stroke-width="${activeIdx === 3 ? '2.5' : '1.8'}" ${activeIdx === 3 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="100" y1="155" x2="86" y2="65" stroke="${activeIdx === 2 ? '#10b981' : '#6b7280'}" stroke-width="${activeIdx === 2 ? '2.2' : '1.5'}" ${activeIdx === 2 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="120" y1="155" x2="134" y2="65" stroke="${activeIdx === 1 ? '#10b981' : '#6b7280'}" stroke-width="${activeIdx === 1 ? '1.8' : '1.1'}" ${activeIdx === 1 ? 'filter="url(#neon-glow)"' : ''} />
+                        <line x1="128" y1="155" x2="134" y2="115" stroke="${activeIdx === 0 ? '#10b981' : '#4b5563'}" stroke-width="${activeIdx === 0 ? '1.4' : '0.6'}" ${activeIdx === 0 ? 'filter="url(#neon-glow)"' : ''} />
+
+                        <!-- Washers & Peg Posts (Silver Chrome Details) -->
+                        <ellipse cx="86" cy="118" rx="6" ry="3" fill="url(#chrome-grad)" />
+                        <rect x="84" y="107" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="86" cy="107" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="86" cy="68" rx="6" ry="3" fill="url(#chrome-grad)" />
+                        <rect x="84" y="57" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="86" cy="57" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="134" cy="68" rx="6" ry="3" fill="url(#chrome-grad)" />
+                        <rect x="132" y="57" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="134" cy="57" r="1.5" fill="#1f2937" />
+
+                        <ellipse cx="134" cy="118" rx="6" ry="3" fill="url(#chrome-grad)" />
+                        <rect x="132" y="107" width="4" height="8" fill="url(#chrome-grad)" />
+                        <circle cx="134" cy="107" r="1.5" fill="#1f2937" />
+
+                        <!-- Tuning Peg Shafts -->
+                        <rect x="48" y="113" width="38" height="4" fill="url(#chrome-grad)" />
+                        <rect x="48" y="63" width="38" height="4" fill="url(#chrome-grad)" />
+                        <rect x="134" y="63" width="38" height="4" fill="url(#chrome-grad)" />
+                        <rect x="134" y="113" width="38" height="4" fill="url(#chrome-grad)" />
+
+                        <!-- Ivory Pearloid Tuning Knobs -->
+                        <rect x="29" y="106" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="29" y="56" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="173" y="56" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+                        <rect x="173" y="106" width="18" height="18" rx="6" fill="url(#pearloid-grad)" stroke="#cfc39d" stroke-width="1" filter="url(#shadow)" />
+
+                        <!-- High Contrast Note Indicators (Outer Left & Right) -->
+                        <!-- Left note bubbles (Pegs 4, 3 at cx = 16) -->
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(3)">
+                            <circle cx="16" cy="115" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l4.circleStroke}" stroke-width="${l4.strokeWidth}" ${l4.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="16" y="115" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[3] ? cleanNoteName(stringsReversed[3]) : ''}</text>
+                            ${l4.showCheck ? `<circle cx="27" cy="105" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M25 105 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(2)">
+                            <circle cx="16" cy="65" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l3.circleStroke}" stroke-width="${l3.strokeWidth}" ${l3.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="16" y="65" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[2] ? cleanNoteName(stringsReversed[2]) : ''}</text>
+                            ${l3.showCheck ? `<circle cx="27" cy="55" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M25 55 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+
+                        <!-- Right note bubbles (Pegs 2, 1 at cx = 204) -->
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(1)">
+                            <circle cx="204" cy="65" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l2.circleStroke}" stroke-width="${l2.strokeWidth}" ${l2.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="204" y="65" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[1] ? cleanNoteName(stringsReversed[1]) : ''}</text>
+                            ${l2.showCheck ? `<circle cx="215" cy="55" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M213 55 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+                        <g class="peg-label" style="cursor: pointer;" onclick="window.selectTunerNoteIndex(0)">
+                            <circle cx="204" cy="115" r="15" fill="#1f2937" style="fill: #1f2937 !important;" stroke="${l1.circleStroke}" stroke-width="${l1.strokeWidth}" ${l1.glow ? 'filter="url(#neon-glow)"' : ''} />
+                            <text x="204" y="115" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#ffffff" style="fill: #ffffff !important; font-family: system-ui, sans-serif;">${stringsReversed[0] ? cleanNoteName(stringsReversed[0]) : ''}</text>
+                            ${l1.showCheck ? `<circle cx="215" cy="105" r="5.5" fill="#10b981" stroke="#fff" stroke-width="1"/><path d="M213 105 l1.5 1.5 l2.5 -2.5" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+                        </g>
+                    </svg>
+                    `;
+                }
+
+                container.innerHTML = svgHtml;
+            };
+
+            window.selectTunerNoteIndex = (idx) => {
+                const noteBtns = stringsContainer.querySelectorAll('.note-btn');
+                if (idx >= 0 && idx < noteBtns.length) {
+                    noteBtns[idx].click();
+                }
+            };
 
             // Note Math Helpers
             const NOTE_NAMES = ["C","C#/Db","D","D#/Eb","E","F","F#/Gb","G","G#/Ab","A","A#/Bb","B"];
@@ -1564,7 +2173,7 @@ const VIEWS = {
                 const map = {"Db":"C#","Eb":"D#","Gb":"F#","Ab":"G#","Bb":"A#"};
                 if (map[n]) n = map[n];
                 const oct = match[2] ? parseInt(match[2], 10) : null;
-                const base = NOTE_NAMES.indexOf(n);
+                const base = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"].indexOf(n);
                 return oct !== null ? base + (oct + 1) * 12 : base;
             };
             const midiToFreq = (midi, ref) => ref * Math.pow(2, (midi - 69) / 12);
@@ -1593,13 +2202,67 @@ const VIEWS = {
                 const preset = presetSelect.value;
                 const strings = TUNING_PRESETS[inst][preset] || [];
                 
-                // 🟢 ปุ่ม AUTO
-                let html = `<button class="tuner-string-btn auto-btn ${tuningMode === 'auto' ? 'active' : ''}" id="btn-tuner-auto" style="width:auto; padding:0 1rem; border-radius:99px; font-size:0.8rem; background: ${tuningMode === 'auto' ? 'var(--pico-primary)' : 'var(--pico-muted-border-color)'}; color: ${tuningMode === 'auto' ? 'white' : 'var(--pico-color)'};">AUTO</button>`;
+                const NOTE_THAI_MAP = {
+                    "C": "โด", "C#": "โด#", "Db": "เรb",
+                    "D": "เร", "D#": "เร#", "Eb": "มีb",
+                    "E": "มี", "F": "ฟา", "F#": "ฟา#", "Gb": "ซอลb",
+                    "G": "ซอล", "G#": "ซอล#", "Ab": "ลาb",
+                    "A": "ลา", "A#": "ลา#", "Bb": "ทีb",
+                    "B": "ที"
+                };
+
+                const CHROMATIC_DISPLAY_MAP = {
+                    "C": "C",
+                    "C#": "C#/Db",
+                    "Db": "C#/Db",
+                    "D": "D",
+                    "D#": "D#/Eb",
+                    "Eb": "D#/Eb",
+                    "E": "E",
+                    "F": "F",
+                    "F#": "F#/Gb",
+                    "Gb": "F#/Gb",
+                    "G": "G",
+                    "G#": "G#/Ab",
+                    "Ab": "G#/Ab",
+                    "A": "A",
+                    "A#": "A#/Bb",
+                    "Bb": "A#/Bb",
+                    "B": "B"
+                };
+
+                const cleanNoteName = (noteStr) => {
+                    return noteStr.replace(/[0-9]/g, ''); // E2 -> E
+                };
                 
+                // 🟢 ปุ่ม AUTO
+                let html = `
+                    <button class="tuner-string-btn auto-btn ${tuningMode === 'auto' ? 'active' : ''}" id="btn-tuner-auto">
+                        <span>AUTO</span>
+                    </button>
+                `;
+                
+                const isStringInst = ["Guitar", "Bass", "Ukulele", "Violin Family"].includes(inst);
+
                 if (strings.length > 0) {
-                    html += [...strings].reverse().map(note => 
-                        `<button class="tuner-string-btn note-btn" data-note="${note}">${note}</button>`
-                    ).join('');
+                    html += [...strings].reverse().map((note, idx) => {
+                        const cleanLetter = cleanNoteName(note);
+                        const solfege = NOTE_THAI_MAP[cleanLetter] || cleanLetter;
+                        
+                        // Clean label inside pill: e.g. "สาย 1: E4" or "F#/Gb"
+                        let label = "";
+                        if (isStringInst) {
+                            label = `สาย ${idx + 1}: ${note}`;
+                        } else {
+                            label = CHROMATIC_DISPLAY_MAP[cleanLetter] || note;
+                        }
+                        
+                        return `
+                            <button class="tuner-string-btn note-btn" data-note="${note}">
+                                <span>${label}</span>
+                            </button>
+                        `;
+                    }).join('');
                 }
 
                 stringsContainer.innerHTML = html;
@@ -1610,11 +2273,16 @@ const VIEWS = {
                 btnAutoInner.addEventListener('click', () => {
                     tuningMode = 'auto';
                     currentTargetMidi = null;
+                    lastActiveMidi = null;
                     stringsContainer.querySelectorAll('.tuner-string-btn').forEach(b => {
-                        b.classList.remove('active'); b.style.boxShadow = ''; b.style.transform = '';
+                        b.classList.remove('active');
                     });
                     btnAutoInner.classList.add('active');
-                    btnAutoInner.style.background = 'var(--pico-primary)'; btnAutoInner.style.color = 'white';
+                    btnAutoInner.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'nearest',
+                        inline: 'center'
+                    });
                 });
 
                 // เมื่อกดโน้ต ให้เข้า Target Mode (ล็อกสาย) อัตโนมัติ
@@ -1622,24 +2290,41 @@ const VIEWS = {
                     btn.addEventListener('click', (e) => {
                         tuningMode = 'target';
                         stringsContainer.querySelectorAll('.tuner-string-btn').forEach(b => {
-                            b.classList.remove('active'); b.style.boxShadow = ''; b.style.transform = '';
+                            b.classList.remove('active');
                         });
-                        btnAutoInner.classList.remove('active');
-                        btnAutoInner.style.background = 'var(--pico-muted-border-color)'; btnAutoInner.style.color = 'var(--pico-color)';
 
-                        e.target.classList.add('active');
-                        currentTargetMidi = noteToMidi(e.target.dataset.note);
+                        const targetBtn = e.target.closest('.tuner-string-btn');
+                        if (targetBtn) {
+                            targetBtn.classList.add('active');
+                            currentTargetMidi = noteToMidi(targetBtn.dataset.note);
+                            lastActiveMidi = currentTargetMidi;
+                            targetBtn.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'nearest',
+                                inline: 'center'
+                            });
+                        }
                     });
                 });
 
+                let activeIdx = null;
                 if (tuningMode === 'target' && currentTargetMidi !== null) {
                      const isChromatic = instSelect.value.startsWith("Chromatic");
-                     const targetBtn = Array.from(noteBtns).find(b => {
-                         const bMidi = noteToMidi(b.dataset.note);
-                         return isChromatic ? (bMidi % 12 === currentTargetMidi % 12) : (bMidi === currentTargetMidi);
+                     noteBtns.forEach((b, idx) => {
+                          const bMidi = noteToMidi(b.dataset.note);
+                          const match = isChromatic ? (bMidi % 12 === currentTargetMidi % 12) : (bMidi === currentTargetMidi);
+                          if (match) {
+                              b.classList.add('active');
+                              activeIdx = idx;
+                              b.scrollIntoView({
+                                  behavior: 'smooth',
+                                  block: 'nearest',
+                                  inline: 'center'
+                              });
+                          }
                      });
-                     if(targetBtn) targetBtn.classList.add('active');
                 }
+                updateHeadstockUI(activeIdx, null);
             };
 
             instSelect.addEventListener('change', () => {
@@ -1657,6 +2342,18 @@ const VIEWS = {
 
             initTunerUI();
 
+            // Carousel Arrow Scroll Listeners
+            const scrollLeftBtn = document.getElementById('tuner-scroll-left');
+            const scrollRightBtn = document.getElementById('tuner-scroll-right');
+            if (scrollLeftBtn && scrollRightBtn) {
+                scrollLeftBtn.addEventListener('click', () => {
+                    stringsContainer.scrollBy({ left: -200, behavior: 'smooth' });
+                });
+                scrollRightBtn.addEventListener('click', () => {
+                    stringsContainer.scrollBy({ left: 200, behavior: 'smooth' });
+                });
+            }
+
             // 🎵 Audio Algorithm + NOISE GATE
             const autoCorrelate = (buf, rate) => {
                 const SIZE = buf.length;
@@ -1666,6 +2363,23 @@ const VIEWS = {
                 // 🔊 ระบบ Noise Gate
                 const gateValue = parseInt(noiseGateSlider.value) || 4;
                 const threshold = gateValue * 0.005; 
+
+                // อัปเดตแถบวัดระดับเสียงและเส้น Threshold แบบเรียลไทม์
+                const meterFill = document.getElementById('tuner-noise-gate-signal-fill');
+                const marker = document.getElementById('tuner-noise-gate-threshold-marker');
+                if (meterFill && marker) {
+                    const maxRms = 0.10;
+                    const signalPercent = Math.min((rms / maxRms) * 100, 100);
+                    const thresholdPercent = Math.min((threshold / maxRms) * 100, 100);
+                    meterFill.style.width = `${signalPercent}%`;
+                    marker.style.left = `${thresholdPercent}%`;
+                    if (rms >= threshold) {
+                        meterFill.style.backgroundColor = '#10b981'; // เสียงดังพ้น Gate (สีเขียว)
+                    } else {
+                        meterFill.style.backgroundColor = '#94a3b8'; // เสียงเบากว่า Gate (สีเทา)
+                    }
+                }
+
                 if (rms < threshold) return -1; // ตัดเสียงรบกวน คืนค่า -1
 
                 let r1 = 0, r2 = SIZE-1;
@@ -1718,17 +2432,27 @@ const VIEWS = {
                         targetWrittenMidi = autoWrittenMidi;
                         targetFreq = midiToFreq(targetWrittenMidi - offset, ref);
 
-                        // ไฮไลต์ปุ่มโน้ต (ใช้ classDiff หรือเปรียบเทียบตรงๆ)
                         const noteBtns = stringsContainer.querySelectorAll('.note-btn');
+                        let newActiveBtn = null;
                         noteBtns.forEach(btn => {
                             const btnMidi = noteToMidi(btn.dataset.note);
                             const match = isChromatic ? (btnMidi % 12 === autoWrittenMidi % 12) : (btnMidi === autoWrittenMidi);
                             if (match) {
-                                btn.classList.add('active'); btn.style.transform = 'scale(1.1)'; btn.style.boxShadow = '0 0 10px var(--pico-primary)';
+                                btn.classList.add('active');
+                                newActiveBtn = btn;
                             } else {
-                                btn.classList.remove('active'); btn.style.transform = ''; btn.style.boxShadow = '';
+                                btn.classList.remove('active');
                             }
                         });
+                        
+                        if (newActiveBtn && autoWrittenMidi !== lastActiveMidi) {
+                            lastActiveMidi = autoWrittenMidi;
+                            newActiveBtn.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'nearest',
+                                inline: 'center'
+                            });
+                        }
                     } else {
                         if (isChromatic) {
                             let classDiff = (currentTargetMidi % 12) - (autoWrittenMidi % 12);
@@ -1743,8 +2467,16 @@ const VIEWS = {
 
                     centsDiff = 1200 * Math.log2(pitch / targetFreq);
 
+                    // อัปเดตตัวบอกตำแหน่งสายบนรูปหัวกีตาร์
+                    const noteBtns = stringsContainer.querySelectorAll('.note-btn');
+                    let activeIdx = null;
+                    noteBtns.forEach((btn, idx) => {
+                        if (btn.classList.contains('active')) activeIdx = idx;
+                    });
+                    updateHeadstockUI(activeIdx, centsDiff);
+
                     const noteName = NOTE_NAMES[targetWrittenMidi % 12];
-                    const octave = isChromatic ? "" : Math.floor(targetWrittenMidi / 12) - 1;
+                    const octave = Math.floor(targetWrittenMidi / 12) - 1;
 
                     noteEl.textContent = noteName.replace('#', '♯');
                     octEl.textContent = octave;
@@ -1773,10 +2505,10 @@ const VIEWS = {
                 ts.raf = requestAnimationFrame(tick);
             };
 
-            const startTuner = async () => {
+             const startTuner = async () => {
                 if (ts.on) return;
                 toggleBtn.setAttribute('aria-busy', 'true');
-                hzInput.disabled = true; noiseGateSlider.disabled = true;
+                hzInput.disabled = true;
                 try {
                     ts.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false } });
                     ts.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1794,11 +2526,15 @@ const VIEWS = {
             };
 
             const stopTuner = () => {
-                hzInput.disabled = false; noiseGateSlider.disabled = false;
+                hzInput.disabled = false;
+                const meterFill = document.getElementById('tuner-noise-gate-signal-fill');
+                if (meterFill) meterFill.style.width = '0%';
+                updateHeadstockUI(null, null); // รีเซ็ตรูปหัวกีตาร์เมื่อหยุดจูน
                 if (ts.raf) cancelAnimationFrame(ts.raf);
                 if (ts.stream) ts.stream.getTracks().forEach(t => t.stop());
                 if (ts.ctx && ts.ctx.state !== 'closed') ts.ctx.close();
                 ts = { ctx:null, stream:null, analyser:null, raf:null, on:false, buf:null };
+                lastActiveMidi = null;
                 noteEl.textContent = '-'; octEl.textContent = ''; freqEl.textContent = '--- Hz'; centsEl.textContent = 'ปิดการทำงาน'; centsEl.style.color = COLORS.sharp; needle.style.transform = 'rotate(0deg)'; needle.style.stroke = COLORS.sharp; noteEl.style.color = COLORS.sharp;
                 toggleBtn.innerHTML = '🎙️ เริ่มจูน (START)'; toggleBtn.classList.replace('sd-btn-danger', 'sd-btn-primary');
             };

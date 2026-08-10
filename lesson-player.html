@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Music Theory RPG: Visual Novel</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Prompt:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+    <!-- Load ABCJS -->
+    <script src="https://cdn.jsdelivr.net/npm/abcjs@6.3.0/dist/abcjs-basic-min.js"></script>
+    <style>
+        * { font-family: 'Prompt', 'DM Sans', sans-serif; }
+        body { background: #0f172a; color: #f8fafc; overflow: hidden; }
+        
+        .neu-btn {
+            box-shadow: 0 4px 0 var(--btn-shadow, #4338ca), 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(0);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .neu-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 var(--btn-shadow, #4338ca), 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .piano-key-white {
+            background: linear-gradient(180deg, #fff 0%, #f1f1f1 100%);
+            box-shadow: 0 4px 0 #d1d5db, 0 6px 12px rgba(0,0,0,0.1);
+            border-radius: 0 0 8px 8px;
+            transition: transform 0.08s, box-shadow 0.08s;
+            color: #475569; font-weight: bold; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 0.5rem; font-size: 0.9rem;
+        }
+        .piano-key-white:active, .piano-key-white.pressed {
+            transform: translateY(3px); box-shadow: 0 1px 0 #d1d5db; background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
+        }
+        .piano-key-black {
+            background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+            box-shadow: 0 3px 0 #000, 0 4px 8px rgba(0,0,0,0.3); border-radius: 0 0 5px 5px; transition: transform 0.08s, box-shadow 0.08s;
+        }
+        .piano-key-black:active, .piano-key-black.pressed {
+            transform: translateY(2px); box-shadow: 0 1px 0 #000; background: linear-gradient(180deg, #4338ca 0%, #3730a3 100%);
+        }
+        
+        .piano-key-black {
+            color: rgba(255, 255, 255, 0.7); font-weight: bold; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 0.2rem; font-size: 0.6rem;
+        }
+
+        .hide-note-names .note-label {
+            display: none !important;
+        }
+        
+        .health-bar-fill { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .progress-fill { transition: width 0.5s ease; }
+        
+        @keyframes bossShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px) rotate(-2deg); }
+            75% { transform: translateX(5px) rotate(2deg); }
+        }
+        .anim-shake { animation: bossShake 0.4s ease-in-out; }
+        
+        @keyframes heroAttackHeroic {
+            0% { transform: translate(0, 0) scale(1) rotate(0deg); filter: brightness(1) drop-shadow(0 0 0 rgba(34,211,238,0)); }
+            20% { transform: translate(60px, -100px) scale(1.1) rotate(5deg); filter: brightness(1.2) drop-shadow(-10px 10px 5px rgba(34,211,238,0.5)); }
+            40% { transform: translate(120px, -180px) scale(1.3) rotate(15deg); filter: brightness(1.5) drop-shadow(-20px 20px 15px rgba(34,211,238,0.8)); }
+            50% { transform: translate(120px, -180px) scale(1.3) rotate(15deg); filter: brightness(2) drop-shadow(0 0 20px rgba(34,211,238,1)); }
+            100% { transform: translate(0, 0) scale(1) rotate(0deg); filter: brightness(1) drop-shadow(0 0 0 rgba(34,211,238,0)); }
+        }
+        .anim-attack { animation: heroAttackHeroic 0.4s cubic-bezier(0.175, 0.885, 0.32, 1); z-index: 50 !important; }
+
+        @keyframes bossAttackEvil {
+            0% { transform: translate(-50%, 0) scale(1) rotate(0deg); filter: brightness(1) drop-shadow(0 0 0 rgba(168,85,247,0)); }
+            20% { transform: translate(-65%, 100px) scale(1.1) rotate(-5deg); filter: brightness(1.2) drop-shadow(10px -10px 5px rgba(168,85,247,0.5)); }
+            40% { transform: translate(-80%, 180px) scale(1.3) rotate(-10deg); filter: brightness(1.5) drop-shadow(20px -20px 15px rgba(168,85,247,0.8)); }
+            50% { transform: translate(-80%, 180px) scale(1.3) rotate(-10deg); filter: brightness(2) drop-shadow(0 0 20px rgba(168,85,247,1)); }
+            100% { transform: translate(-50%, 0) scale(1) rotate(0deg); filter: brightness(1) drop-shadow(0 0 0 rgba(168,85,247,0)); }
+        }
+        .anim-boss-attack { animation: bossAttackEvil 0.4s cubic-bezier(0.175, 0.885, 0.32, 1); z-index: 50 !important; }
+
+        @keyframes bossDamage {
+            0% { transform: scale(1) translateX(0) rotate(0); filter: brightness(1); }
+            20% { transform: scale(0.9) translateX(-15px) rotate(-5deg); filter: brightness(3) drop-shadow(0 0 20px red) contrast(200%); }
+            40% { transform: scale(0.85) translateX(15px) rotate(5deg); filter: invert(1) hue-rotate(180deg) drop-shadow(0 0 30px red); }
+            60% { transform: scale(0.95) translateX(-10px) rotate(-3deg); filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(10); }
+            80% { transform: scale(1) translateX(5px) rotate(2deg); filter: brightness(2) drop-shadow(0 0 10px red); }
+            100% { transform: scale(1) translateX(0) rotate(0); filter: brightness(1); }
+        }
+        .anim-damage { animation: bossDamage 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+        
+        @keyframes damageFloat {
+            0% { transform: scale(0.5) translateY(0); opacity: 0; }
+            20% { transform: scale(1.2) translateY(-20px); opacity: 1; }
+            80% { transform: scale(1) translateY(-60px); opacity: 1; }
+            100% { transform: scale(0.8) translateY(-80px); opacity: 0; }
+        }
+
+        @keyframes bossDance {
+            0%, 100% { transform: translateY(0) rotate(0); }
+            25% { transform: translateY(-10px) rotate(-3deg); }
+            75% { transform: translateY(-10px) rotate(3deg); }
+        }
+        .anim-dance { animation: bossDance 0.8s ease-in-out infinite; }
+
+        @keyframes bossDie {
+            0% { transform: rotate(0deg) scale(1) translateY(0); opacity: 1; }
+            100% { transform: rotate(90deg) scale(0.5) translateY(100px); opacity: 0; }
+        }
+        .anim-die { animation: bossDie 1s forwards ease-in; }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .abcjs-container svg { background-color: transparent; }
+        .abcjs-container path, .abcjs-container text { fill: #f8fafc; stroke: #f8fafc; }
+        .abcjs-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+
+        #screen-select, #screen-battle, #screen-victory, #screen-gameover { display: none; }
+        .active-screen { display: flex !important; }
+
+        /* VN Character Transitions */
+        .char-sprite {
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy transition */
+        }
+        .char-active {
+            filter: brightness(1) drop-shadow(0 0 15px rgba(255,255,255,0.3));
+            transform: scale(1);
+            z-index: 20;
+        }
+        .char-attacking {
+            z-index: 50 !important;
+        }
+        .char-inactive {
+            filter: brightness(0.3);
+            transform: scale(0.9) translateY(40px); /* Move down significantly */
+            z-index: 10;
+        }
+
+        /* Rhythm Runner Styles */
+        .rhythm-note {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.8);
+            border: 2px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 14px;
+        }
+        .rhythm-note.hit-effect {
+            animation: note-burst 0.3s ease-out forwards;
+        }
+        @keyframes note-burst {
+            0% { transform: translateY(-50%) scale(1); opacity: 1; }
+            100% { transform: translateY(-50%) scale(2.5); opacity: 0; filter: hue-rotate(90deg); }
+        }
+        .note-id-btn {
+            background-color: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #334155;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.1s ease;
+        }
+        .note-id-btn:active {
+            transform: scale(0.95);
+            background-color: #e2e8f0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center">
+    
+    <!-- Game Container (Aspect Ratio fixed for Mobile/Desktop blend) -->
+    <div class="w-full max-w-md h-[100dvh] mx-auto flex flex-col relative overflow-hidden bg-slate-900 shadow-2xl">
+        
+        <!-- Dynamic Background -->
+        <div id="bg-layer" class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700" style="background-image: url('https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=600&auto=format&fit=crop'); opacity: 0.4;"></div>
+        <div class="absolute inset-0 z-0 bg-gradient-to-b from-slate-900/60 via-transparent to-slate-900/90 pointer-events-none"></div>
+
+
+        <!-- SCREEN 2: Battle & VN UI -->
+        <div id="screen-battle" class="flex-col h-full relative z-10 hidden">
+            
+            <!-- Top Bar (HUD) -->
+            <header class="flex items-center justify-between px-4 pt-6 pb-2 z-30 relative">
+                <button onclick="window.location.href='explore.html'" class="w-10 h-10 flex items-center justify-center rounded-full glass-panel shadow"> 
+                    <i data-lucide="arrow-left" style="width:20px;height:20px;color:#cbd5e1;"></i> 
+                </button> 
+                <!-- Settings Toggle -->
+                <button onclick="openSettings()" id="btn-settings" class="w-10 h-10 flex items-center justify-center rounded-full glass-panel shadow ml-2 hover:border-cyan-400 transition-colors">
+                    <i data-lucide="settings" style="width:18px;height:18px;color:#cbd5e1;"></i>
+                </button>
+                <!-- Progress/Combo Bar -->
+                <div class="flex-1 mx-3 h-3 rounded-full bg-slate-800/80 overflow-hidden shadow-inner border border-slate-700">
+                    <div id="progress-bar" class="progress-fill h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-600" style="width:0%"></div>
+                </div>
+                <!-- Lives -->
+                <div class="flex items-center gap-1 glass-panel px-3 py-1 rounded-full border border-rose-900/50">
+                    <span style="color:#f43f5e;font-size:1rem;">❤️</span> 
+                    <span id="lives-count" class="font-bold text-sm text-rose-100">3</span>
+                </div>
+            </header>
+
+            <!-- Boss HP Bar (Center Top) -->
+            <div class="w-full px-12 z-30 relative mt-2">
+                <div class="flex justify-between text-[10px] font-bold mb-1 uppercase tracking-wider drop-shadow-md">
+                    <span id="boss-name-display" class="text-purple-300">Boss: Noise Demon</span> 
+                    <span id="boss-hp-text" class="text-rose-400 font-bold">5/5 HP</span>
+                </div>
+                <div class="h-2.5 rounded-full bg-slate-800/80 overflow-hidden shadow-inner border border-slate-700 backdrop-blur-sm">
+                    <div id="boss-hp-bar" class="health-bar-fill h-full rounded-full bg-gradient-to-r from-rose-500 to-purple-600" style="width:100%"></div>
+                </div>
+            </div>
+
+            <!-- VN Character Sprites (Background Layer) -->
+            <div class="absolute inset-x-0 bottom-[100px] pointer-events-none z-10 h-[45vh]">
+                <!-- Hero (Left) -->
+                <div id="char-hero-container" class="char-sprite char-active absolute bottom-0 left-[-20px] origin-bottom-left">
+                    <img id="char-hero" src="" class="h-[40vh] max-w-none w-auto object-contain drop-shadow-[0_0_15px_rgba(56,189,248,0.5)]">
+                </div>
+                <!-- Boss (Right) -->
+                <div id="char-boss-container" class="char-sprite char-inactive absolute bottom-0 right-[-30px] origin-bottom-right">
+                    <!-- Increased height to 60vh to make boss much larger, max-w-none prevents squishing -->
+                    <img id="char-boss" src="assets/game/boss1.png" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=boss&backgroundColor=9333ea'" class="h-[60vh] max-w-none w-auto object-contain drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]">
+                </div>
+            </div>
+
+            <!-- Gameplay Center Area (Floats above characters) -->
+            <div id="gameplay-area" class="w-full flex-1 flex flex-col justify-start items-center px-4 pt-6 z-30 relative pointer-events-none pb-40">
+                <div id="sheet-music-container" class="abcjs-container bg-slate-900/80 backdrop-blur-md rounded-2xl px-6 py-2 border border-slate-700 shadow-2xl mb-4 pointer-events-auto" style="display: none;"></div>
+                
+                <div id="quiz-container" class="w-full grid grid-cols-2 gap-3 pointer-events-auto" style="display: none;"></div>
+                
+                <div id="piano-section" class="w-full pointer-events-auto" style="display: none;">
+                    <div class="relative flex justify-center" style="height: 120px;">
+                        <div class="flex gap-[2px]" id="white-keys">
+                            <button class="piano-key-white w-[42px] h-full" data-note="C4"><span class="note-label">C</span></button>
+                            <button class="piano-key-white w-[42px] h-full" data-note="D4"><span class="note-label">D</span></button>
+                            <button class="piano-key-white w-[42px] h-full" data-note="E4"><span class="note-label">E</span></button>
+                            <button class="piano-key-white w-[42px] h-full" data-note="F4"><span class="note-label">F</span></button>
+                            <button class="piano-key-white w-[42px] h-full" data-note="G4"><span class="note-label">G</span></button>
+                            <button class="piano-key-white w-[42px] h-full" data-note="A4"><span class="note-label">A</span></button>
+                            <button class="piano-key-white w-[42px] h-full" data-note="B4"><span class="note-label">B</span></button>
+                        </div>
+                        <div class="absolute top-0 left-1/2 -translate-x-1/2 flex pointer-events-none" style="width: calc(7 * 44px);">
+                            <button class="piano-key-black pointer-events-auto w-7 h-[75px] absolute" style="left: 28px;" data-note="C#4"><span class="note-label flex flex-col items-center leading-none gap-[1px]"><span class="text-[9px] opacity-75">Db</span><span class="text-[11px]">C#</span></span></button>
+                            <button class="piano-key-black pointer-events-auto w-7 h-[75px] absolute" style="left: 72px;" data-note="D#4"><span class="note-label flex flex-col items-center leading-none gap-[1px]"><span class="text-[9px] opacity-75">Eb</span><span class="text-[11px]">D#</span></span></button>
+                            <button class="piano-key-black pointer-events-auto w-7 h-[75px] absolute" style="left: 160px;" data-note="F#4"><span class="note-label flex flex-col items-center leading-none gap-[1px]"><span class="text-[9px] opacity-75">Gb</span><span class="text-[11px]">F#</span></span></button>
+                            <button class="piano-key-black pointer-events-auto w-7 h-[75px] absolute" style="left: 204px;" data-note="G#4"><span class="note-label flex flex-col items-center leading-none gap-[1px]"><span class="text-[9px] opacity-75">Ab</span><span class="text-[11px]">G#</span></span></button>
+                            <button class="piano-key-black pointer-events-auto w-7 h-[75px] absolute" style="left: 248px;" data-note="A#4"><span class="note-label flex flex-col items-center leading-none gap-[1px]"><span class="text-[9px] opacity-75">Bb</span><span class="text-[11px]">A#</span></span></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="note-id-section" class="w-full pointer-events-auto flex flex-col gap-1 items-center justify-center mt-2" style="display: none;">
+                    <div class="flex gap-1">
+                        <button class="note-id-btn" data-base="C#">C#</button>
+                        <button class="note-id-btn" data-base="D#">D#</button>
+                        <button class="note-id-btn" data-base="E#">E#</button>
+                        <button class="note-id-btn" data-base="F#">F#</button>
+                        <button class="note-id-btn" data-base="G#">G#</button>
+                        <button class="note-id-btn" data-base="A#">A#</button>
+                        <button class="note-id-btn" data-base="B#">B#</button>
+                    </div>
+                    <div class="flex gap-1">
+                        <button class="note-id-btn" data-base="C">C</button>
+                        <button class="note-id-btn" data-base="D">D</button>
+                        <button class="note-id-btn" data-base="E">E</button>
+                        <button class="note-id-btn" data-base="F">F</button>
+                        <button class="note-id-btn" data-base="G">G</button>
+                        <button class="note-id-btn" data-base="A">A</button>
+                        <button class="note-id-btn" data-base="B">B</button>
+                    </div>
+                    <div class="flex gap-1">
+                        <button class="note-id-btn" data-base="Cb">Cb</button>
+                        <button class="note-id-btn" data-base="Db">Db</button>
+                        <button class="note-id-btn" data-base="Eb">Eb</button>
+                        <button class="note-id-btn" data-base="Fb">Fb</button>
+                        <button class="note-id-btn" data-base="Gb">Gb</button>
+                        <button class="note-id-btn" data-base="Ab">Ab</button>
+                        <button class="note-id-btn" data-base="Bb">Bb</button>
+                    </div>
+                </div>
+
+                <div id="rhythm-runner-container" class="w-full pointer-events-auto bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-700 shadow-2xl p-4 overflow-hidden flex flex-col gap-2" style="display: none;">
+                    <div class="relative w-full h-20 border-b-4 border-slate-600 overflow-hidden">
+                        <!-- Hit Zone -->
+                        <div id="rhythm-hit-zone" class="absolute top-2 bottom-2 left-[10%] w-12 border-[3px] border-yellow-400/80 rounded-full shadow-[0_0_15px_rgba(250,204,21,0.5)] z-10 flex items-center justify-center bg-yellow-400/10">
+                            <div class="w-6 h-6 rounded-full border-2 border-yellow-400/50"></div>
+                        </div>
+                        <!-- Notes Track -->
+                        <div id="rhythm-track" class="absolute top-0 bottom-0 left-0 right-0 z-0"></div>
+                    </div>
+                    <!-- Big Tap Button for Mobile -->
+                    <button id="btn-rhythm-tap" class="w-full py-4 mt-2 rounded-xl font-black text-xl tracking-widest text-white shadow-[0_6px_0_#0ea5e9,0_10px_15px_rgba(0,0,0,0.4)] bg-gradient-to-r from-cyan-500 to-blue-500 active:translate-y-[6px] active:shadow-[0_0px_0_#0ea5e9,0_0px_0px_rgba(0,0,0,0.4)] transition-all select-none">
+                        TAP (Spacebar)
+                    </button>
+                </div>
+
+                <div id="feedback-msg" class="w-full text-center mt-4 font-bold text-sm hidden py-2 rounded-lg pointer-events-auto backdrop-blur-md"></div>
+            </div>
+
+            <!-- VN Dialogue Box (Bottom Fixed) -->
+            <div class="absolute bottom-4 inset-x-4 z-40">
+                <!-- Speaker Name Badge -->
+                <div id="speaker-badge" class="absolute -top-4 left-4 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-xs px-4 py-1 rounded-t-lg rounded-br-lg shadow-lg">Hero</div>
+                
+                <!-- Scale Builder -->
+                <div id="scale-builder-container" class="w-full bg-slate-900/90 backdrop-blur-md rounded-2xl px-4 py-3 border border-slate-600 shadow-2xl mb-4 pointer-events-auto flex flex-col items-center" style="display: none;">
+                    <div class="text-white font-bold text-center mb-2" id="sb-target-label">Target: G Major Scale</div>
+                    <div id="sb-sheet-container" class="abcjs-container bg-slate-800/80 rounded-xl px-2 py-2 border border-slate-700 w-full overflow-x-auto"></div>
+                    
+                    <div class="flex gap-2 mt-3 w-full justify-center overflow-x-auto px-2" id="sb-controls">
+                        <!-- Generated buttons here -->
+                    </div>
+                    
+                    <div class="flex gap-2 w-full mt-3">
+                        <button id="btn-sb-submit" class="neu-btn flex-1 bg-emerald-500 text-white font-bold py-3 rounded-xl border border-emerald-400 active:scale-95 transition-transform">✅ ตรวจคำตอบ</button>
+                    </div>
+                </div>
+
+                <!-- Text Box -->
+                <div id="dialogue-box" class="glass-panel rounded-2xl rounded-tl-none p-4 pt-5 border border-slate-600 shadow-2xl cursor-pointer min-h-[120px] flex flex-col justify-between" onclick="goNext(true)">
+                    <p id="slide-text" class="font-medium text-slate-100 text-sm leading-relaxed"></p>
+                    
+                    <div id="dialogue-prompt" class="text-xs text-slate-400 text-right mt-2 animate-pulse">แตะหน้าจอเพื่อเล่นต่อ ▼</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- SCREEN 3 & 4 (Victory / Game Over) remains similar but styled better -->
+        <div id="screen-victory" class="flex-col h-full p-6 items-center justify-center hidden z-50 bg-slate-900/90 backdrop-blur-md absolute inset-0">
+            <div class="text-6xl mb-4">🏆</div>
+            <h2 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500 mb-2">STAGE CLEARED!</h2>
+            <p class="text-slate-300 mb-8 text-center">คุณปราบปีศาจเสียงเพี้ยนได้สำเร็จ!</p>
+            <h2 class="text-3xl font-black text-white mb-2">ชัยชนะ!</h2>
+            <p class="text-emerald-100 mb-8">คุณปราบมอนสเตอร์และผ่านด่านนี้สำเร็จ!</p>
+            
+            <div class="flex flex-col gap-3 w-full max-w-[250px]">
+                <button onclick="nextLevel()" id="btn-next-level" class="neu-btn w-full bg-yellow-400 text-yellow-900 font-bold py-3 rounded-xl border border-yellow-300">
+                    ลุยด่านต่อไป ⚔️
+                </button>
+                <button onclick="window.location.href='explore.html'" class="neu-btn w-full bg-slate-700 text-white font-bold py-3 rounded-xl border border-slate-600">
+                    กลับไปแผนที่หลัก (Map)
+                </button>
+            </div>
+        </div>
+
+        <div id="screen-gameover" class="flex-col h-full p-6 items-center justify-center hidden z-50 bg-slate-900/90 backdrop-blur-md absolute inset-0">
+            <div class="text-6xl mb-4">💀</div>
+            <h2 class="text-4xl font-black text-rose-500 mb-2">GAME OVER</h2>
+            <p class="text-slate-400 mb-8 text-center">พลังชีวิตหมด... ต้องฝึกทฤษฎีให้แม่นกว่านี้!</p>
+            <button class="neu-btn px-8 py-3 rounded-2xl font-bold text-white bg-rose-600" onclick="window.location.href='explore.html'">กลับไปเริ่มใหม่ที่แผนที่</button>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        lucide.createIcons();
+    </script>
+    
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[9999] hidden flex items-center justify-center">
+        <div class="glass-panel p-6 rounded-3xl w-[90%] max-w-sm flex flex-col items-center shadow-2xl border border-slate-700">
+            <h2 class="text-2xl font-black text-white mb-6 uppercase tracking-wider">การตั้งค่าเสียง</h2>
+            
+            <div class="space-y-4 w-full">
+                <div class="bg-slate-900/50 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-slate-300 font-semibold"><i data-lucide="music" class="inline w-5 h-5 mr-2 text-cyan-400"></i>เพลงพื้นหลัง (BGM)</span>
+                        <span id="val-bgm" class="text-cyan-400 text-sm font-bold">50%</span>
+                    </div>
+                    <input type="range" id="slider-bgm" min="0" max="100" value="50" class="w-full accent-cyan-400" oninput="updateSettings('bgmVol', this.value)">
+                </div>
+                <div class="bg-slate-900/50 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-slate-300 font-semibold"><i data-lucide="volume-2" class="inline w-5 h-5 mr-2 text-emerald-400"></i>เอฟเฟกต์ (SFX)</span>
+                        <span id="val-sfx" class="text-emerald-400 text-sm font-bold">50%</span>
+                    </div>
+                    <input type="range" id="slider-sfx" min="0" max="100" value="50" class="w-full accent-emerald-400" oninput="updateSettings('sfxVol', this.value)">
+                </div>
+                <div class="bg-slate-900/50 p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-slate-300 font-semibold"><i data-lucide="mic" class="inline w-5 h-5 mr-2 text-purple-400"></i>เสียงอ่าน (Voice)</span>
+                        <span id="val-voice" class="text-purple-400 text-sm font-bold">100%</span>
+                    </div>
+                    <input type="range" id="slider-voice" min="0" max="100" value="100" class="w-full accent-purple-400" oninput="updateSettings('voiceVol', this.value)">
+                </div>
+                
+                <div class="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl cursor-pointer hover:bg-slate-800 transition-colors">
+                    <span class="text-slate-300 font-semibold flex items-center"><i data-lucide="eye" class="text-blue-400 w-5 h-5 mr-2"></i> แสดงชื่อตัวโน้ตเปียโน</span>
+                    <input type="checkbox" id="toggle-note-names" class="w-5 h-5 rounded-md accent-blue-400" onchange="updateSettings('showNoteNames', this.checked)">
+                </div>
+            </div>
+            
+            <button onclick="closeSettings()" class="mt-8 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold px-8 py-3 rounded-full hover:scale-105 transition-transform shadow-lg shadow-cyan-500/30 w-full text-lg">
+                ปิดการตั้งค่า
+            </button>
+        </div>
+    </div>
+    <script src="lesson-data.js?v=51"></script>
+    <script src="lesson-player.js?v=51"></script>
+</body>
+</html>
