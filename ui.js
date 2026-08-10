@@ -4,12 +4,14 @@
  */
 
 import { currentUser, getUserProfile, isUserBlocked, setCurrentUser, getCurrentUser, requestPushPermission } from './auth.js';
-import { 
+import {
     borrow, borrowExt, repair, usersExt, authApi, instrumentsExt, realtimeApi,
-    badgesExt, knowledgeExt, rankingsExt, gamesExt, notificationsExt, adminExt
+    badgesExt, knowledgeExt, rankingsExt, gamesExt, notificationsExt, adminExt,
+    eventsApi
 } from './api.js';
 import { supabase, ICONS, VAPID_PUBLIC_KEY } from './config.js';
 import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
+import { parseKitCode, processKitScan } from './uniform-kit.js';
 import { initAdminDashboard, destroyAdminDashboard } from './admin-dashboard.js';
 import { initStudentDashboard, destroyStudentDashboard } from './student-dashboard.js';
 
@@ -1139,11 +1141,13 @@ export async function loadAndRenderMyBorrowedItems(userId) {
         } else {
             borrowedSection.classList.remove('hidden'); 
             
-            let overdueWarningHtml = ''; 
-            const sixHoursAgo = new Date(new Date().getTime() - (6 * 60 * 60 * 1000));
-            const overdueItems = data.filter(log => !log.is_take_home && new Date(log.borrow_timestamp) < sixHoursAgo);
+            // 🟢 FIX: เดิมใช้ 6 ชม. ตายตัวกับทุกคนและทุกประเภทการยืม
+            // ตอนนี้ใช้ is_overdue จาก RPC ซึ่งอิง expected_return_at ตามกติกาของแต่ละกลุ่ม
+            // (นักเรียนทั่วไป 1 ชม. / สมาชิกชุมนุม 6 ชม. / ออกงานตามที่ครูกำหนด)
+            let overdueWarningHtml = '';
+            const overdueItems = data.filter(log => log.is_overdue === true);
             if (overdueItems.length > 0) {
-                overdueWarningHtml = `<article style="background-color: var(--pico-form-element-invalid-active-border-color); color: red; padding: 1rem; margin-bottom: 1rem;"><h5 style="margin:0; color:red;">⚠️ พบรายการที่อาจลืมคืน!</h5><p style="margin-top:0.5rem;">คุณมีรายการยืมในโรงเรียนที่นานเกิน 6 ชั่วโมง หากใช้งานเสร็จแล้ว กรุณากดคืน</p></article>`;
+                overdueWarningHtml = `<article style="background-color: var(--pico-form-element-invalid-active-border-color); color: red; padding: 1rem; margin-bottom: 1rem;"><h5 style="margin:0; color:red;">⚠️ เลยกำหนดคืนแล้ว ${overdueItems.length} รายการ</h5><p style="margin-top:0.5rem;">${overdueItems.map(l => escapeHtml(l.instrument_name || '—')).join(', ')} — หากใช้งานเสร็จแล้ว กรุณากดคืน</p></article>`;
             }
             
             const itemsHtml = data.map(log => {
@@ -1731,6 +1735,10 @@ export function handleUniversalScan() {
                 html5QrCode.stop().then(() => {
                     Swal.close();
                     
+                    // 👔 QR ที่ถุงชุด (KIT-012 หรือ URL ที่มี ?kit=) → เข้าหน้าเบิก/คืนชุด
+                    const kitCode = parseKitCode(decodedText);
+                    if (kitCode) return processKitScan(kitCode);
+
                     let instrumentId = null;
                     try {
                         if (decodedText.includes('?')) {
@@ -1758,6 +1766,104 @@ export function handleUniversalScan() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// 🎭 ขั้นที่ 1 ของการยืมผ่าน QR — "ยืมเพื่ออะไร?"
+//    ถ้าครูเปิดงานไว้ ให้เลือกงาน กำหนดคืนจะยึดตามงานนั้นโดยอัตโนมัติ
+//    ถ้าไม่มีงานเปิด ก็เป็นการซ้อมปกติ ไม่ต้องถาม
+//    คืนค่า null = ผู้ใช้ยกเลิก
+// ─────────────────────────────────────────────────────────────────────────────
+async function _pickBorrowContext(instrumentName) {
+    const { data: events } = await eventsApi.getOpen();
+    const usable = (events || []).filter(e => e.needs_instrument);
+
+    if (!usable.length) {
+        const { isConfirmed } = await Swal.fire({
+            title: '🎶 ข้อตกลงการยืม',
+            html: `คุณกำลังจะยืม: <strong>${escapeHtml(instrumentName)}</strong><br><br>โปรดปฏิบัติตามกติกาอย่างเคร่งครัด`,
+            icon: 'info', showCancelButton: true,
+            confirmButtonText: 'ยอมรับ และยืนยันการยืม', cancelButtonText: 'ยกเลิก'
+        });
+        return isConfirmed ? { borrowType: 'in_school', eventId: null } : null;
+    }
+
+    const optionsHtml = usable.map(e => `
+        <button type="button" class="qr-ctx-btn" data-event="${e.id}"
+                style="display:block;width:100%;margin:0 0 .5rem;padding:.85rem 1rem;border-radius:12px;
+                       border:1px solid #f59e0b;background:rgba(245,158,11,.1);color:inherit;
+                       text-align:left;cursor:pointer;font-size:.95rem;">
+            🎭 <strong>${escapeHtml(e.name)}</strong><br>
+            <span style="font-size:.78rem;opacity:.75;">คืน ${new Date(e.return_due_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</span>
+        </button>`).join('');
+
+    const result = await Swal.fire({
+        title: 'ยืมเพื่ออะไร?',
+        html: `<div style="text-align:left;">
+                 <p style="margin:0 0 .75rem;font-size:.9rem;">${escapeHtml(instrumentName)}</p>
+                 ${optionsHtml}
+                 <button type="button" class="qr-ctx-btn" data-event=""
+                     style="display:block;width:100%;padding:.85rem 1rem;border-radius:12px;
+                            border:1px solid #3b82f6;background:rgba(59,130,246,.1);color:inherit;
+                            text-align:left;cursor:pointer;font-size:.95rem;">
+                   🏫 <strong>ซ้อมปกติในโรงเรียน</strong>
+                 </button>
+               </div>`,
+        showConfirmButton: false, showCancelButton: true, cancelButtonText: 'ยกเลิก',
+        didOpen: () => {
+            document.querySelectorAll('.qr-ctx-btn').forEach(btn => {
+                btn.addEventListener('click', () => Swal.close({ isConfirmed: true, value: btn.dataset.event }));
+            });
+        }
+    });
+
+    if (!result.isConfirmed && result.value === undefined) return null;
+    const eventId = result.value ? Number(result.value) : null;
+    return { borrowType: eventId ? 'performance' : 'in_school', eventId };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔍 ขั้นที่ 2 — บังคับตรวจสภาพก่อนรับ
+//    เดิมเป็น dialog เดียวกด "ยอมรับ" รวดเดียว เด็กจึงรับเครื่องโดยไม่ดูสภาพ
+//    ผลพลอยได้: ถ้าคนก่อนหน้าทำพังแล้วเงียบ คนถัดไปจะเป็นคนแจ้งเอง
+//    คืนค่า null = ยกเลิก / { action:'borrow'|'report', note }
+// ─────────────────────────────────────────────────────────────────────────────
+async function _inspectBeforeBorrow(scan) {
+    const img = scan.image_url
+        ? `<img src="${escapeHtml(scan.image_url)}" alt="" style="width:100%;max-height:170px;object-fit:contain;border-radius:10px;margin-bottom:.6rem;">`
+        : '';
+
+    const result = await Swal.fire({
+        title: '🔍 ตรวจสภาพก่อนรับ',
+        html: `<div style="text-align:left;font-size:.9rem;">
+                 ${img}
+                 <div style="padding:.55rem .7rem;border-radius:8px;background:rgba(16,185,129,.1);margin-bottom:.7rem;">
+                   สภาพที่บันทึกไว้ล่าสุด: <strong>${escapeHtml(scan.condition || 'ไม่ระบุ')}</strong>
+                 </div>
+                 <p style="margin:0 0 .4rem;font-weight:700;">กรุณาตรวจก่อนรับ:</p>
+                 <label style="display:block;margin-bottom:.3rem;"><input type="checkbox" class="insp-chk"> ตัวเครื่องไม่มีรอยแตก/บุบ</label>
+                 <label style="display:block;margin-bottom:.3rem;"><input type="checkbox" class="insp-chk"> ชิ้นส่วน/สายครบ ใช้งานได้</label>
+                 <label style="display:block;margin-bottom:.6rem;"><input type="checkbox" class="insp-chk"> กระเป๋าและอุปกรณ์เสริมครบ</label>
+                 <input id="insp-note" class="swal2-input" style="margin:0;width:100%;font-size:.85rem;"
+                        placeholder="พบตำหนิอะไรไหม? (ไม่มีก็เว้นว่าง)">
+               </div>`,
+        showCancelButton: true, showDenyButton: true,
+        confirmButtonText: '✅ สภาพปกติ รับเลย',
+        denyButtonText: '❌ ใช้ไม่ได้ แจ้งซ่อม',
+        cancelButtonText: 'ยกเลิก',
+        didOpen: () => {
+            const confirmBtn = Swal.getConfirmButton();
+            const chks = [...document.querySelectorAll('.insp-chk')];
+            const sync = () => { confirmBtn.disabled = !chks.every(c => c.checked); };
+            chks.forEach(c => c.addEventListener('change', sync));
+            sync();
+        },
+        preConfirm: () => ({ action: 'borrow', note: document.getElementById('insp-note')?.value?.trim() || null }),
+        preDeny:    () => ({ action: 'report', note: document.getElementById('insp-note')?.value?.trim() || null })
+    });
+
+    if (result.isConfirmed || result.isDenied) return result.value;
+    return null;
+}
+
 // 🚀 ฟังก์ชันสแกน QR Code เพื่อทำรายการยืม-คืนด่วน
 // ─────────────────────────────────────────────────────────────────────────────
 export async function processQrScan(instrumentId) {
@@ -1785,34 +1891,50 @@ export async function processQrScan(instrumentId) {
         if (status === 'พร้อมใช้งาน') {
             if (currentUser.is_blocked) return Swal.fire('บัญชีถูกระงับ', `คุณถูกระงับการใช้งานเนื่องจาก: ${currentUser.block_reason || 'ไม่ระบุ'}`, 'error');
 
-            // ใช้ then(result) อย่างระมัดระวัง หรือใช้ await destructuring { isConfirmed } แบบนี้ครับ
-            const { isConfirmed } = await Swal.fire({ 
-                title: '🎶 ข้อตกลงการยืม 🎶',
-                html: `คุณกำลังจะยืม: <strong>${escapeHtml(instrument_name)}</strong><br><br>โปรดปฏิบัติตามกติกาอย่างเคร่งครัด`, 
-                icon: 'info', 
-                showCancelButton: true, 
-                confirmButtonText: 'ยอมรับ และ ยืนยันการยืม', 
-                cancelButtonText: 'ยกเลิก'
-            });
+            // ── ขั้นที่ 1: เลือกว่ายืมเพื่ออะไร (ถ้าครูเปิดงานไว้)
+            const borrowContext = await _pickBorrowContext(instrument_name);
+            if (!borrowContext) return;   // ผู้ใช้ยกเลิก
 
-            if (isConfirmed) { 
-                Swal.fire({ title: 'กำลังบันทึกรายการ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                
-                // ตัวแปร borrowResult ถูกประกาศตรงนี้ ใช้งานได้ปลอดภัย
-                const { data: borrowResult, error } = await borrowExt.borrowInstrumentAtomic(
-                    Number(instrumentId), 
-                    currentUser.id, 
-                    false, 
-                    null, 
-                    false
-                );
-                
-                if (error) throw error;
-                
-                await Swal.fire('สำเร็จ!', borrowResult?.message || 'ทำรายการยืมเรียบร้อย', 'success');
-                
-                if(typeof refreshOnReturn === 'function') await refreshOnReturn();
+            // ── ขั้นที่ 2: บังคับตรวจสภาพก่อนรับ
+            const inspection = await _inspectBeforeBorrow(scanResult);
+            if (!inspection) return;
+
+            if (inspection.action === 'report') {
+                const { error: repErr } = await repair.report(
+                    Number(instrumentId), currentUser.id,
+                    inspection.note || 'พบปัญหาตอนตรวจก่อนยืม');
+                return Swal.fire(
+                    repErr ? 'ส่งไม่สำเร็จ' : 'ส่งเรื่องแล้ว',
+                    repErr ? repErr.message : 'แจ้งซ่อมเรียบร้อย ครูจะตรวจสอบให้',
+                    repErr ? 'error' : 'success');
             }
+
+            Swal.fire({ title: 'กำลังบันทึกรายการ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            // 🟢 FIX: เดิมส่งแค่ 5 อาร์กิวเมนต์ แต่ borrowInstrumentAtomic รับ 6-7 ตัว
+            // → borrowType เป็น undefined ทุกครั้งที่ยืมผ่าน QR
+            // ทำให้ยืมออกงานผ่านการสแกนไม่เคยทำงานเลย
+            const { data: borrowResult, error } = await borrowExt.borrowInstrumentAtomic(
+                Number(instrumentId),
+                currentUser.id,
+                false,
+                null,
+                false,
+                borrowContext.borrowType,
+                borrowContext.eventId
+            );
+
+            if (error) throw error;
+
+            // ตำหนิที่พบตอนรับ → บันทึกเป็นใบแจ้งให้ครูเห็น ไม่บล็อกการยืม
+            if (inspection.note) {
+                await repair.report(Number(instrumentId), currentUser.id,
+                                    `[ตรวจก่อนรับ] ${inspection.note}`).catch(() => {});
+            }
+
+            await Swal.fire('สำเร็จ!', borrowResult?.message || 'ทำรายการยืมเรียบร้อย', 'success');
+
+            if (typeof refreshOnReturn === 'function') await refreshOnReturn();
         } else if (status === 'ถูกยืมอยู่' && is_borrowed_by_current_user) {
             // โยนเข้าฟังก์ชันคืนเครื่อง
             handleReturnInstrument(instrumentId, instrument_name, document.body);

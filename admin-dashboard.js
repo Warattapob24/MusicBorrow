@@ -4,7 +4,7 @@
  * เรียกใช้ฟังก์ชันทั้งหมดผ่าน api.js แทน
  */
 
-import { adminDashboard as api, adminExt, authApi, bossesApi, raidApi, instrumentsExt, notifications, adminKnowledgeApi, scheduledNotificationsApi, adminNotifications, recoveryApi, studentLoopsApi } from './api.js';
+import { adminDashboard as api, adminExt, authApi, bossesApi, raidApi, instrumentsExt, notifications, adminKnowledgeApi, scheduledNotificationsApi, adminNotifications, recoveryApi, studentLoopsApi, eventsApi, uniformApi, staffApi, sectionsApi } from './api.js';
 import { escapeHtml, translateGroup } from './utils.js';
 import { getCurrentUser } from './auth.js';
 
@@ -342,6 +342,20 @@ function injectStyles() {
 .oad-badge-gray   { background: rgba(124,132,156,0.12);color: var(--oad-muted); }
 .oad-badge-purple { background: rgba(99,102,241,0.15); color: var(--oad-accent2); }
 
+/* ── Form input (แท็บงาน/การแสดง) ──────────────── */
+.oad-input {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    margin-top: 0.25rem;
+    border-radius: 8px;
+    border: 1px solid var(--oad-border);
+    background: var(--oad-surface2);
+    color: var(--oad-text);
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+.oad-input:focus { outline: 2px solid var(--oad-accent); outline-offset: -1px; }
+
 /* ── Avatar ─────────────────────────────────────── */
 .oad-avatar {
     width: 32px; height: 32px;
@@ -473,6 +487,8 @@ function buildShell() {
     <div class="oad-tabs" id="oad-tabs">
         <button class="oad-tab active" data-tab="overview">📊 ภาพรวม</button>
         <button class="oad-tab" data-tab="borrows">📦 การยืม <span class="oad-tab-badge hidden" id="oad-pending-badge">0</span></button>
+        <button class="oad-tab" data-tab="events">🎭 งาน/การแสดง <span class="oad-tab-badge hidden" id="oad-events-badge">0</span></button>
+        <button class="oad-tab" data-tab="uniforms">👔 ชุดวงโยธวาทิต</button>
         <button class="oad-tab" data-tab="repairs">🔧 แจ้งซ่อม <span class="oad-tab-badge hidden" id="oad-repair-badge">0</span></button>
         <button class="oad-tab" data-tab="users">👤 ผู้ใช้</button>
         <button class="oad-tab" data-tab="recovery">🔄 กู้คืนบัญชี <span class="oad-tab-badge hidden" id="oad-recovery-badge">0</span></button>
@@ -606,6 +622,26 @@ function buildShell() {
         <div class="oad-tab-panel" id="oad-panel-users">
             <div class="oad-panel">
                 <div class="oad-panel-title">
+                    🎖 ตำแหน่งหัวหน้า
+                    <button class="oad-btn oad-btn-approve" id="oad-staff-add" style="margin-left:auto;">➕ แต่งตั้ง</button>
+                </div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    หัวหน้า <strong>ดูข้อมูลได้อย่างเดียว + ส่งใบตรวจให้ครู</strong> —
+                    ไม่มีสิทธิ์คืนของ ปิดงาน หรือบล็อกใคร ทุกอย่างที่มีผลจริงยังอยู่ที่ครูคนเดียว
+                </p>
+                <div class="oad-table-wrap" id="oad-staff-wrap"></div>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">
+                    📋 ใบตรวจจากหัวหน้า
+                    <span class="oad-tab-badge hidden" id="oad-staffrep-badge" style="margin-left:.5rem;">0</span>
+                </div>
+                <div class="oad-table-wrap" id="oad-staffrep-wrap"></div>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">
                     👤 จัดการผู้ใช้
                     <button class="oad-btn oad-btn-primary" onclick="window.__oadManageBadgeDefs()" style="margin-left:auto;">🏅 จัดการเงื่อนไขเหรียญตรา</button>
                 </div>
@@ -627,7 +663,13 @@ function buildShell() {
                         <option value="blocked">ถูกบล็อก</option>
                         <option value="closed">ปิดบัญชี</option>
                     </select>
+                    <select class="oad-select" id="oad-user-kit-filter" title="เฉพาะสมาชิกชุมนุม">
+                        <option value="all">👔 ชุด: ทั้งหมด</option>
+                        <option value="has">✅ เลือกชุดแล้ว</option>
+                        <option value="none">⬜ ยังไม่เลือกชุด</option>
+                    </select>
                 </div>
+                <div id="oad-kit-status-summary" style="font-size:.85rem;color:var(--oad-muted);margin-bottom:.6rem;"></div>
                 <div class="oad-table-wrap" id="oad-user-table-wrap">
                     ${skeleton(6, 5)}
                 </div>
@@ -689,6 +731,20 @@ function buildShell() {
         </div>
 
         <div class="oad-tab-panel" id="oad-panel-instruments">
+            <div class="oad-panel">
+                <div class="oad-panel-title">
+                    🎼 จัดกลุ่มเครื่องดนตรีเข้ากลุ่มของวง
+                    <span class="oad-tab-badge hidden" id="oad-section-badge" style="margin-left:.5rem;">0</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    จับคู่ <strong>ประเภทเครื่องดนตรี</strong> ที่มีอยู่จริงในคลัง เข้ากับ <strong>กลุ่มของวง</strong>
+                    (ทองเหลือง / ลมไม้ / กระทบ / คัลเลอร์การ์ด)<br>
+                    ใช้เพื่อให้ <strong>หัวหน้ากลุ่มเครื่อง</strong> เห็นเฉพาะของในกลุ่มตัวเอง —
+                    เครื่องที่ไม่ได้อยู่ในวงโยธวาทิต (เช่น เครื่องสาย) เว้นว่างไว้ได้
+                </p>
+                <div class="oad-table-wrap" id="oad-section-map"></div>
+            </div>
+
             <div class="oad-panel">
                 <div class="oad-panel-title">
                     🎺 คลังเครื่องดนตรี
@@ -788,6 +844,103 @@ function buildShell() {
                 <div id="oad-boss-lobby-area" style="margin-bottom: 1.5rem; display: none; background: var(--oad-surface2); padding: 1.5rem; border-radius: var(--oad-radius); border: 2px dashed var(--oad-accent);"></div>
 
                 <div class="oad-table-wrap" id="oad-boss-table-wrap"></div>
+            </div>
+        </div>
+
+        <div class="oad-tab-panel" id="oad-panel-events">
+            <div class="oad-panel">
+                <div class="oad-panel-title">🎭 เปิดงานใหม่</div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    เปิดงานแล้วนักเรียนจะเลือกงานนี้ได้ตอนสแกน QR ยืมเครื่อง — กำหนดคืนจะยึดตามงานอัตโนมัติ
+                </p>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.75rem; align-items:end;">
+                    <div>
+                        <label style="font-size:.8rem; font-weight:700;">ชื่องาน*</label>
+                        <input id="oad-ev-name" class="oad-input" placeholder="เช่น แห่เทียนพรรษา">
+                    </div>
+                    <div>
+                        <label style="font-size:.8rem; font-weight:700;">วันที่จัดงาน*</label>
+                        <input id="oad-ev-date" type="date" class="oad-input">
+                    </div>
+                    <div>
+                        <label style="font-size:.8rem; font-weight:700;">กำหนดคืน*</label>
+                        <input id="oad-ev-due" type="datetime-local" class="oad-input">
+                    </div>
+                    <div>
+                        <label style="font-size:.8rem; font-weight:700;">เปิดให้ใคร</label>
+                        <select id="oad-ev-open" class="oad-input">
+                            <option value="club">สมาชิกชุมนุม</option>
+                            <option value="all">ทุกคน</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:flex; gap:1.25rem; flex-wrap:wrap; margin:.9rem 0;">
+                    <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-inst" checked> เบิกเครื่องดนตรี</label>
+                    <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-uni" checked> เบิกชุด</label>
+                </div>
+                <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
+                    <button class="oad-btn oad-btn-approve" id="oad-ev-create">🎭 เปิดงาน</button>
+                    <button class="oad-btn" id="oad-ev-quick">⚡ งานวันนี้ (คืนพรุ่งนี้เที่ยง)</button>
+                </div>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">📋 งานทั้งหมด</div>
+                <div class="oad-table-wrap" id="oad-events-wrap"></div>
+            </div>
+
+        </div>
+
+        <div class="oad-tab-panel" id="oad-panel-uniforms">
+            <div class="oad-panel">
+                <div class="oad-panel-title">👔 ถุงชุด</div>
+                <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
+                    <select id="oad-uni-settype" class="oad-input" style="width:auto; min-width:170px;"></select>
+                    <select id="oad-uni-filter" class="oad-input" style="width:auto; min-width:150px;">
+                        <option value="all">ทั้งหมด</option>
+                        <option value="free">🟢 ชุดว่าง</option>
+                        <option value="owned">👤 มีเจ้าของ</option>
+                        <option value="inactive">⚠️ เจ้าของจบ/ออกแล้ว</option>
+                        <option value="nosize">📏 ไซส์ยังไม่ครบ</option>
+                    </select>
+                    <button class="oad-btn oad-btn-approve" id="oad-uni-card">🪪 พิมพ์บัตรใส่ถุงสูท</button>
+                    <button class="oad-btn" id="oad-uni-sizes">📏 กรอกไซส์</button>
+                    <button class="oad-btn" id="oad-uni-newkits">➕ เพิ่มถุงชุด</button>
+                    <button class="oad-btn oad-btn-red" id="oad-uni-relinactive">🧹 ปลดชุดของคนที่จบ/ออก</button>
+                    <button class="oad-btn" id="oad-uni-refresh">🔄 รีเฟรช</button>
+                </div>
+                <div id="oad-uni-summary" style="font-size:.85rem; color:var(--oad-muted); margin-bottom:.75rem;"></div>
+                <div class="oad-table-wrap" id="oad-uni-kits"></div>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">📊 รายงานไซส์และสภาพ</div>
+                <div id="oad-uni-report"></div>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">🔒 ล็อกการเลือกชุด</div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:.8rem;">
+                    ปิดสวิตช์นี้เมื่อจัดชุดเสร็จแล้ว เพื่อกันนักเรียนลงเบอร์มั่ว<br>
+                    <strong>ชุดที่ยังกรอกไซส์ไม่ครบ ระบบไม่ให้เลือกอยู่แล้ว</strong> — และล็อกรายชุดได้ด้วยปุ่ม 🔓/🔒 ในตารางด้านบน
+                </p>
+                <label style="display:flex; align-items:center; gap:.6rem; font-size:.95rem;">
+                    <input type="checkbox" id="oad-uni-selfselect" style="width:20px;height:20px;">
+                    <span>เปิดให้นักเรียนเลือกชุดเองได้</span>
+                </label>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">🧩 อุปกรณ์ในชุด</div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    เพิ่ม/ลดอุปกรณ์ได้เอง ไม่ต้องแก้โปรแกรม — เพิ่มแล้วระบบจะเติมให้ทุกถุงอัตโนมัติ
+                    ส่วนการลดจะ<strong>ไม่ลบประวัติ</strong> แค่ปลดออกจากรายการที่ต้องติ๊ก
+                </p>
+                <div style="display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1rem;">
+                    <button class="oad-btn oad-btn-approve" id="oad-uni-addpart">➕ เพิ่มอุปกรณ์</button>
+                    <button class="oad-btn" id="oad-uni-sync">🔧 เติมชิ้นที่ขาดให้ทุกถุง</button>
+                </div>
+                <div class="oad-table-wrap" id="oad-uni-parttypes"></div>
             </div>
         </div>
 
@@ -3364,18 +3517,30 @@ function renderBorrowsTable() {
                 </tr></thead>
                 <tbody>
                 ${rows.map(r => {
-                    const isOverdue = !r.is_take_home &&
-                        r.borrow_timestamp &&
-                        (Date.now() - new Date(r.borrow_timestamp).getTime()) > 6*3600*1000;
-                    const statusBadge = r.is_take_home
-                        ? (r.approval_status === 'pending' ? badge('pending') : badge('approved'))
-                        : (isOverdue ? badge('overdue') : badge('active'));
+                    // 🟢 FIX: เดิมตัดสินทุกอย่างจาก is_take_home อย่างเดียว ทำให้
+                    //   - ยืมออกงาน (performance) ขึ้นว่า "ในโรงเรียน"
+                    //   - ยืมออกงานเกิน 6 ชม. (ปกติมาก) ถูกตีว่าเลยกำหนด
+                    // ตอนนี้ใช้ borrow_type + is_overdue ที่ RPC คำนวณให้จาก expected_return_at
+                    const type = r.borrow_type || (r.is_take_home ? 'take_home' : 'in_school');
+                    const isOverdue = r.is_overdue === true;
+                    const needsApproval = r.approval_status === 'pending';
 
-                    // 🕐 Live timer cell — countdown สำหรับ take-home, elapsed สำหรับ in-school
-                    const timerCell = r.is_take_home
+                    const statusBadge = needsApproval ? badge('pending')
+                                      : isOverdue     ? badge('overdue')
+                                      : badge('active');
+
+                    const TYPE_BADGE = {
+                        in_school:   '<span class="oad-badge oad-badge-blue">🏫 ในโรงเรียน</span>',
+                        performance: '<span class="oad-badge oad-badge-amber">🎭 ออกงาน</span>',
+                        take_home:   '<span class="oad-badge oad-badge-purple">🏠 กลับบ้าน</span>',
+                        special:     '<span class="oad-badge oad-badge-gray">📝 กรณีพิเศษ</span>'
+                    };
+
+                    // 🕐 Live timer — นับถอยหลังจาก expected_return_at ได้ทุกประเภทแล้ว
+                    const timerCell = r.expected_return_at
                         ? `<div style="font-size:0.85rem;">
-                              <div style="font-size:0.7rem; color:var(--oad-muted);">📅 กำหนดคืน ${fmtDateShort(r.due_date)}</div>
-                              <div class="oad-live-countdown" data-due="${escapeHtml(r.due_date || '')}" style="font-weight:700; color:var(--oad-accent);">…</div>
+                              <div style="font-size:0.7rem; color:var(--oad-muted);">📅 กำหนดคืน ${fmtDate(r.expected_return_at)}</div>
+                              <div class="oad-live-countdown" data-due="${escapeHtml(r.expected_return_at)}" style="font-weight:700; color:${isOverdue ? 'var(--oad-danger, #ef4444)' : 'var(--oad-accent)'};">…</div>
                            </div>`
                         : `<div style="font-size:0.85rem;">
                               <div style="font-size:0.7rem; color:var(--oad-muted);">⏱️ ยืมเมื่อ ${fmtDate(r.borrow_timestamp)}</div>
@@ -3388,7 +3553,7 @@ function renderBorrowsTable() {
                         </div></td>
                         <td class="nowrap">${escapeHtml(r.instrument_name || '—')}</td>
                         <td>${timerCell}</td>
-                        <td>${r.is_take_home ? '<span class="oad-badge oad-badge-purple">🏠 กลับบ้าน</span>' : '<span class="oad-badge oad-badge-blue">🏫 ในโรงเรียน</span>'}</td>
+                        <td>${TYPE_BADGE[type] || TYPE_BADGE.in_school}</td>
                         <td>${statusBadge}</td>
                         <td><div class="actions">
                             <button class="oad-btn oad-btn-red" onclick="window.__oadForceReturn(${r.log_id})">↩ บังคับคืน</button>
@@ -3559,6 +3724,14 @@ function renderUsersTable() {
         if (status === 'normal')  rows = rows.filter(r => !r.is_blocked);
     }
 
+    // 👔 กรองตามสถานะการเลือกชุด — มีผลเฉพาะสมาชิกชุมนุม (คนอื่นไม่มีชุดประจำตัว)
+    const kitF = document.getElementById('oad-user-kit-filter')?.value || 'all';
+    if (kitF !== 'all') {
+        rows = rows.filter(r => r.student_group === 'club'
+            && (kitF === 'has' ? _userKitMap.has(r.id) : !_userKitMap.has(r.id)));
+    }
+    _renderKitStatusSummary();
+
     if (group !== 'all') {
         rows = rows.filter(r => r.student_group === group);
     }
@@ -3665,9 +3838,12 @@ function renderUsersTable() {
 
                     <td style="font-size:0.85rem; line-height:1.4;">${activityHtml}</td>
 
-                    <td style="text-align:center;">${statusBadge}</td>
-                    
+                    <td style="text-align:center;">${statusBadge}${_userKitBadge(r.id, r.student_group)}</td>
+
                     <td><div class="actions" style="justify-content:center;">
+                        ${r.student_group === 'club'
+                          ? `<button class="oad-btn oad-btn-ghost" title="จัดการชุดประจำตัว" onclick="window.__oadUserKit('${r.id}', '${escapeHtml(fullName)}')">👔</button>`
+                          : ''}
                         <button class="oad-btn oad-btn-ghost" title="ดูประวัติการยืม" onclick="window.__oadUserHistory('${r.id}', '${escapeHtml(fullName)}')">📜</button>
                         
                         ${isDeactivated ? `
@@ -5251,12 +5427,14 @@ function renderActiveTab() {
     switch (state.activeTab) {
         case 'overview':     renderStats(); renderOverviewPanels(); break;
         case 'borrows':      renderBorrowsTable(); break;
+        case 'events':       renderEventsTab(); break;
+        case 'uniforms':     renderUniformsTab(); break;
         case 'repairs':      renderRepairsTable(); break;
-        case 'users':        renderUsersTable(); break;
+        case 'users':        loadUserKitMap().then(renderUsersTable); renderStaffPanels(); break;
         case 'recovery':     renderRecoveryTable(); break;
         case 'config':       renderConfigTab(); break;
         case 'rankings':     renderRankingsTable(); break;
-        case 'instruments':  renderInstrumentsTable(); break;
+        case 'instruments':  renderInstrumentsTable(); renderSectionMap(); break;
         case 'history':      renderHistoryTable(); break;
         case 'knowledge':    renderKnowledgeTable(); break;
         case 'notifications': renderScheduledNotifications(); break;
@@ -5279,6 +5457,54 @@ function wireListeners() {
             document.getElementById(`oad-panel-${state.activeTab}`).classList.add('active');
             renderActiveTab();
         }
+    });
+
+    // 🎭 Events tab
+    document.getElementById('oad-ev-create')?.addEventListener('click', () => _createEvent(false));
+    document.getElementById('oad-ev-quick')?.addEventListener('click', () => _createEvent(true));
+    // เลือกวันที่จัดงาน → เดากำหนดคืนให้เป็นวันถัดไป 12:00 (แก้ได้)
+    document.getElementById('oad-ev-date')?.addEventListener('change', e => {
+        const dueEl = document.getElementById('oad-ev-due');
+        if (!dueEl || dueEl.value || !e.target.value) return;
+        const d = new Date(e.target.value + 'T12:00');
+        d.setDate(d.getDate() + 1);
+        const pad = n => String(n).padStart(2, '0');
+        dueEl.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T12:00`;
+    });
+
+    // 🎖 Staff roles
+    document.getElementById('oad-staff-add')?.addEventListener('click', () => window.__oadAddStaff());
+    document.getElementById('oad-user-kit-filter')?.addEventListener('change', () => renderUsersTable());
+
+    // 👔 Uniforms tab
+    document.getElementById('oad-uni-settype')?.addEventListener('change', e => {
+        _uni.setTypeId = Number(e.target.value);
+        _renderKitTable();
+    });
+    document.getElementById('oad-uni-card')?.addEventListener('click', () => window.__oadPrintKitCards());
+    document.getElementById('oad-uni-sizes')?.addEventListener('click', () => window.__oadBulkSizes());
+    document.getElementById('oad-uni-newkits')?.addEventListener('click', () => window.__oadNewKits());
+    document.getElementById('oad-uni-refresh')?.addEventListener('click', () => renderUniformsTab());
+    document.getElementById('oad-uni-filter')?.addEventListener('change', () => _renderKitTable());
+    document.getElementById('oad-uni-relinactive')?.addEventListener('click', async () => {
+        const { isConfirmed } = await Swal.fire({
+            title: '🧹 ปลดชุดของคนที่จบ/ลาออก/ปิดบัญชี?',
+            text: 'ชุดเหล่านั้นจะกลับมาว่างให้รุ่นน้องเลือกได้ ประวัติเจ้าของเดิมยังอยู่ครบ',
+            icon: 'question', showCancelButton: true,
+            confirmButtonText: 'ปลดทั้งหมด', cancelButtonText: 'ยกเลิก'
+        });
+        if (!isConfirmed) return;
+        const { data, error } = await uniformApi.releaseInactiveKits();
+        if (error) return toast(error.message, 'error');
+        toast(data?.message || 'ปลดแล้ว');
+        _renderKitTable();
+    });
+    document.getElementById('oad-uni-addpart')?.addEventListener('click', () => window.__oadAddPartType());
+    document.getElementById('oad-uni-sync')?.addEventListener('click', async () => {
+        const { data, error } = await uniformApi.syncKitParts(_uni.setTypeId);
+        if (error) return toast(error.message, 'error');
+        toast(data?.message || 'เติมชิ้นส่วนแล้ว');
+        renderUniformsTab();
     });
 
     // Recovery tab listeners
@@ -5406,7 +5632,15 @@ function _fmtElapsed(startIso) {
 function _fmtCountdown(dueDateStr) {
     if (!dueDateStr) return '<span style="color:var(--oad-muted);">ไม่มีกำหนด</span>';
     const due = new Date(dueDateStr);
-    due.setHours(23, 59, 59, 999);
+    if (isNaN(due)) return '<span style="color:var(--oad-muted);">ไม่มีกำหนด</span>';
+
+    // 🟢 FIX: เดิมบังคับ setHours(23,59) เสมอ ซึ่งถูกเฉพาะตอนรับค่าเป็น date (ยืมกลับบ้าน)
+    // ตอนนี้รับ expected_return_at ที่มีเวลาจริง (เช่น ยืม 1 ชม. หมดเวลา 15:30)
+    // ถ้ายังบังคับสิ้นวันจะนับถอยหลังผิดไปหลายชั่วโมง
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(dueDateStr).trim())) {
+        due.setHours(23, 59, 59, 999);
+    }
+
     const diff = due.getTime() - Date.now();
     if (diff < 0) {
         const od = Math.abs(diff);
@@ -5420,7 +5654,11 @@ function _fmtCountdown(dueDateStr) {
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
     if (d > 0) return `<span style="color:#10b981;">🕐 อีก ${d} วัน ${h} ชม. ${m} นาที</span>`;
-    return `<span style="color:${h < 6 ? '#f59e0b' : '#10b981'};">🕐 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</span>`;
+
+    // เกณฑ์สีอิงเวลาที่เหลือจริง — ยืม 1 ชม. กับ 6 ชม. ใช้เกณฑ์เดียวกันได้
+    const minsLeft = diff / 60000;
+    const color = minsLeft <= 10 ? '#ef4444' : minsLeft <= 30 ? '#f59e0b' : '#10b981';
+    return `<span style="color:${color};">🕐 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</span>`;
 }
 
 function _updateAdminBorrowTimers() {
@@ -5763,4 +6001,1218 @@ export function destroyAdminDashboard() {
      '__oadNewScheduledNotif', '__oadEditScheduledNotif', '__oadToggleScheduledNotif', '__oadDeleteScheduledNotif',
      '__oadAnnounceNow', '__oadDispatchNow',
      '__oadStopFlashBoost', '__oadUserHistory'].forEach(k => delete window[k]);
+}
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎭 EVENTS TAB — หน้าเปิด/ปิดงานของครู
+//    งานเป็นตัวกลางของทุกอย่าง: เด็กเลือกงานตอนสแกน → กำหนดคืนยึดตามงาน
+//    → ปิดงานไม่ได้ถ้ายังมีของค้าง (เว้นแต่ระบุเหตุผล)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const _EV_STATUS = {
+    draft:  '<span class="oad-badge oad-badge-gray">ร่าง</span>',
+    open:   '<span class="oad-badge oad-badge-green">เปิดรับเบิก</span>',
+    active: '<span class="oad-badge oad-badge-blue">กำลังดำเนินงาน</span>',
+    closed: '<span class="oad-badge oad-badge-gray">ปิดแล้ว</span>'
+};
+
+async function renderEventsTab() {
+    const wrap = document.getElementById('oad-events-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '<div class="oad-skel" style="height:120px;"></div>';
+
+    const { data: events, error } = await eventsApi.list();
+    if (error) {
+        wrap.innerHTML = `<div class="oad-empty">โหลดรายการงานไม่สำเร็จ: ${escapeHtml(error.message)}</div>`;
+        return;
+    }
+    if (!events?.length) {
+        wrap.innerHTML = '<div class="oad-empty"><span class="oad-empty-icon">🎭</span>ยังไม่มีงาน — เปิดงานแรกได้เลย</div>';
+        _updateEventsBadge(0);
+        return;
+    }
+
+    // ดึงสรุปของแต่ละงานพร้อมกัน
+    const summaries = await Promise.all(
+        events.map(e => eventsApi.getSummary(e.id).then(r => r.data || {}).catch(() => ({})))
+    );
+
+    _updateEventsBadge(events.filter(e => e.status === 'open' || e.status === 'active').length);
+
+    wrap.innerHTML = `
+        <table class="oad-table">
+            <thead><tr>
+                <th>งาน</th><th>วันที่</th><th>กำหนดคืน</th>
+                <th>เครื่องดนตรี</th><th>ชุด</th><th>สถานะ</th><th>จัดการ</th>
+            </tr></thead>
+            <tbody>
+            ${events.map((e, i) => {
+                const s = summaries[i] || {};
+                const iPend = s.instrument_pending || 0;
+                const uPend = s.uniform_pending || 0;
+                const cell = (back, out, pend) => out
+                    ? `${back}/${out}${pend ? ` <span style="color:#ef4444;font-weight:700;">ค้าง ${pend}</span>` : ' ✅'}`
+                    : '—';
+                const isClosed = e.status === 'closed';
+                return `<tr>
+                    <td><strong>${escapeHtml(e.name)}</strong></td>
+                    <td class="nowrap">${fmtDateShort(e.event_date)}</td>
+                    <td class="nowrap">${fmtDate(e.return_due_at)}</td>
+                    <td class="nowrap">${cell(s.instrument_back, s.instrument_out, iPend)}</td>
+                    <td class="nowrap">${cell(s.uniform_back, s.uniform_out, uPend)}</td>
+                    <td>${_EV_STATUS[e.status] || escapeHtml(e.status)}</td>
+                    <td><div class="actions">
+                        ${isClosed ? '' :
+                          `<button class="oad-btn oad-btn-red" onclick="window.__oadCloseEvent(${e.id}, ${iPend + uPend})">🔴 ปิดงาน</button>`}
+                        <button class="oad-btn" onclick="window.__oadEventDetail(${e.id})">🔍 ของค้าง</button>
+                    </div></td>
+                </tr>`;
+            }).join('')}
+            </tbody>
+        </table>`;
+}
+
+function _updateEventsBadge(n) {
+    const b = document.getElementById('oad-events-badge');
+    if (!b) return;
+    if (n > 0) { b.textContent = String(n); b.classList.remove('hidden'); }
+    else b.classList.add('hidden');
+}
+
+async function _createEvent(quick = false) {
+    let name, date, due, openTo, needsInst, needsUni;
+
+    if (quick) {
+        // ⚡ ปุ่มลัด — เปิดงานให้เสร็จใน 15 วิ กันครูลืมเปิดจนเด็กเบิกออกงานไม่ได้
+        const { value: qName } = await Swal.fire({
+            title: '⚡ เปิดงานด่วน',
+            input: 'text', inputPlaceholder: 'ชื่องาน',
+            text: 'จัดวันนี้ — กำหนดคืนพรุ่งนี้ 12:00',
+            showCancelButton: true, confirmButtonText: 'เปิดงาน', cancelButtonText: 'ยกเลิก',
+            inputValidator: v => (!v || !v.trim()) ? 'กรุณาใส่ชื่องาน' : undefined
+        });
+        if (!qName) return;
+        const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(12, 0, 0, 0);
+        name = qName.trim();
+        date = new Date().toISOString().slice(0, 10);
+        due = t.toISOString();
+        openTo = 'club'; needsInst = true; needsUni = true;
+    } else {
+        name      = document.getElementById('oad-ev-name')?.value?.trim();
+        date      = document.getElementById('oad-ev-date')?.value;
+        const dueLocal = document.getElementById('oad-ev-due')?.value;
+        openTo    = document.getElementById('oad-ev-open')?.value || 'club';
+        needsInst = document.getElementById('oad-ev-inst')?.checked ?? true;
+        needsUni  = document.getElementById('oad-ev-uni')?.checked ?? true;
+
+        if (!name || !date || !dueLocal) {
+            return toast('กรอกชื่องาน วันที่ และกำหนดคืนให้ครบ', 'error');
+        }
+        // datetime-local ให้เวลาท้องถิ่นแบบไม่มี timezone — แปลงเป็น ISO ก่อนส่ง
+        due = new Date(dueLocal).toISOString();
+        if (new Date(due) <= new Date()) {
+            return toast('กำหนดคืนต้องเป็นเวลาในอนาคต', 'error');
+        }
+    }
+
+    const { data, error } = await eventsApi.create({
+        name, eventDate: date, returnDueAt: due,
+        needsInstrument: needsInst, needsUniform: needsUni, openTo
+    });
+
+    if (error) return toast(error.message || 'เปิดงานไม่สำเร็จ', 'error');
+
+    toast(data?.message || `เปิดงาน "${name}" แล้ว`);
+    ['oad-ev-name', 'oad-ev-date', 'oad-ev-due'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    renderEventsTab();
+}
+
+window.__oadCloseEvent = async (eventId, pending) => {
+    let note = null;
+
+    if (pending > 0) {
+        const { value, isConfirmed } = await Swal.fire({
+            title: `ยังมีของค้าง ${pending} รายการ`,
+            text: 'ถ้าจะปิดงานตอนนี้ ต้องระบุเหตุผลไว้เป็นหลักฐาน',
+            input: 'text', inputPlaceholder: 'เช่น ตามเก็บภายหลัง / ของหาย แจ้งแล้ว',
+            showCancelButton: true, confirmButtonText: 'ปิดงาน', cancelButtonText: 'ยกเลิก',
+            inputValidator: v => (!v || !v.trim()) ? 'ต้องระบุเหตุผล' : undefined
+        });
+        if (!isConfirmed) return;
+        note = (value || '').trim();
+    } else {
+        const { isConfirmed } = await Swal.fire({
+            title: 'ปิดงานนี้?', text: 'ของคืนครบแล้ว ปิดงานได้เลย',
+            icon: 'question', showCancelButton: true,
+            confirmButtonText: 'ปิดงาน', cancelButtonText: 'ยกเลิก'
+        });
+        if (!isConfirmed) return;
+    }
+
+    const { data, error } = await eventsApi.close(eventId, note);
+    if (error) return toast(error.message || 'ปิดงานไม่สำเร็จ', 'error');
+    toast(`ปิดงานแล้ว${data?.pending_when_closed ? ` (ค้าง ${data.pending_when_closed} รายการ)` : ''}`);
+    renderEventsTab();
+};
+
+window.__oadEventDetail = async (eventId) => {
+    Swal.fire({ title: 'กำลังโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    const [liveRes, uniRes] = await Promise.all([
+        api.getActiveBorrows(),
+        uniformApi.getOutstanding(eventId)
+    ]);
+
+    const insts = (liveRes.data || []).filter(r => r.event_id === eventId);
+    const unis  = uniRes.data || [];
+
+    const section = (title, rows, render) => rows.length
+        ? `<div style="margin-bottom:1rem;">
+             <strong style="font-size:.9rem;">${title} (${rows.length})</strong>
+             <div style="margin-top:.4rem;">${rows.map(render).join('')}</div>
+           </div>`
+        : `<div style="margin-bottom:1rem;font-size:.85rem;opacity:.7;">${title}: คืนครบแล้ว ✅</div>`;
+
+    Swal.fire({
+        title: '🔍 ของที่ยังไม่คืน',
+        width: 620,
+        html: `<div style="text-align:left;font-size:.88rem;">
+            ${section('🎺 เครื่องดนตรี', insts, r => `
+                <div style="padding:.4rem .6rem;border-bottom:1px solid rgba(128,128,128,.2);">
+                    ${escapeHtml(r.student_name || '—')} — ${escapeHtml(r.instrument_name || '—')}
+                    ${r.is_overdue ? ' <span style="color:#ef4444;">เลยกำหนด</span>' : ''}
+                </div>`)}
+            ${section('👔 ชุด', unis, r => `
+                <div style="padding:.4rem .6rem;border-bottom:1px solid rgba(128,128,128,.2);">
+                    ชุด #${r.kit_no} — ${escapeHtml(r.student_name || '—')}
+                    <span style="opacity:.75;">${r.icon || ''} ${escapeHtml(r.part_type || '')} (${escapeHtml(r.part_code || '')})</span>
+                </div>`)}
+        </div>`,
+        confirmButtonText: 'ปิด'
+    });
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 👔 UNIFORMS TAB — จัดการถุงชุด เจ้าของ ไซส์ และอุปกรณ์ในชุด
+// ═══════════════════════════════════════════════════════════════════════════
+
+const _uni = { setTypes: [], kits: [], partTypes: [], setTypeId: null, selected: new Set() };
+
+// อัปเดตป้ายจำนวนที่เลือกบนปุ่มพิมพ์บัตร
+function _syncKitSelectionUI(visibleIds) {
+    const btn = document.getElementById('oad-uni-card');
+    const n = _uni.selected.size;
+    if (btn) btn.textContent = n ? `🪪 พิมพ์บัตร (${n} ใบ)` : '🪪 พิมพ์บัตรใส่ถุงสูท';
+    const all = document.getElementById('uni-check-all');
+    if (all && visibleIds) {
+        all.checked = visibleIds.length > 0 && visibleIds.every(id => _uni.selected.has(id));
+        all.indeterminate = !all.checked && visibleIds.some(id => _uni.selected.has(id));
+    }
+}
+
+async function renderUniformsTab() {
+    const sel = document.getElementById('oad-uni-settype');
+
+    if (!_uni.setTypes.length) {
+        const { data } = await uniformApi.setTypes();
+        _uni.setTypes = data || [];
+        if (sel) {
+            sel.innerHTML = _uni.setTypes
+                .map(s => `<option value="${s.id}">${s.icon || ''} ${escapeHtml(s.name_th)}</option>`).join('');
+        }
+        _uni.setTypeId = _uni.setTypes[0]?.id ?? null;
+        if (sel && _uni.setTypeId) sel.value = String(_uni.setTypeId);
+    }
+
+    const ss = document.getElementById('oad-uni-selfselect');
+    if (ss && !ss.dataset.wired) {
+        const { data: on } = await uniformApi.getSelfSelect();
+        ss.checked = on !== false;
+        ss.dataset.wired = '1';
+        ss.addEventListener('change', async e => {
+            const { error } = await uniformApi.setSelfSelect(e.target.checked);
+            if (error) { e.target.checked = !e.target.checked; return toast(error.message, 'error'); }
+            toast(e.target.checked ? 'เปิดให้นักเรียนเลือกชุดเองแล้ว' : 'ปิดการเลือกชุดเองแล้ว');
+        });
+    }
+
+    await Promise.all([_renderKitTable(), _renderPartTypeTable(), _renderUniformReport()]);
+}
+
+async function _renderKitTable() {
+    const wrap = document.getElementById('oad-uni-kits');
+    const sum  = document.getElementById('oad-uni-summary');
+    if (!wrap) return;
+    wrap.innerHTML = '<div class="oad-skel" style="height:100px;"></div>';
+
+    const { data, error } = await uniformApi.adminListKits(_uni.setTypeId);
+    if (error) { wrap.innerHTML = `<div class="oad-empty">${escapeHtml(error.message)}</div>`; return; }
+
+    _uni.kits = data || [];
+    if (!_uni.kits.length) {
+        wrap.innerHTML = '<div class="oad-empty"><span class="oad-empty-icon">👔</span>ยังไม่มีถุงชุดของประเภทนี้ — กด "เพิ่มถุงชุด"</div>';
+        if (sum) sum.textContent = '';
+        return;
+    }
+
+    const INACTIVE = ['graduated', 'resigned', 'deactivated'];
+    const isInactive = k => k.owner_id && INACTIVE.includes(k.owner_group);
+
+    const owned    = _uni.kits.filter(k => k.owner_id).length;
+    const free     = _uni.kits.length - owned;
+    const sized    = _uni.kits.filter(k => k.parts_total > 0 && k.parts_sized === k.parts_total).length;
+    const orphaned = _uni.kits.filter(isInactive).length;
+
+    if (sum) {
+        sum.innerHTML = `ทั้งหมด <strong>${_uni.kits.length}</strong> ถุง ·
+            🟢 ว่าง <strong>${free}</strong> ·
+            👤 มีเจ้าของ <strong>${owned}</strong> ·
+            📏 ไซส์ครบ <strong>${sized}</strong>
+            ${orphaned ? ` · <span style="color:#ef4444;font-weight:700;">⚠️ เจ้าของจบ/ออกแล้ว ${orphaned} ชุด</span>` : ''}`;
+    }
+
+    // ตัวกรอง — ทำฝั่ง client เพราะข้อมูลโหลดมาครบแล้ว ไม่ต้องยิงซ้ำ
+    const f = document.getElementById('oad-uni-filter')?.value || 'all';
+    const rows = _uni.kits.filter(k =>
+        f === 'free'     ? !k.owner_id :
+        f === 'owned'    ? !!k.owner_id :
+        f === 'inactive' ? isInactive(k) :
+        f === 'nosize'   ? (k.parts_total === 0 || k.parts_sized < k.parts_total) : true);
+
+    if (!rows.length) {
+        wrap.innerHTML = '<div class="oad-empty"><span class="oad-empty-icon">🔍</span>ไม่มีถุงที่ตรงกับตัวกรองนี้</div>';
+        return;
+    }
+
+    wrap.innerHTML = `
+        <table class="oad-table">
+            <thead><tr>
+                <th style="width:34px;text-align:center;">
+                    <input type="checkbox" id="uni-check-all" title="เลือก/ยกเลิกทั้งหมดที่แสดงอยู่"
+                           style="width:18px;height:18px;cursor:pointer;"></th>
+                <th>เบอร์ชุด</th><th>เจ้าของ</th><th>ชั้น</th><th>เครื่องดนตรี</th>
+                <th>ไซส์</th><th>จัดการ</th>
+            </tr></thead>
+            <tbody>
+            ${rows.map(k => {
+                const parts = k.parts || [];
+                const sizeTxt = parts.length
+                    ? parts.map(p => `${p.icon || ''}${p.size ? escapeHtml(p.size) : '—'}`).join(' ')
+                    : '<span style="opacity:.5;">ไม่มีชิ้น</span>';
+                const ownerCell = k.owner_name
+                    ? escapeHtml(k.owner_name)
+                      + (k.owner_nickname ? ` <span style="opacity:.6;">(${escapeHtml(k.owner_nickname)})</span>` : '')
+                      + (isInactive(k)
+                          ? `<div><span class="oad-badge oad-badge-red">⚠️ ${escapeHtml(translateGroup(k.owner_group))}</span></div>`
+                          : '')
+                    : '<span class="oad-badge oad-badge-green">🟢 ว่าง</span>';
+                const locked = k.is_selectable === false;
+                return `<tr${isInactive(k) ? ' style="background:rgba(239,68,68,.06);"' : ''}>
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="uni-pick" value="${k.kit_id}"
+                               ${_uni.selected.has(k.kit_id) ? 'checked' : ''}
+                               style="width:18px;height:18px;cursor:pointer;"></td>
+                    <td><strong style="font-size:1.05rem;">#${k.kit_no}</strong>
+                        ${locked ? ' <span class="oad-badge oad-badge-gray">🔒 ล็อก</span>' : ''}
+                        <div style="font-size:.7rem;opacity:.6;">${escapeHtml(k.qr_code || '')}</div></td>
+                    <td>${ownerCell}</td>
+                    <td class="nowrap">${escapeHtml(k.owner_class || '—')}</td>
+                    <td class="nowrap">${escapeHtml(k.owner_instrument || '—')}</td>
+                    <td style="font-size:.8rem;">${sizeTxt}
+                        <div style="font-size:.7rem;opacity:.6;">
+                            ${k.parts_sized}/${k.parts_total} ชิ้น
+                            ${k.parts_issue ? ` · <span style="color:#f59e0b;font-weight:700;">🔧 ${k.parts_issue}</span>` : ''}
+                        </div></td>
+                    <td><div class="actions">
+                        <button class="oad-btn" onclick="window.__oadAssignKit(${k.kit_id})">${k.owner_id ? '🔁 ย้าย' : '👤 กำหนด'}</button>
+                        ${k.owner_id ? `<button class="oad-btn oad-btn-red" onclick="window.__oadReleaseKit(${k.kit_id}, ${k.kit_no})">🚪 ปลด</button>` : ''}
+                        <button class="oad-btn" onclick="window.__oadKitSizes(${k.kit_id})">📏 ไซส์</button>
+                        <button class="oad-btn" onclick="window.__oadLockKit(${k.kit_id}, ${k.kit_no}, ${!locked})">${locked ? '🔓' : '🔒'}</button>
+                        <button class="oad-btn" onclick="window.__oadKitHistory(${k.kit_id}, ${k.kit_no})">📜</button>
+                    </div></td>
+                </tr>`;
+            }).join('')}
+            </tbody>
+        </table>`;
+
+    // ── ติ๊กเลือกถุงสำหรับพิมพ์บัตรเฉพาะที่ต้องการ
+    const visibleIds = rows.map(r => r.kit_id);
+    wrap.querySelectorAll('.uni-pick').forEach(cb => {
+        cb.addEventListener('change', e => {
+            const id = Number(e.target.value);
+            if (e.target.checked) _uni.selected.add(id); else _uni.selected.delete(id);
+            _syncKitSelectionUI(visibleIds);
+        });
+    });
+    document.getElementById('uni-check-all')?.addEventListener('change', e => {
+        // เลือก/ยกเลิกเฉพาะแถวที่แสดงอยู่ตามตัวกรอง ไม่ไปยุ่งกับถุงอื่น
+        visibleIds.forEach(id => e.target.checked ? _uni.selected.add(id) : _uni.selected.delete(id));
+        wrap.querySelectorAll('.uni-pick').forEach(cb => { cb.checked = e.target.checked; });
+        _syncKitSelectionUI(visibleIds);
+    });
+    _syncKitSelectionUI(visibleIds);
+}
+
+async function _renderPartTypeTable() {
+    const wrap = document.getElementById('oad-uni-parttypes');
+    if (!wrap) return;
+
+    const { data, error } = await uniformApi.adminListPartTypes();
+    if (error) { wrap.innerHTML = `<div class="oad-empty">${escapeHtml(error.message)}</div>`; return; }
+    _uni.partTypes = data || [];
+
+    wrap.innerHTML = `
+        <table class="oad-table">
+            <thead><tr><th>ประเภทชุด</th><th>อุปกรณ์</th><th>รหัสนำหน้า</th>
+                       <th>จำนวนชิ้น</th><th>บังคับติ๊ก</th><th>จัดการ</th></tr></thead>
+            <tbody>
+            ${_uni.partTypes.map(p => `<tr>
+                <td class="nowrap">${escapeHtml(p.set_name || '—')}</td>
+                <td>${p.icon || ''} <strong>${escapeHtml(p.name_th)}</strong></td>
+                <td><code>${escapeHtml(p.prefix)}-001</code></td>
+                <td>${p.part_count}</td>
+                <td>${p.is_required
+                    ? '<span class="oad-badge oad-badge-green">บังคับ</span>'
+                    : '<span class="oad-badge oad-badge-gray">ปลดแล้ว</span>'}</td>
+                <td>${p.is_required
+                    ? `<button class="oad-btn oad-btn-red" onclick="window.__oadRetirePart(${p.id}, '${escapeHtml(p.name_th).replace(/'/g, "\\'")}')">ปลดออก</button>`
+                    : ''}</td>
+            </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+// ── กำหนดเจ้าของชุด ────────────────────────────────────────────────────────
+window.__oadAssignKit = async (kitId) => {
+    const kit = _uni.kits.find(k => k.kit_id === kitId);
+    const candidates = (state.users || [])
+        .filter(u => u.role !== 'admin' && u.student_group !== 'deactivated')
+        .sort((a, b) => (a.class_level || '').localeCompare(b.class_level || ''));
+
+    const { value, isConfirmed } = await Swal.fire({
+        title: `👤 เจ้าของชุด #${kit?.kit_no}`,
+        html: `<select id="assign-stu" class="swal2-input" style="width:100%;margin:0;">
+                 <option value="">— ไม่มีเจ้าของ —</option>
+                 ${candidates.map(u => `<option value="${u.id}"${kit?.owner_id === u.id ? ' selected' : ''}>
+                    ${escapeHtml((u.prefix || '') + u.first_name + ' ' + u.last_name)}
+                    ${u.class_level ? ' · ' + escapeHtml(u.class_level) : ''}
+                    ${u.main_instrument ? ' · ' + escapeHtml(u.main_instrument) : ''}
+                 </option>`).join('')}
+               </select>`,
+        showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => document.getElementById('assign-stu').value || null
+    });
+    if (!isConfirmed) return;
+
+    // ใช้ transfer เสมอ — จัดการเคสคนใหม่ถือชุดอื่นอยู่ / คนเดิมต้องถูกปลด ให้ในตัว
+    const { data, error } = value
+        ? await uniformApi.transferKit(kitId, value)
+        : await uniformApi.releaseKit(kitId, 'ปลดโดยครู');
+    if (error) return toast(error.message, 'error');
+    toast(data?.message || 'บันทึกเจ้าของชุดแล้ว');
+    _renderKitTable();
+};
+
+// ── ปลดเจ้าของ (คนเดิมออก / เปลี่ยนชุด) ────────────────────────────────────
+window.__oadReleaseKit = async (kitId, kitNo) => {
+    const { value, isConfirmed } = await Swal.fire({
+        title: `🚪 ปลดเจ้าของชุด #${kitNo}?`,
+        input: 'text', inputPlaceholder: 'เหตุผล เช่น ลาออก / เปลี่ยนไซส์',
+        text: 'ชุดจะกลับมาเป็นชุดว่าง ให้คนอื่นเลือกได้ ประวัติเจ้าของเดิมถูกบันทึกไว้',
+        showCancelButton: true, confirmButtonText: 'ปลด', cancelButtonText: 'ยกเลิก'
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.releaseKit(kitId, (value || '').trim() || null);
+    if (error) return toast(error.message, 'error');
+    toast(data?.message || 'ปลดแล้ว');
+    _renderKitTable();
+};
+
+// ── ประวัติเจ้าของ ─────────────────────────────────────────────────────────
+window.__oadKitHistory = async (kitId, kitNo) => {
+    const { data, error } = await uniformApi.kitHistory(kitId);
+    if (error) return toast(error.message, 'error');
+
+    const rows = data || [];
+    Swal.fire({
+        title: `📜 ประวัติเจ้าของชุด #${kitNo}`,
+        width: 520,
+        html: rows.length
+            ? `<div style="text-align:left;font-size:.85rem;">
+                 ${rows.map(h => `<div style="padding:.5rem .3rem;border-bottom:1px solid rgba(128,128,128,.2);">
+                     <strong>${escapeHtml(h.student_name || 'ไม่ทราบชื่อ')}</strong>
+                     <div style="opacity:.7;font-size:.78rem;">
+                       ${h.assigned_at ? fmtDateShort(h.assigned_at) : '—'} → ${fmtDateShort(h.released_at)}
+                       ${h.reason ? ' · ' + escapeHtml(h.reason) : ''}
+                     </div>
+                   </div>`).join('')}
+               </div>`
+            : '<div style="opacity:.7;">ยังไม่เคยเปลี่ยนเจ้าของ</div>',
+        confirmButtonText: 'ปิด'
+    });
+};
+
+// ── กรอกไซส์รายถุง ─────────────────────────────────────────────────────────
+window.__oadKitSizes = async (kitId) => {
+    const kit = _uni.kits.find(k => k.kit_id === kitId);
+    const parts = kit?.parts || [];
+    if (!parts.length) return toast('ถุงนี้ยังไม่มีชิ้นส่วน', 'error');
+
+    const { value, isConfirmed } = await Swal.fire({
+        title: `📏 ไซส์ชุด #${kit.kit_no}`,
+        width: 460,
+        html: `<div style="text-align:left;font-size:.9rem;">
+                 ${parts.map(p => `
+                   <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;">
+                     <span style="flex:1;">${p.icon || ''} ${escapeHtml(p.type_name)}
+                       <span style="opacity:.6;font-size:.78rem;">${escapeHtml(p.part_code)}</span></span>
+                     <input class="size-in" data-part="${p.part_id}" value="${escapeHtml(p.size || '')}"
+                            placeholder="เช่น L / 42"
+                            style="width:110px;padding:.35rem .5rem;border-radius:6px;">
+                   </div>`).join('')}
+               </div>`,
+        showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => [...document.querySelectorAll('.size-in')].map(i => ({
+            part_id: Number(i.dataset.part), size: i.value.trim()
+        }))
+    });
+    if (!isConfirmed) return;
+
+    const { error } = await uniformApi.setPartSizes(value);
+    if (error) return toast(error.message, 'error');
+    toast('บันทึกไซส์แล้ว');
+    _renderKitTable();
+};
+
+// ── กรอกไซส์แบบรวดเดียวทั้งประเภทชุด ───────────────────────────────────────
+window.__oadBulkSizes = async () => {
+    const kits = _uni.kits;
+    if (!kits.length) return toast('ยังไม่มีถุงชุด', 'error');
+
+    const types = (kits[0].parts || []).map(p => ({ id: p.type_id, name: p.type_name, icon: p.icon }));
+    if (!types.length) return toast('ยังไม่มีชิ้นส่วน', 'error');
+
+    const { value, isConfirmed } = await Swal.fire({
+        title: '📏 กรอกไซส์รวดเดียว',
+        width: 680,
+        html: `<div style="text-align:left;font-size:.85rem;max-height:60vh;overflow:auto;">
+                 <p style="margin:0 0 .6rem;opacity:.75;">กรอกเฉพาะช่องที่ต้องการ — ช่องที่เว้นว่างจะไม่ถูกแก้</p>
+                 <table style="width:100%;border-collapse:collapse;">
+                   <thead><tr>
+                     <th style="text-align:left;padding:.3rem;">ชุด</th>
+                     ${types.map(t => `<th style="padding:.3rem;">${t.icon || ''} ${escapeHtml(t.name)}</th>`).join('')}
+                   </tr></thead>
+                   <tbody>
+                   ${kits.map(k => `<tr>
+                     <td style="padding:.25rem;white-space:nowrap;">
+                       <strong>#${k.kit_no}</strong>
+                       <span style="opacity:.6;">${escapeHtml(k.owner_nickname || k.owner_name || '')}</span>
+                     </td>
+                     ${types.map(t => {
+                        const p = (k.parts || []).find(x => x.type_id === t.id);
+                        return `<td style="padding:.15rem;">${p
+                          ? `<input class="bulk-size" data-part="${p.part_id}" value="${escapeHtml(p.size || '')}"
+                                    style="width:66px;padding:.25rem;border-radius:5px;font-size:.8rem;">`
+                          : '—'}</td>`;
+                     }).join('')}
+                   </tr>`).join('')}
+                   </tbody>
+                 </table>
+               </div>`,
+        showCancelButton: true, confirmButtonText: 'บันทึกทั้งหมด', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => [...document.querySelectorAll('.bulk-size')]
+            .map(i => ({ part_id: Number(i.dataset.part), size: i.value.trim() }))
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.setPartSizes(value);
+    if (error) return toast(error.message, 'error');
+    toast(`บันทึกไซส์ ${data?.updated ?? 0} ชิ้น`);
+    _renderKitTable();
+};
+
+// ── เพิ่มถุงชุด / เพิ่ม-ลดอุปกรณ์ ────────────────────────────────────────────
+window.__oadNewKits = async () => {
+    const st = _uni.setTypes.find(s => s.id === _uni.setTypeId);
+    const { value, isConfirmed } = await Swal.fire({
+        title: `➕ เพิ่มถุงชุด — ${st?.name_th || ''}`,
+        input: 'number', inputLabel: 'เพิ่มกี่ถุง?', inputValue: 20,
+        inputAttributes: { min: 1, max: 200 },
+        text: 'เลขถุงจะต่อจากเลขสูงสุดที่มีอยู่ และระบบจะสร้างชิ้นส่วนให้อัตโนมัติ',
+        showCancelButton: true, confirmButtonText: 'สร้าง', cancelButtonText: 'ยกเลิก'
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.createKits(_uni.setTypeId, Number(value));
+    if (error) return toast(error.message, 'error');
+    toast(`สร้างถุง #${data.from}–#${data.to} แล้ว`);
+    _renderKitTable();
+};
+
+window.__oadRetirePart = async (partTypeId, name) => {
+    const { isConfirmed } = await Swal.fire({
+        title: `ปลด "${name}" ออกจากชุด?`,
+        text: 'ประวัติการเบิกเดิมยังอยู่ครบ แต่จะไม่ต้องติ๊กชิ้นนี้อีกต่อไป',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonText: 'ปลดออก', cancelButtonText: 'ยกเลิก'
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.retirePartType(partTypeId);
+    if (error) return toast(error.message, 'error');
+    toast(data?.message || 'ปลดออกแล้ว');
+    renderUniformsTab();
+};
+
+window.__oadAddPartType = async () => {
+    const { value, isConfirmed } = await Swal.fire({
+        title: '➕ เพิ่มอุปกรณ์ในชุด',
+        width: 460,
+        html: `<div style="text-align:left;font-size:.9rem;">
+                 <label style="font-weight:700;">ประเภทชุด</label>
+                 <select id="pt-set" class="swal2-input" style="width:100%;margin:.2rem 0 .6rem;">
+                   ${_uni.setTypes.map(s => `<option value="${s.id}"${s.id === _uni.setTypeId ? ' selected' : ''}>${s.icon || ''} ${escapeHtml(s.name_th)}</option>`).join('')}
+                 </select>
+                 <label style="font-weight:700;">ชื่ออุปกรณ์</label>
+                 <input id="pt-name" class="swal2-input" style="width:100%;margin:.2rem 0 .6rem;" placeholder="เช่น ถุงมือ">
+                 <label style="font-weight:700;">อีโมจิ</label>
+                 <input id="pt-icon" class="swal2-input" style="width:100%;margin:.2rem 0 .6rem;" placeholder="🧤">
+                 <label style="font-weight:700;">รหัสนำหน้า (ตัวอักษร ไม่ซ้ำของเดิม)</label>
+                 <input id="pt-prefix" class="swal2-input" style="width:100%;margin:.2rem 0 .3rem;" placeholder="G" maxlength="3">
+                 <p style="margin:0;font-size:.75rem;opacity:.7;">ชิ้นจะได้รหัสเช่น G-001, G-002 …</p>
+               </div>`,
+        showCancelButton: true, confirmButtonText: 'เพิ่ม', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+            const name   = document.getElementById('pt-name').value.trim();
+            const prefix = document.getElementById('pt-prefix').value.trim().toUpperCase();
+            if (!name || !prefix) { Swal.showValidationMessage('กรอกชื่อและรหัสนำหน้า'); return false; }
+            if (!/^[A-Z]{1,3}$/.test(prefix)) { Swal.showValidationMessage('รหัสนำหน้าต้องเป็นตัวอักษร A-Z 1-3 ตัว'); return false; }
+            return {
+                setTypeId: Number(document.getElementById('pt-set').value),
+                nameTh: name, prefix,
+                icon: document.getElementById('pt-icon').value.trim() || null,
+                code: prefix.toLowerCase() + '_' + Date.now().toString(36)
+            };
+        }
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.addPartType(value);
+    if (error) return toast(error.message, 'error');
+    toast(data?.message || 'เพิ่มอุปกรณ์แล้ว');
+    renderUniformsTab();
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🪪 บัตรประจำชุด — ขนาดเครดิตการ์ด 85.6 × 54 มม. ใส่ในซองใสของถุงสูทได้
+//    ด้านหน้า: QR + เบอร์ชุด + ชื่อเจ้าของ + ชั้น + เครื่องดนตรี + ไซส์รายชิ้น
+// ═══════════════════════════════════════════════════════════════════════════
+window.__oadPrintKitCards = async () => {
+    if (typeof QRCode === 'undefined') return toast('ไลบรารี QRCode ยังไม่ถูกโหลด', 'error');
+    if (!_uni.kits.length) return toast('ยังไม่มีถุงชุด', 'error');
+
+    // เลือกไว้กี่ใบก็พิมพ์เท่านั้น — ไม่ได้ติ๊กเลยค่อยถามว่าจะพิมพ์ทั้งหมดไหม
+    let targets = _uni.kits.filter(k => _uni.selected.has(k.kit_id));
+    if (!targets.length) {
+        const { isConfirmed } = await Swal.fire({
+            title: 'ยังไม่ได้เลือกถุง',
+            text: `พิมพ์บัตรทั้งหมด ${_uni.kits.length} ใบเลยไหม? (ติ๊กช่องหน้าแถวเพื่อเลือกเฉพาะที่ต้องการ)`,
+            icon: 'question', showCancelButton: true,
+            confirmButtonText: `พิมพ์ทั้งหมด ${_uni.kits.length} ใบ`, cancelButtonText: 'ยกเลิก'
+        });
+        if (!isConfirmed) return;
+        targets = _uni.kits;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return toast('เบราว์เซอร์บล็อกป๊อปอัป — อนุญาตก่อนแล้วลองใหม่', 'error');
+    printWindow.document.write('<div style="font-family:sans-serif;text-align:center;margin-top:50px;"><h2>⏳ กำลังสร้างบัตร...</h2></div>');
+
+    Swal.fire({ title: 'กำลังเตรียมบัตร...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        const cards = await Promise.all(targets.map(k => new Promise(resolve => {
+            const div = document.createElement('div');
+            new QRCode(div, {
+                text: k.qr_code || `KIT-${String(k.kit_no).padStart(3, '0')}`,
+                width: 200, height: 200,
+                colorDark: '#000000', colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            setTimeout(() => {
+                const c = div.querySelector('canvas');
+                resolve({ ...k, base64: c ? c.toDataURL('image/png') : '' });
+            }, 50);
+        })));
+
+        const setName = _uni.setTypes.find(s => s.id === _uni.setTypeId)?.name_th || '';
+
+        const cardHtml = c => {
+            const parts = c.parts || [];
+            return `<div class="card">
+              <div class="left">
+                <img src="${c.base64}" alt="">
+                <div class="code">${escapeHtml(c.qr_code || '')}</div>
+              </div>
+              <div class="right">
+                <div class="kitno">ชุด #${c.kit_no}</div>
+                <div class="name">${escapeHtml(c.owner_name || 'ยังไม่มีเจ้าของ')}</div>
+                <div class="meta">
+                  ${c.owner_nickname ? `(${escapeHtml(c.owner_nickname)}) ` : ''}
+                  ${c.owner_class ? escapeHtml(c.owner_class) : ''}
+                </div>
+                <div class="inst">${escapeHtml(c.owner_instrument || setName)}</div>
+                <table class="sizes">
+                  ${parts.map(p => `<tr>
+                    <td class="pn">${p.icon || ''} ${escapeHtml(p.type_name)}</td>
+                    <td class="pc">${escapeHtml(p.part_code)}</td>
+                    <td class="ps">${p.size ? escapeHtml(p.size) : '—'}</td>
+                  </tr>`).join('')}
+                </table>
+              </div>
+            </div>`;
+        };
+
+        const html = `<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+<title>บัตรประจำชุด_${setName}</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
+* { box-sizing: border-box; }
+body { font-family:'Sarabun',sans-serif; background:#f4f4f5; margin:0; padding:12mm 8mm; color:#000; }
+.header { text-align:center; margin-bottom:8mm; }
+.sheet { display:flex; flex-wrap:wrap; gap:4mm; justify-content:flex-start; }
+
+/* ขนาดบัตรเครดิต ISO/IEC 7810 ID-1 = 85.6 x 54 mm */
+.card {
+  width:85.6mm; height:54mm;
+  border:0.3mm solid #333; border-radius:3mm;
+  background:#fff; padding:3mm;
+  display:flex; gap:3mm; overflow:hidden;
+  break-inside:avoid; page-break-inside:avoid;
+}
+.left { width:26mm; flex-shrink:0; text-align:center; }
+.left img { width:26mm; height:26mm; display:block; }
+.code { font-size:7pt; letter-spacing:.3pt; margin-top:1mm; color:#333; }
+.right { flex:1; min-width:0; display:flex; flex-direction:column; }
+.kitno { font-size:15pt; font-weight:700; line-height:1.05; }
+.name  { font-size:10pt; font-weight:600; line-height:1.15; margin-top:.6mm;
+         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.meta  { font-size:7.5pt; color:#555; line-height:1.1; }
+.inst  { font-size:8pt; color:#111; font-weight:600; margin:.6mm 0 1mm; }
+.sizes { width:100%; border-collapse:collapse; font-size:7pt; margin-top:auto; }
+.sizes td { border-top:0.15mm solid #ddd; padding:.35mm 0; line-height:1.25; }
+.pn { white-space:nowrap; }
+.pc { color:#777; text-align:center; font-size:6.5pt; }
+.ps { text-align:right; font-weight:700; width:11mm; }
+
+@media print {
+  body { background:#fff; padding:0; }
+  .no-print { display:none !important; }
+  .sheet { gap:0; }
+  .card { border:0.2mm dashed #999; border-radius:0; margin:0; }
+  @page { size:A4; margin:8mm; }
+}
+</style></head><body>
+<div class="header no-print">
+  <h2>บัตรประจำชุด — ${escapeHtml(setName)} (${cards.length} ใบ)</h2>
+  <p style="font-size:14px;color:#555;margin:.3rem 0 1rem;">
+    ขนาดเท่าบัตรเครดิต (85.6 × 54 มม.) — ตัดแล้วใส่ซองใสของถุงสูทได้เลย<br>
+    พิมพ์บนกระดาษ A4 แนวตั้ง ได้ 8 ใบ/แผ่น · ตั้งค่าการพิมพ์เป็น <strong>ขนาดจริง 100%</strong> (ห้าม Fit to page)
+  </p>
+  <button onclick="window.print()" style="padding:12px 24px;font-size:16px;cursor:pointer;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-family:'Sarabun',sans-serif;font-weight:600;">🖨️ สั่งพิมพ์ / บันทึกเป็น PDF</button>
+</div>
+<div class="sheet">${cards.map(cardHtml).join('')}</div>
+</body></html>`;
+
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        Swal.close();
+        toast(`สร้างบัตร ${cards.length} ใบแล้ว`);
+    } catch (e) {
+        Swal.close();
+        toast('สร้างบัตรไม่สำเร็จ: ' + (e?.message || e), 'error');
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📊 รายงานไซส์และสภาพชุด — ครูดูได้ว่ามีไซส์ไหนกี่ชุด เสียหายกี่ชิ้น
+// ═══════════════════════════════════════════════════════════════════════════
+const _COND_TH = { A: 'สภาพดี', B: 'มีร่องรอย', C: 'ชำรุดเล็กน้อย', repair: 'ต้องซ่อม', lost: 'สูญหาย' };
+
+async function _renderUniformReport() {
+    const box = document.getElementById('oad-uni-report');
+    if (!box) return;
+    box.innerHTML = '<div class="oad-skel" style="height:80px;"></div>';
+
+    const [repRes, dmgRes] = await Promise.all([
+        uniformApi.sizeReport(_uni.setTypeId),
+        uniformApi.damagedList(_uni.setTypeId)
+    ]);
+
+    if (repRes.error) { box.innerHTML = `<div class="oad-empty">${escapeHtml(repRes.error.message)}</div>`; return; }
+
+    const rows = repRes.data || [];
+    const dmg  = dmgRes.data || [];
+
+    if (!rows.length) { box.innerHTML = '<div class="oad-empty">ยังไม่มีข้อมูลชิ้นส่วน</div>'; return; }
+
+    // จัดกลุ่มตามประเภทชิ้น → ไซส์
+    const byType = new Map();
+    for (const r of rows) {
+        if (!byType.has(r.type_id)) byType.set(r.type_id, { name: r.type_name, icon: r.icon, sizes: [] });
+        byType.get(r.type_id).sizes.push(r);
+    }
+
+    const totalDamaged = rows.reduce((s, r) => s + Number(r.damaged_n), 0);
+    const totalLost    = rows.reduce((s, r) => s + Number(r.lost_n), 0);
+    const totalUnsized = rows.filter(r => r.size === '(ยังไม่ระบุ)').reduce((s, r) => s + Number(r.n), 0);
+
+    box.innerHTML = `
+        <div style="display:flex; gap:1.2rem; flex-wrap:wrap; margin-bottom:1rem; font-size:.9rem;">
+            <span>🧾 ทั้งหมด <strong>${rows.reduce((s, r) => s + Number(r.n), 0)}</strong> ชิ้น</span>
+            <span style="color:#f59e0b;">🔧 ชำรุด/ต้องซ่อม <strong>${totalDamaged}</strong></span>
+            <span style="color:#ef4444;">❌ สูญหาย <strong>${totalLost}</strong></span>
+            <span style="color:${totalUnsized ? '#f59e0b' : 'inherit'};">📏 ยังไม่ระบุไซส์ <strong>${totalUnsized}</strong></span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:1rem;">
+        ${[...byType.values()].map(t => `
+            <div style="border:1px solid var(--oad-border); border-radius:10px; padding:.8rem;">
+                <div style="font-weight:700; margin-bottom:.5rem;">${t.icon || ''} ${escapeHtml(t.name)}</div>
+                <table style="width:100%; font-size:.83rem; border-collapse:collapse;">
+                    <thead><tr style="opacity:.6; font-size:.75rem;">
+                        <th style="text-align:left;">ไซส์</th><th>ทั้งหมด</th><th>ใช้ได้</th><th>ซ่อม</th><th>หาย</th>
+                    </tr></thead>
+                    <tbody>
+                    ${t.sizes.map(s => `<tr${s.size === '(ยังไม่ระบุ)' ? ' style="color:#f59e0b;"' : ''}>
+                        <td style="padding:.2rem 0;"><strong>${escapeHtml(s.size)}</strong></td>
+                        <td style="text-align:center;">${s.n}</td>
+                        <td style="text-align:center;color:#10b981;">${s.ok_n}</td>
+                        <td style="text-align:center;color:${Number(s.damaged_n) ? '#f59e0b' : 'inherit'};">${s.damaged_n}</td>
+                        <td style="text-align:center;color:${Number(s.lost_n) ? '#ef4444' : 'inherit'};">${s.lost_n}</td>
+                    </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`).join('')}
+        </div>
+
+        ${dmg.length ? `
+        <div style="margin-top:1.2rem;">
+            <div style="font-weight:700; margin-bottom:.5rem;">🔧 ชิ้นที่ต้องจัดการ (${dmg.length})</div>
+            <table class="oad-table">
+                <thead><tr><th>ชิ้น</th><th>รหัส</th><th>ไซส์</th><th>สภาพ</th><th>ถุง</th><th>เจ้าของ</th><th>แก้สภาพ</th></tr></thead>
+                <tbody>
+                ${dmg.map(d => `<tr>
+                    <td class="nowrap">${d.icon || ''} ${escapeHtml(d.type_name)}</td>
+                    <td><code>${escapeHtml(d.part_code)}</code></td>
+                    <td>${escapeHtml(d.size || '—')}</td>
+                    <td><span class="oad-badge ${d.condition === 'lost' ? 'oad-badge-red' : 'oad-badge-amber'}">${_COND_TH[d.condition] || d.condition}</span></td>
+                    <td>#${d.kit_no}</td>
+                    <td>${escapeHtml(d.owner_name || '—')}</td>
+                    <td><button class="oad-btn" onclick="window.__oadFixPart(${d.part_id}, '${escapeHtml(d.part_code)}')">แก้</button></td>
+                </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>` : '<p style="margin-top:1rem;font-size:.85rem;color:#10b981;">✅ ไม่มีชิ้นที่ชำรุดหรือสูญหาย</p>'}`;
+}
+
+window.__oadFixPart = async (partId, code) => {
+    const { value, isConfirmed } = await Swal.fire({
+        title: `แก้สภาพ ${code}`,
+        input: 'select',
+        inputOptions: { A: 'A — สภาพดี', B: 'B — มีร่องรอย', C: 'C — ชำรุดเล็กน้อย',
+                        repair: 'ต้องซ่อม', lost: 'สูญหาย' },
+        inputValue: 'A',
+        showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก'
+    });
+    if (!isConfirmed) return;
+    const { error } = await uniformApi.setPartCondition(partId, value);
+    if (error) return toast(error.message, 'error');
+    toast('อัปเดตสภาพแล้ว');
+    _renderUniformReport();
+    _renderKitTable();
+};
+
+window.__oadLockKit = async (kitId, kitNo, lock) => {
+    const { error } = await uniformApi.lockKit(kitId, !lock);
+    if (error) return toast(error.message, 'error');
+    toast(lock ? `ล็อกชุด #${kitNo} แล้ว` : `ปลดล็อกชุด #${kitNo} แล้ว`);
+    _renderKitTable();
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 👔 ชุดประจำตัวในหน้าจัดการผู้ใช้
+//    ข้อมูลดึงจาก uniform_kits แหล่งเดียว (ไม่เก็บซ้ำใน users) จึงตรงกันเสมอ
+//    _userKitMap ถูกโหลดพร้อมรายชื่อผู้ใช้ และรีเฟรชทุกครั้งที่เปลี่ยนเจ้าของ
+// ═══════════════════════════════════════════════════════════════════════════
+let _userKitMap = new Map();
+
+async function loadUserKitMap() {
+    const { data, error } = await uniformApi.userKits();
+    if (error) { console.warn('[uniform] loadUserKitMap:', error.message); return; }
+    _userKitMap = new Map((data || []).map(k => [k.user_id, k]));
+}
+
+// สรุปสถานะการเลือกชุดของสมาชิกชุมนุม — คนกลุ่มอื่นไม่นับ เพราะไม่มีชุดประจำตัว
+function _renderKitStatusSummary() {
+    const el = document.getElementById('oad-kit-status-summary');
+    if (!el) return;
+    const club = (state.users || []).filter(u => u.student_group === 'club');
+    if (!club.length) { el.textContent = ''; return; }
+    const has = club.filter(u => _userKitMap.has(u.id)).length;
+    const none = club.length - has;
+    el.innerHTML = `👔 สมาชิกชุมนุม <strong>${club.length}</strong> คน ·
+        ✅ เลือกชุดแล้ว <strong style="color:#10b981;">${has}</strong> ·
+        ⬜ ยังไม่เลือก <strong style="color:${none ? '#f59e0b' : 'inherit'};">${none}</strong>`;
+}
+
+function _userKitBadge(userId, studentGroup) {
+    // คนนอกชุมนุมไม่มีชุดประจำตัว — ไม่ต้องแสดงอะไรเลย
+    if (studentGroup !== 'club') return '';
+    const k = _userKitMap.get(userId);
+    if (!k) return '<div style="margin-top:3px;"><span class="oad-badge oad-badge-gray">⬜ ยังไม่เลือกชุด</span></div>';
+    const incomplete = k.parts_sized < k.parts_total;
+    return `<div style="margin-top:3px;">
+        <span class="oad-badge ${k.has_issue ? 'oad-badge-amber' : 'oad-badge-blue'}"
+              title="${k.has_issue ? 'มีชิ้นชำรุด/สูญหาย' : (incomplete ? 'ไซส์ยังไม่ครบ' : 'ชุดปกติ')}">
+            ${k.set_icon || '👔'} #${k.kit_no}${k.has_issue ? ' 🔧' : (incomplete ? ' 📏' : '')}
+        </span></div>`;
+}
+
+window.__oadUserKit = async (userId, fullName) => {
+    Swal.fire({ title: 'กำลังโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    await loadUserKitMap();
+    const mine = _userKitMap.get(userId);
+
+    // ถ้ายังไม่มีชุด → ให้เลือกจากชุดที่ว่าง
+    if (!mine) {
+        const { data: kits, error } = await uniformApi.adminListKits(null);
+        if (error) return Swal.fire('ผิดพลาด', error.message, 'error');
+        const free = (kits || []).filter(k => !k.owner_id);
+        if (!free.length) return Swal.fire('ไม่มีชุดว่าง', 'ชุดถูกใช้หมดแล้ว', 'info');
+
+        const { value, isConfirmed } = await Swal.fire({
+            title: `👔 กำหนดชุดให้ ${fullName}`,
+            html: `<select id="uk-pick" class="swal2-input" style="width:100%;margin:0;">
+                     ${free.map(k => `<option value="${k.kit_id}">
+                        ${k.set_icon || ''} ชุด #${k.kit_no}
+                        ${k.parts_sized < k.parts_total ? ' · ⚠️ ไซส์ไม่ครบ' : ''}
+                        ${k.is_selectable === false ? ' · 🔒 ล็อก' : ''}
+                     </option>`).join('')}
+                   </select>`,
+            showCancelButton: true, confirmButtonText: 'กำหนด', cancelButtonText: 'ยกเลิก',
+            preConfirm: () => Number(document.getElementById('uk-pick').value)
+        });
+        if (!isConfirmed) return;
+
+        const { data, error: tErr } = await uniformApi.transferKit(value, userId, 'กำหนดจากหน้าผู้ใช้');
+        if (tErr) return Swal.fire('ไม่สำเร็จ', tErr.message, 'error');
+        await loadUserKitMap();
+        renderUsersTable();
+        return Swal.fire('เรียบร้อย', data?.message || 'กำหนดชุดแล้ว', 'success');
+    }
+
+    // มีชุดแล้ว → แสดงรายละเอียด + ปุ่มจัดการ
+    const { data: kits } = await uniformApi.adminListKits(null);
+    const kit = (kits || []).find(k => k.kit_id === mine.kit_id);
+    const parts = kit?.parts || [];
+
+    const result = await Swal.fire({
+        title: `${mine.set_icon || '👔'} ชุด #${mine.kit_no}`,
+        width: 480,
+        html: `<div style="text-align:left;font-size:.88rem;">
+                 <p style="margin:0 0 .6rem;opacity:.75;">${escapeHtml(fullName)}</p>
+                 <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+                   ${parts.map(p => `<tr>
+                     <td style="padding:.28rem 0;border-top:1px solid rgba(128,128,128,.2);">
+                       ${p.icon || ''} ${escapeHtml(p.type_name)}</td>
+                     <td style="padding:.28rem 0;border-top:1px solid rgba(128,128,128,.2);opacity:.6;font-size:.78rem;">
+                       ${escapeHtml(p.part_code)}</td>
+                     <td style="padding:.28rem 0;border-top:1px solid rgba(128,128,128,.2);text-align:right;font-weight:700;">
+                       ${p.size ? escapeHtml(p.size) : '<span style="color:#f59e0b;font-weight:400;">ยังไม่ระบุ</span>'}</td>
+                     <td style="padding:.28rem 0;border-top:1px solid rgba(128,128,128,.2);text-align:right;">
+                       ${['C','repair','lost'].includes(p.condition)
+                          ? `<span style="color:#ef4444;">${_COND_TH[p.condition]}</span>` : ''}</td>
+                   </tr>`).join('')}
+                 </table>
+               </div>`,
+        showCancelButton: true, showDenyButton: true,
+        confirmButtonText: '🔁 เปลี่ยนชุด',
+        denyButtonText: '🚪 ปลดชุด',
+        cancelButtonText: 'ปิด'
+    });
+
+    if (result.isDenied) {
+        const { data, error } = await uniformApi.releaseKit(mine.kit_id, 'ปลดจากหน้าผู้ใช้');
+        if (error) return Swal.fire('ไม่สำเร็จ', error.message, 'error');
+        await loadUserKitMap();
+        renderUsersTable();
+        return Swal.fire('ปลดแล้ว', data?.message || '', 'success');
+    }
+
+    if (result.isConfirmed) {
+        const free = (kits || []).filter(k => !k.owner_id);
+        if (!free.length) return Swal.fire('ไม่มีชุดว่าง', 'ต้องปลดชุดคนอื่นก่อน', 'info');
+
+        const { value, isConfirmed } = await Swal.fire({
+            title: 'เปลี่ยนเป็นชุดไหน?',
+            html: `<select id="uk-new" class="swal2-input" style="width:100%;margin:0;">
+                     ${free.map(k => `<option value="${k.kit_id}">${k.set_icon || ''} ชุด #${k.kit_no}</option>`).join('')}
+                   </select>`,
+            showCancelButton: true, confirmButtonText: 'เปลี่ยน', cancelButtonText: 'ยกเลิก',
+            preConfirm: () => Number(document.getElementById('uk-new').value)
+        });
+        if (!isConfirmed) return;
+
+        const { data, error } = await uniformApi.transferKit(value, userId, 'เปลี่ยนชุดจากหน้าผู้ใช้');
+        if (error) return Swal.fire('ไม่สำเร็จ', error.message, 'error');
+        await loadUserKitMap();
+        renderUsersTable();
+        return Swal.fire('เรียบร้อย', data?.message || '', 'success');
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎖 ตำแหน่งหัวหน้า + กล่องใบตรวจ  (อยู่ในแท็บ "👤 ผู้ใช้")
+//    หัวหน้า = อ่านอย่างเดียว + ส่งใบตรวจ ไม่มีสิทธิ์คืน/ปิดงาน/บล็อก
+// ═══════════════════════════════════════════════════════════════════════════
+const _SCOPE_LABEL = {
+    band:    { icon: '🎖', name: 'หัวหน้าวง',        hint: 'เห็นทั้งวง' },
+    section: { icon: '🎺', name: 'หัวหน้ากลุ่มเครื่อง', hint: 'เห็นเฉพาะกลุ่มตน' },
+    event:   { icon: '🎭', name: 'หัวหน้างาน',        hint: 'เห็นเฉพาะงานนั้น' },
+    uniform: { icon: '👔', name: 'ฝ่ายเสื้อผ้า',      hint: 'ดูแลชุด' }
+};
+
+async function renderStaffPanels() {
+    await Promise.all([_renderStaffRoles(), _renderStaffReports()]);
+}
+
+async function _renderStaffRoles() {
+    const wrap = document.getElementById('oad-staff-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '<div class="oad-skel" style="height:60px;"></div>';
+
+    const { data, error } = await staffApi.listAll();
+    if (error) { wrap.innerHTML = `<div class="oad-empty">${escapeHtml(error.message)}</div>`; return; }
+
+    const rows = data || [];
+    if (!rows.length) {
+        wrap.innerHTML = '<div class="oad-empty"><span class="oad-empty-icon">🎖</span>ยังไม่ได้แต่งตั้งใคร — กด "แต่งตั้ง"</div>';
+        return;
+    }
+
+    wrap.innerHTML = `
+        <table class="oad-table">
+            <thead><tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>ขอบเขต</th><th>จัดการ</th></tr></thead>
+            <tbody>
+            ${rows.map(r => {
+                const s = _SCOPE_LABEL[r.scope_type] || { icon: '•', name: r.scope_type, hint: '' };
+                const u = r.users || {};
+                const name = `${u.prefix || ''}${u.first_name || ''} ${u.last_name || ''}`.trim() || '—';
+                return `<tr>
+                    <td><strong>${escapeHtml(name)}</strong></td>
+                    <td>${s.icon} ${escapeHtml(s.name)}</td>
+                    <td style="font-size:.85rem;opacity:.8;">${escapeHtml(r.scope_value || s.hint)}</td>
+                    <td><button class="oad-btn oad-btn-red" onclick="window.__oadRevokeStaff(${r.id})">ถอดถอน</button></td>
+                </tr>`;
+            }).join('')}
+            </tbody>
+        </table>`;
+}
+
+async function _renderStaffReports() {
+    const wrap  = document.getElementById('oad-staffrep-wrap');
+    const badge = document.getElementById('oad-staffrep-badge');
+    if (!wrap) return;
+
+    const { data, error } = await staffApi.listReports(true);
+    if (error) { wrap.innerHTML = `<div class="oad-empty">${escapeHtml(error.message)}</div>`; return; }
+
+    const rows = data || [];
+    if (badge) {
+        if (rows.length) { badge.textContent = String(rows.length); badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+    }
+    if (!rows.length) {
+        wrap.innerHTML = '<div class="oad-empty"><span class="oad-empty-icon">✨</span>ไม่มีใบตรวจค้าง</div>';
+        return;
+    }
+
+    wrap.innerHTML = `
+        <table class="oad-table">
+            <thead><tr><th>เมื่อ</th><th>เรื่อง</th><th>ผลตรวจ</th><th>หมายเหตุ</th><th>จัดการ</th></tr></thead>
+            <tbody>
+            ${rows.map(r => `<tr>
+                <td class="nowrap" style="font-size:.8rem;">${fmtDate(r.created_at)}</td>
+                <td>${escapeHtml(r.target_label || r.target_kind)}</td>
+                <td><span class="oad-badge ${r.finding === 'ครบ' ? 'oad-badge-green' : 'oad-badge-amber'}">${escapeHtml(r.finding)}</span></td>
+                <td style="font-size:.85rem;">${escapeHtml(r.note || '—')}</td>
+                <td><button class="oad-btn oad-btn-approve" onclick="window.__oadAckReport(${r.id})">✓ รับทราบ</button></td>
+            </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+window.__oadAckReport = async (id) => {
+    const { error } = await staffApi.ackReport(id);
+    if (error) return toast(error.message, 'error');
+    toast('รับทราบแล้ว');
+    _renderStaffReports();
+};
+
+window.__oadRevokeStaff = async (roleId) => {
+    const { isConfirmed } = await Swal.fire({
+        title: 'ถอดถอนตำแหน่งนี้?', icon: 'warning',
+        showCancelButton: true, confirmButtonText: 'ถอดถอน', cancelButtonText: 'ยกเลิก'
+    });
+    if (!isConfirmed) return;
+    const { error } = await staffApi.revoke(roleId);
+    if (error) return toast(error.message, 'error');
+    toast('ถอดถอนแล้ว');
+    _renderStaffRoles();
+};
+
+window.__oadAddStaff = async () => {
+    const [{ data: sections }, { data: events }] = await Promise.all([
+        sectionsApi.list(), eventsApi.list()
+    ]);
+
+    const candidates = (state.users || [])
+        .filter(u => u.student_group !== 'deactivated')
+        .map(u => `<option value="${u.id}">${escapeHtml((u.prefix||'') + u.first_name + ' ' + u.last_name)}${u.class_level ? ' · ' + escapeHtml(u.class_level) : ''}</option>`)
+        .join('');
+
+    const result = await Swal.fire({
+        title: '🎖 แต่งตั้งหัวหน้า',
+        width: 480,
+        html: `<div style="text-align:left;font-size:.9rem;">
+                 <label style="font-weight:700;">นักเรียน</label>
+                 <select id="st-user" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">${candidates}</select>
+                 <label style="font-weight:700;">ตำแหน่ง</label>
+                 <select id="st-scope" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">
+                   ${Object.entries(_SCOPE_LABEL).map(([k, v]) =>
+                      `<option value="${k}">${v.icon} ${v.name} — ${v.hint}</option>`).join('')}
+                 </select>
+                 <div id="st-value-wrap" style="display:none;">
+                   <label style="font-weight:700;">ขอบเขต</label>
+                   <select id="st-value" class="swal2-input" style="width:100%;margin:.2rem 0 0;"></select>
+                 </div>
+               </div>`,
+        showCancelButton: true, confirmButtonText: 'แต่งตั้ง', cancelButtonText: 'ยกเลิก',
+        didOpen: () => {
+            const scope = document.getElementById('st-scope');
+            const wrap  = document.getElementById('st-value-wrap');
+            const val   = document.getElementById('st-value');
+            const sync = () => {
+                const s = scope.value;
+                if (s === 'section') {
+                    wrap.style.display = 'block';
+                    val.innerHTML = (sections || []).map(x =>
+                        `<option value="${escapeHtml(x.code)}">${x.icon || ''} ${escapeHtml(x.name_th)}</option>`).join('');
+                } else if (s === 'event') {
+                    wrap.style.display = 'block';
+                    const open = (events || []).filter(e => e.status === 'open' || e.status === 'active');
+                    val.innerHTML = open.length
+                        ? open.map(e => `<option value="${e.id}">🎭 ${escapeHtml(e.name)}</option>`).join('')
+                        : '<option value="">— ยังไม่มีงานที่เปิดอยู่ —</option>';
+                } else {
+                    wrap.style.display = 'none';
+                }
+            };
+            scope.addEventListener('change', sync);
+            sync();
+        },
+        preConfirm: () => {
+            const scope = document.getElementById('st-scope').value;
+            const needsValue = scope === 'section' || scope === 'event';
+            const value = needsValue ? document.getElementById('st-value').value : null;
+            if (needsValue && !value) { Swal.showValidationMessage('ต้องเลือกขอบเขต'); return false; }
+            return { userId: document.getElementById('st-user').value, scope, value };
+        }
+    });
+
+    if (!result.isConfirmed) return;
+    const { error } = await staffApi.grant(result.value.userId, result.value.scope, result.value.value);
+    if (error) return toast(error.message, 'error');
+    toast('แต่งตั้งเรียบร้อย');
+    _renderStaffRoles();
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎼 จับคู่ประเภทเครื่องดนตรี → กลุ่มของวง  (แท็บ "🎺 เครื่องดนตรี")
+//    ชื่อประเภทดึงสดจาก instruments.type ไม่เก็บซ้ำที่ไหน
+//    เปลี่ยนกลุ่ม = UPDATE instruments.section_id ทุกชิ้นของประเภทนั้น
+// ═══════════════════════════════════════════════════════════════════════════
+let _sectionList = [];
+
+async function renderSectionMap() {
+    const wrap = document.getElementById('oad-section-map');
+    if (!wrap) return;
+    wrap.innerHTML = '<div class="oad-skel" style="height:80px;"></div>';
+
+    if (!_sectionList.length) {
+        const { data } = await sectionsApi.list();
+        _sectionList = data || [];
+    }
+
+    const { data, error } = await sectionsApi.listTypeMapping();
+    if (error) { wrap.innerHTML = `<div class="oad-empty">${escapeHtml(error.message)}</div>`; return; }
+
+    const rows = data || [];
+    const unmappedTypes = rows.filter(r => !r.section_id);
+    const unmappedItems = unmappedTypes.reduce((s, r) => s + Number(r.n), 0);
+
+    const badge = document.getElementById('oad-section-badge');
+    if (badge) {
+        if (unmappedTypes.length) { badge.textContent = String(unmappedTypes.length); badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+    }
+
+    // สรุปจำนวนชิ้นต่อกลุ่ม
+    const perSection = new Map(_sectionList.map(s => [s.id, 0]));
+    rows.forEach(r => { if (r.section_id) perSection.set(r.section_id, (perSection.get(r.section_id) || 0) + Number(r.n)); });
+
+    wrap.innerHTML = `
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:.9rem; font-size:.88rem;">
+            ${_sectionList.map(s => `<span>${s.icon || ''} ${escapeHtml(s.name_th)}
+                <strong>${perSection.get(s.id) || 0}</strong> ชิ้น</span>`).join('')}
+            <span style="color:${unmappedItems ? '#f59e0b' : '#10b981'};">
+                ${unmappedItems ? `⚠️ ยังไม่จัดกลุ่ม ${unmappedTypes.length} ประเภท (${unmappedItems} ชิ้น)` : '✅ จัดกลุ่มครบแล้ว'}
+            </span>
+        </div>
+
+        <table class="oad-table">
+            <thead><tr><th>ประเภทเครื่อง (จากคลังจริง)</th><th style="text-align:center;">จำนวน</th><th>กลุ่มของวง</th></tr></thead>
+            <tbody>
+            ${rows.map(r => `<tr${!r.section_id ? ' style="background:rgba(245,158,11,.06);"' : ''}>
+                <td><strong>${escapeHtml(r.type)}</strong></td>
+                <td style="text-align:center;">${r.n}</td>
+                <td>
+                    <select class="oad-input sec-pick" data-type="${escapeHtml(r.type)}" style="max-width:230px;">
+                        <option value=""${!r.section_id ? ' selected' : ''}>— ไม่อยู่ในวงโยธวาทิต —</option>
+                        ${_sectionList.map(s => `<option value="${s.id}"${r.section_id === s.id ? ' selected' : ''}>
+                            ${s.icon || ''} ${escapeHtml(s.name_th)}</option>`).join('')}
+                    </select>
+                </td>
+            </tr>`).join('')}
+            </tbody>
+        </table>`;
+
+    wrap.querySelectorAll('.sec-pick').forEach(sel => {
+        sel.addEventListener('change', async e => {
+            const type = e.target.dataset.type;
+            const val  = e.target.value ? Number(e.target.value) : null;
+            e.target.disabled = true;
+            const { data: res, error: err } = await sectionsApi.setTypeSection(type, val);
+            e.target.disabled = false;
+            if (err) return toast(err.message, 'error');
+            toast(`จัดกลุ่ม "${type}" แล้ว (${res?.updated ?? 0} ชิ้น)`);
+            renderSectionMap();
+        });
+    });
 }

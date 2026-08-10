@@ -6,19 +6,21 @@
     <title>Pitch Perfect - Vocal Trainer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700;800&family=Nunito:wght@700;800&display=swap');
         
         body { 
             font-family: 'Kanit', sans-serif; 
-            background-color: #f8fafc; /* slate-50 */
-            color: #334155; /* slate-700 */
-            min-height: 100vh;
-            overflow-x: hidden;
+            background-color: #f8fafc; 
+            color: #334155; 
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
         .font-brand { font-family: 'Nunito', sans-serif; }
 
-        /* Modern Soft UI Panels */
         .soft-panel {
             background: #ffffff;
             border-radius: 24px;
@@ -26,7 +28,7 @@
             border: 2px solid #f1f5f9;
         }
 
-        /* Toggle Switch (Male/Female) */
+        /* Toggle Switch */
         .toggle-checkbox:checked { right: 0; border-color: #3b82f6; }
         .toggle-checkbox:checked + .toggle-label { background-color: #bfdbfe; }
         .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); border-color: white; }
@@ -36,18 +38,20 @@
         #practice-arena {
             position: relative;
             width: 100%;
-            height: 400px;
+            height: 100%; /* Fill flex parent */
+            min-height: 200px;
             border-radius: 1.5rem;
             overflow: hidden;
-            background-color: #f1f5f9; /* Soft gray for canvas bg */
+            background-color: #f1f5f9; 
             border: 3px solid #e2e8f0;
         }
-        #pitch-canvas { width: 100%; height: 100%; display: block; }
+        #pitch-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
 
         /* Mic Meter */
         .mic-meter-container {
             width: 12px;
-            height: 100px;
+            height: 100%;
+            min-height: 150px;
             background: #e2e8f0;
             border-radius: 6px;
             overflow: hidden;
@@ -61,246 +65,284 @@
             transition: height 0.1s ease-out;
         }
 
-        /* Fun Buttons */
-        .btn-primary {
-            background-color: #3b82f6;
-            color: white;
-            border-bottom: 4px solid #2563eb;
-            transition: all 0.1s;
-        }
-        .btn-primary:active { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
+        /* Buttons */
+        .btn-primary { background-color: #3b82f6; color: white; border-bottom: 4px solid #2563eb; transition: all 0.1s; }
+        .btn-primary:active:not(:disabled) { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; border-bottom-width: 0px; transform: translateY(4px); margin-bottom: 4px;}
         
-        .btn-secondary {
-            background-color: #e2e8f0;
-            color: #475569;
-            border-bottom: 4px solid #cbd5e1;
-            transition: all 0.1s;
-        }
-        .btn-secondary:active { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
+        .btn-secondary { background-color: #e2e8f0; color: #475569; border-bottom: 4px solid #cbd5e1; transition: all 0.1s; }
+        .btn-secondary:active:not(:disabled) { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
 
-        .btn-success {
-            background-color: #22c55e;
-            color: white;
-            border-bottom: 4px solid #16a34a;
-            transition: all 0.1s;
-        }
-        .btn-success:active { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
+        .btn-success { background-color: #22c55e; color: white; border-bottom: 4px solid #16a34a; transition: all 0.1s; }
+        .btn-success:active:not(:disabled) { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
 
-        .mode-card {
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid transparent;
-        }
+        .mode-card { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
         .mode-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px -5px rgba(0,0,0,0.1); }
         .mode-card.selected { border-color: #3b82f6; background-color: #eff6ff; }
         
-        .level-card {
-            cursor: pointer;
-            transition: transform 0.1s;
-            border: 2px solid #e2e8f0;
-        }
+        .level-card { cursor: pointer; transition: transform 0.1s; border: 2px solid #e2e8f0; }
         .level-card:active { transform: scale(0.95); }
         .level-card.selected { border-color: #3b82f6; background-color: #eff6ff; }
         
+        /* Floating feedback animations */
+        .feedback-text {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 20;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-60px) scale(1); opacity: 0; }
+        }
     </style>
 </head>
 <body class="flex flex-col">
 
-    <!-- Header -->
-    <header class="p-4 bg-white shadow-sm flex justify-between items-center sticky top-0 z-50">
-        <div class="flex items-center gap-4">
-            <a href="index.html" class="text-slate-400 hover:text-slate-600 transition w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100">
+    <header class="p-4 bg-white shadow-sm flex flex-col md:flex-row justify-between items-center sticky top-0 z-50 gap-4">
+        <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+            <button onclick="handleGlobalBack()" class="text-slate-400 hover:text-slate-600 transition w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100">
                 <i class="fas fa-arrow-left text-xl"></i>
-            </a>
+            </button>
             <h1 class="text-2xl font-bold font-brand tracking-wide text-blue-500">Pitch<span class="text-slate-700">Perfect</span></h1>
         </div>
         
-        <!-- Voice Range Selector -->
-        <div class="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full border border-slate-200">
-            <span class="text-sm text-pink-500 font-medium"><i class="fas fa-venus"></i> หญิง</span>
-            <div class="relative inline-block w-12 mr-2 align-middle select-none">
-                <input type="checkbox" id="voice-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-slate-200 appearance-none cursor-pointer z-10 transition-transform duration-300" checked/>
-                <label for="voice-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 cursor-pointer"></label>
+        <div class="bg-slate-100 p-1 rounded-full flex relative w-40 select-none shadow-inner border border-slate-200">
+            <div id="gender-indicator" class="absolute top-1 left-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 transform translate-x-full"></div>
+            <div onclick="setGender('female')" id="gender-btn-female" class="w-1/2 text-center text-sm font-bold z-10 py-1.5 cursor-pointer text-slate-500 transition-colors">
+                <i class="fas fa-venus text-pink-500"></i> หญิง
             </div>
-            <span class="text-sm text-blue-500 font-medium"><i class="fas fa-mars"></i> ชาย</span>
+            <div onclick="setGender('male')" id="gender-btn-male" class="w-1/2 text-center text-sm font-bold z-10 py-1.5 cursor-pointer text-slate-800 transition-colors">
+                <i class="fas fa-mars text-blue-500"></i> ชาย
+            </div>
         </div>
     </header>
 
-    <main class="flex-grow container mx-auto px-4 py-8 max-w-5xl">
+    <main class="flex-grow container mx-auto px-2 md:px-4 py-4 md:py-6 max-w-5xl flex flex-col overflow-y-auto">
         
-        <!-- 1. Mode Selection Dashboard -->
+        <!-- Dashboard -->
         <section id="view-dashboard" class="animate-fade-in">
             <div class="text-center mb-8">
                 <h2 class="text-3xl font-bold text-slate-800">เลือกโหมดการเรียนรู้</h2>
-                <p class="text-slate-500 mt-2">ฝึกฝนทักษะการร้องเพลงของคุณทีละขั้นตอน</p>
+                <p class="text-slate-500 mt-2">ฝึกฝนทักษะการร้องเพลงและการควบคุมลมหายใจทีละขั้นตอน</p>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Tutorial Mode -->
-                <div class="soft-panel p-6 text-center mode-card" onclick="selectMode('tutorial')">
-                    <div class="w-20 h-20 mx-auto bg-yellow-100 text-yellow-500 rounded-full flex items-center justify-center text-4xl mb-4">
-                        <i class="fas fa-lightbulb"></i>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                <div class="soft-panel p-6 text-center mode-card cursor-pointer hover:border-emerald-400 transition" onclick="selectMode('breathing')">
+                    <div class="w-16 h-16 md:w-20 md:h-20 mx-auto bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center text-3xl md:text-4xl mb-4"><i class="fas fa-wind"></i></div>
+                    <h3 class="text-xl font-bold mb-2">ฝึกลมหายใจ</h3>
+                    <p class="text-sm text-slate-500">ฝึกการสูดลมกระบังลม กักลม และผ่อนลม Ss... ตามคลิปครูคูณครวญเพลง</p>
+                </div>
+                <div class="soft-panel p-6 text-center mode-card cursor-pointer hover:border-yellow-400 transition" onclick="selectMode('tutorial')">
+                    <div class="w-16 h-16 md:w-20 md:h-20 mx-auto bg-yellow-100 text-yellow-500 rounded-full flex items-center justify-center text-3xl md:text-4xl mb-4"><i class="fas fa-lightbulb"></i></div>
                     <h3 class="text-xl font-bold mb-2">บทเรียนฝึกสอน</h3>
                     <p class="text-sm text-slate-500">เรียนรู้ทฤษฎี การหายใจ และเทคนิคการวอร์มเสียงพื้นฐาน</p>
                 </div>
-                
-                <!-- Practice Mode -->
-                <div class="soft-panel p-6 text-center mode-card" onclick="selectMode('practice')">
-                    <div class="w-20 h-20 mx-auto bg-blue-100 text-blue-500 rounded-full flex items-center justify-center text-4xl mb-4">
-                        <i class="fas fa-microphone"></i>
-                    </div>
-                    <h3 class="text-xl font-bold mb-2">โหมดฝึกฝน</h3>
-                    <p class="text-sm text-slate-500">ฟังเสียงเปียโนแล้วร้องตาม พร้อมกราฟวิเคราะห์ความแม่นยำ</p>
-                </div>
-                
-                <!-- Test Mode -->
-                <div class="soft-panel p-6 text-center mode-card" onclick="selectMode('test')">
-                    <div class="w-20 h-20 mx-auto bg-purple-100 text-purple-500 rounded-full flex items-center justify-center text-4xl mb-4">
-                        <i class="fas fa-trophy"></i>
-                    </div>
-                    <h3 class="text-xl font-bold mb-2">โหมดทดสอบ</h3>
-                    <p class="text-sm text-slate-500">ทดสอบร้องโดยไม่มีตัวช่วยดูเส้นกราฟ รับคะแนนเมื่อร้องจบ</p>
+                <div class="soft-panel p-6 text-center mode-card cursor-pointer hover:border-blue-400 transition" onclick="selectMode('practice')">
+                    <div class="w-16 h-16 md:w-20 md:h-20 mx-auto bg-blue-100 text-blue-500 rounded-full flex items-center justify-center text-3xl md:text-4xl mb-4"><i class="fas fa-microphone"></i></div>
+                    <h3 class="text-xl font-bold mb-2">เข้าสู่บทเรียนร้องเพลง</h3>
+                    <p class="text-sm text-slate-500">ฝึกร้องโน้ตบรรทัด 5 เส้น พร้อมตรวจจับระดับเสียงคีย์เป๊ะ</p>
                 </div>
             </div>
         </section>
 
-        <!-- 2. Level Selection (Practice/Test) -->
-        <section id="view-levels" class="hidden animate-fade-in mt-8">
-            <div class="flex justify-between items-end mb-6 border-b-2 border-slate-200 pb-4">
-                <div>
-                    <button onclick="goBackToDashboard()" class="text-blue-500 hover:text-blue-600 font-medium mb-2 inline-block">
-                        <i class="fas fa-arrow-left mr-1"></i> กลับไปเลือกโหมด
+        <!-- Breathing Training Mode (Dedicated Breathing Controller) -->
+        <section id="view-breathing" class="hidden animate-fade-in mt-4 md:mt-6">
+            <div class="soft-panel p-6 md:p-8 max-w-3xl mx-auto text-center relative">
+                <button onclick="goBackToDashboard()" class="text-blue-500 hover:text-blue-600 font-medium mb-4 block text-left"><i class="fas fa-arrow-left mr-1"></i> กลับหน้าหลัก</button>
+                
+                <div class="flex items-center justify-center gap-2 mb-2">
+                    <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xl font-bold"><i class="fas fa-wind"></i></div>
+                    <h2 class="text-2xl md:text-3xl font-bold text-slate-800">ฝึกลมหายใจ เพื่อการร้องเพลง</h2>
+                </div>
+                <p class="text-sm md:text-base text-slate-500 mb-6">ฝึกเทคนิคการหายใจด้วยกระบังลม: สูดลมเข้า (ท้องป่อง) → กักลม → ผ่อนลมออก Ss... (ท้องแฟบ)</p>
+
+                <!-- Preset Selection -->
+                <div class="flex flex-wrap justify-center gap-2 mb-8">
+                    <button onclick="setBreathingPreset('basic')" id="breath-preset-basic" class="py-2 px-4 rounded-full text-sm font-bold bg-emerald-500 text-white shadow-md transition">🟢 เริ่มต้น (สูด 4s | กัก 4s | ผ่อน 8s)</button>
+                    <button onclick="setBreathingPreset('relax')" id="breath-preset-relax" class="py-2 px-4 rounded-full text-sm font-bold bg-slate-200 text-slate-700 hover:bg-slate-300 transition">🔵 4-7-8 (สูด 4s | กัก 7s | ผ่อน 8s)</button>
+                    <button onclick="setBreathingPreset('stamina')" id="breath-preset-stamina" class="py-2 px-4 rounded-full text-sm font-bold bg-slate-200 text-slate-700 hover:bg-slate-300 transition">🔴 ความอึดปอด (สูด 4s | กัก 8s | ผ่อน 16s)</button>
+                </div>
+
+                <!-- Animated Breathing Sphere Container -->
+                <div class="relative w-64 h-64 md:w-72 md:h-72 mx-auto mb-8 flex items-center justify-center">
+                    <!-- Outer Ring -->
+                    <div class="absolute inset-0 rounded-full border-4 border-slate-200 opacity-50"></div>
+                    
+                    <!-- Animated Breathing Circle -->
+                    <div id="breath-sphere" class="w-28 h-28 rounded-full bg-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.6)] flex flex-col items-center justify-center transition-all duration-1000 transform text-white p-4">
+                        <div id="breath-phase-text" class="font-extrabold text-base md:text-lg text-center leading-tight">พร้อมแล้ว</div>
+                        <div id="breath-timer-text" class="text-3xl md:text-4xl font-black my-1">4</div>
+                        <div id="breath-sub-text" class="text-xs opacity-90">กดปุ่มเริ่มฝึก</div>
+                    </div>
+                </div>
+
+                <!-- Airflow Mic Bar Detector -->
+                <div class="max-w-md mx-auto mb-6 bg-slate-100 p-3 rounded-xl border border-slate-200">
+                    <div class="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                        <span><i class="fas fa-microphone mr-1"></i>ระดับลมที่ผ่อนออก (Mic Feedback)</span>
+                        <span id="breath-mic-status">ปิดการวัด</span>
+                    </div>
+                    <div class="h-3 bg-slate-200 rounded-full overflow-hidden">
+                        <div id="breath-mic-fill" class="h-full bg-emerald-500 transition-all duration-75" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Progress & Controls -->
+                <div class="flex items-center justify-between max-w-md mx-auto mb-6 px-2 text-sm font-bold text-slate-600">
+                    <div id="breath-cycle-count">รอบที่: 0 / 5</div>
+                    <div id="breath-total-time">เวลารวม: 00:00</div>
+                </div>
+
+                <div class="flex justify-center gap-4">
+                    <button id="btn-start-breath" onclick="toggleBreathingSession()" class="btn-primary py-3 px-8 rounded-full font-bold text-lg shadow-lg flex items-center gap-2">
+                        <i class="fas fa-play"></i> เริ่มฝึกลมหายใจ
                     </button>
+                    <button onclick="resetBreathingSession()" class="btn-secondary py-3 px-6 rounded-full font-bold text-slate-600 border border-slate-300">
+                        <i class="fas fa-redo"></i> รีเซ็ต
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Calibration (Find Your Voice) -->
+        <section id="view-calibration" class="hidden animate-fade-in mt-4 md:mt-8">
+            <div class="soft-panel p-6 md:p-8 max-w-2xl mx-auto text-center">
+                <button onclick="goBackToDashboard()" class="text-blue-500 hover:text-blue-600 font-medium mb-4 block text-left"><i class="fas fa-arrow-left mr-1"></i> กลับ</button>
+                <div class="w-20 h-20 mx-auto bg-green-100 text-green-500 rounded-full flex items-center justify-center text-4xl mb-4"><i class="fas fa-wave-square"></i></div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">ค้นหาคีย์ประจำตัวของคุณ</h2>
+                <p class="text-slate-500 mb-8">เพื่อการฝึกฝนที่มีประสิทธิภาพ ระบบจะปรับระดับความสูงต่ำของโน้ตให้เข้ากับเสียงธรรมชาติของคุณ ร้องลากเสียง "อาาา" ในระดับที่สบายที่สุดเป็นเวลา 3 วินาที</p>
+                
+                <div id="calibration-visualizer" class="h-32 bg-slate-100 rounded-xl mb-6 relative overflow-hidden flex items-end justify-center px-4 pb-2 border-2 border-slate-200">
+                    <div id="calib-mic-bar" class="w-full bg-green-400 opacity-20 absolute bottom-0 left-0 transition-all duration-100" style="height: 0%"></div>
+                    <div id="calib-note-display" class="absolute inset-0 flex items-center justify-center text-5xl font-black text-slate-300">-</div>
+                </div>
+
+                <div class="flex justify-center mb-6">
+                    <div id="calib-progress-bar" class="w-full max-w-md h-3 bg-slate-200 rounded-full overflow-hidden hidden">
+                        <div id="calib-progress-fill" class="h-full bg-green-500 transition-all duration-100" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div id="calib-result" class="hidden mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <h3 class="font-bold text-slate-700">โทนเสียงของคุณคือ</h3>
+                    <p id="calib-result-note" class="text-3xl font-black text-blue-600 my-2">G3</p>
+                    <p id="calib-result-type" class="text-sm font-medium text-slate-500">Baritone (เสียงกลางชาย)</p>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-3 justify-center items-center">
+                    <button id="btn-start-calibration" class="btn-primary py-3 px-8 rounded-full font-bold text-lg w-full md:w-auto"><i class="fas fa-microphone mr-2"></i> เริ่มจับเสียง (3 วินาที)</button>
+                    <button id="btn-skip-calibration" onclick="skipCalibration()" class="btn-secondary py-3 px-8 rounded-full font-bold text-lg w-full md:w-auto">ข้าม (ใช้คีย์ C)</button>
+                    <button id="btn-finish-calibration" class="btn-primary py-3 px-8 rounded-full font-bold text-lg w-full md:w-auto hidden">ถัดไป <i class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Level Selection -->
+        <section id="view-levels" class="hidden animate-fade-in mt-4 md:mt-8">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b-2 border-slate-200 pb-4 gap-4">
+                <div>
+                    <button onclick="goBackToDashboard()" class="text-blue-500 hover:text-blue-600 font-medium mb-2 inline-block"><i class="fas fa-arrow-left mr-1"></i> กลับไปเลือกโหมด</button>
                     <h2 class="text-2xl font-bold text-slate-800" id="level-selection-title">เลือกบทเรียน</h2>
                 </div>
+                <button onclick="startCalibrationFlow()" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 px-4 rounded-full font-medium transition"><i class="fas fa-cog mr-1"></i> ตั้งค่าคีย์ประจำตัวใหม่</button>
             </div>
-            
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="level-grid">
-                <!-- Levels injected via JS -->
-            </div>
-            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" id="level-grid"></div>
             <div class="mt-8 flex justify-center">
-                <button id="start-arena-btn" class="btn-primary font-bold py-3 px-12 rounded-full text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                    เริ่ม <i class="fas fa-play ml-1"></i>
-                </button>
+                <button id="start-arena-btn" class="btn-primary font-bold py-3 px-12 rounded-full text-lg disabled:opacity-50">เริ่ม <i class="fas fa-play ml-1"></i></button>
             </div>
         </section>
 
-        <!-- 3. Tutorial View -->
-        <section id="view-tutorial" class="hidden animate-fade-in mt-8">
-            <div class="soft-panel p-8 max-w-3xl mx-auto">
-                <button onclick="goBackToDashboard()" class="text-blue-500 hover:text-blue-600 font-medium mb-6 inline-block">
-                    <i class="fas fa-arrow-left mr-1"></i> กลับ
-                </button>
-                
-                <div id="tutorial-content" class="text-center">
-                    <!-- Slides injected via JS -->
-                </div>
-                
-                <div class="flex justify-between mt-8">
-                    <button id="tut-prev-btn" class="btn-secondary py-2 px-6 rounded-full font-medium">ก่อนหน้า</button>
-                    <div id="tut-progress" class="flex gap-2 items-center">
-                        <!-- Dots injected via JS -->
-                    </div>
-                    <button id="tut-next-btn" class="btn-primary py-2 px-6 rounded-full font-medium">ถัดไป</button>
+        <!-- Tutorial -->
+        <section id="view-tutorial" class="hidden animate-fade-in mt-4 md:mt-8">
+            <div class="soft-panel p-6 md:p-8 max-w-3xl mx-auto">
+                <button onclick="goBackToDashboard()" class="text-blue-500 hover:text-blue-600 font-medium mb-6 inline-block"><i class="fas fa-arrow-left mr-1"></i> กลับ</button>
+                <div id="tutorial-content" class="text-center"></div>
+                <div class="flex justify-between mt-8 items-center">
+                    <button id="tut-prev-btn" class="btn-secondary py-2 px-4 md:px-6 rounded-full font-medium text-sm md:text-base">ก่อนหน้า</button>
+                    <div id="tut-progress" class="flex gap-2 items-center"></div>
+                    <button id="tut-next-btn" class="btn-primary py-2 px-4 md:px-6 rounded-full font-medium text-sm md:text-base">ถัดไป</button>
                 </div>
             </div>
         </section>
 
-        <!-- 4. Practice/Test Arena -->
-        <section id="view-arena" class="hidden animate-fade-in mt-4">
-            <div class="soft-panel p-6">
-                <!-- Arena Header -->
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <button onclick="stopAndGoBack()" class="text-slate-400 hover:text-red-500 font-medium mr-4">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                        <span id="arena-title" class="text-xl font-bold text-slate-800">Level 1</span>
+        <!-- Arena -->
+        <section id="view-arena" class="hidden animate-fade-in flex-1 flex flex-col mt-2">
+            <div class="soft-panel p-3 md:p-6 flex-1 flex flex-col">
+                <!-- Top Controls -->
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-2">
+                        <button onclick="goBackToDashboard()" class="text-slate-400 hover:text-slate-600 transition p-2"><i class="fas fa-times text-xl"></i></button>
+                        <h2 class="text-xl font-bold text-slate-800" id="arena-title">Level 1: Long Tone <span class="text-sm text-slate-500 font-normal ml-2" id="arena-status">(รอเริ่ม...)</span></h2>
                     </div>
-                    
-                    <!-- Arena Controls -->
-                    <div class="flex gap-3 items-center bg-slate-50 p-2 rounded-xl border border-slate-200">
-                        <div id="arena-controls-practice" class="flex gap-3">
-                            <label class="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer">
-                                <input type="checkbox" id="auto-piano-toggle" checked class="rounded text-blue-500">
-                                🎹 กดโจทย์อัตโนมัติ (Auto)
-                            </label>
-                            <button id="manual-play-btn" class="hidden bg-blue-100 text-blue-600 px-3 py-1 rounded-lg text-sm font-bold hover:bg-blue-200 transition">
-                                <i class="fas fa-play"></i> ฟังกดเปียโน
-                            </button>
-                        </div>
-                        
-                        <div id="arena-controls-test" class="hidden flex gap-3">
-                            <label class="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer">
-                                <input type="checkbox" id="test-guide-toggle" checked class="rounded text-blue-500">
-                                🎵 เปิดเสียงคลอนำ (Guide Tone)
-                            </label>
-                        </div>
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 text-sm text-slate-600 font-medium cursor-pointer bg-slate-50 px-3 py-1 rounded-full border border-slate-200">
+                            <input type="checkbox" id="arena-guide-toggle" class="form-checkbox text-blue-500 rounded" checked>
+                            <i class="fas fa-music text-blue-500"></i> <span class="hidden md:inline">เปิดเสียงนำ (Guide Tone)</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-purple-600 font-medium cursor-pointer bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
+                            <input type="checkbox" id="arena-testmode-toggle" class="form-checkbox text-purple-500 rounded">
+                            <i class="fas fa-eye-slash text-purple-500"></i> <span class="hidden md:inline">ซ่อนกราฟ (Test Mode)</span>
+                        </label>
                     </div>
                 </div>
 
-                <!-- Canvas Area -->
-                <div class="flex gap-4">
-                    <!-- Left: Mic Meter -->
-                    <div class="flex flex-col items-center justify-center gap-2">
+                <!-- Main Arena layout -->
+                <div class="flex flex-col md:flex-row gap-3 md:gap-4 flex-1">
+                    <!-- Mic Meter (Hidden on very small screens) -->
+                    <div class="hidden md:flex flex-col items-center justify-center gap-2 w-8">
                         <i class="fas fa-microphone text-slate-400 text-sm"></i>
-                        <div class="mic-meter-container">
-                            <div id="mic-level-fill"></div>
-                        </div>
+                        <div class="mic-meter-container"><div id="mic-level-fill"></div></div>
                     </div>
                     
-                    <!-- Center: Visualizer -->
-                    <div id="practice-arena" class="flex-grow shadow-inner relative">
+                    <!-- Canvas Area -->
+                    <div id="practice-arena" class="flex-grow shadow-inner relative flex-1">
                         <canvas id="pitch-canvas"></canvas>
                         
-                        <!-- Center Target Line (Dashed) -->
-                        <div class="absolute left-0 right-0 top-1/2 border-t-2 border-slate-300 border-dashed pointer-events-none z-0"></div>
-                        
                         <!-- Test Mode Blindfold -->
-                        <div id="test-blindfold" class="hidden absolute inset-0 bg-slate-800/90 backdrop-blur-sm flex flex-col items-center justify-center text-white z-10">
-                            <i class="fas fa-eye-slash text-4xl mb-4 text-slate-400"></i>
-                            <h3 class="text-xl font-bold">โหมดทดสอบกำลังทำงาน</h3>
-                            <p class="text-slate-300 mt-2">ร้องตามโจทย์โดยใช้ความจำเสียง (ห้ามดูเส้น)</p>
-                            <div id="test-status-text" class="mt-4 font-bold text-yellow-400 text-2xl">รอสัญญาณ...</div>
+                        <div id="test-blindfold" class="hidden absolute inset-0 bg-slate-800/95 backdrop-blur-md flex flex-col items-center justify-center text-white z-30">
+                            <i class="fas fa-eye-slash text-5xl md:text-6xl mb-4 text-slate-400 drop-shadow-lg"></i>
+                            <h3 class="text-2xl font-bold">โหมดทดสอบ</h3>
+                            <p class="text-slate-300 mt-2 text-center px-4">ระบบกำลังบันทึกและวิเคราะห์เสียงของคุณ<br>พยายามร้องให้ตรงคีย์โดยใช้ความจำเสียง!</p>
                         </div>
                     </div>
 
-                    <!-- Right: Tuner / Note Indicator -->
-                    <div class="flex flex-col items-center justify-center w-24 bg-slate-50 rounded-2xl border border-slate-200 p-2 shadow-sm">
-                        <div class="text-xs text-slate-400 font-bold mb-2">PITCH</div>
-                        <div id="tuner-note" class="text-3xl font-brand font-bold text-slate-800">-</div>
-                        <div id="tuner-cents" class="text-sm font-medium mt-1 text-slate-500">0</div>
+                    <!-- Right Tuner -->
+                    <div class="flex flex-row md:flex-col items-center justify-center md:w-24 bg-slate-50 rounded-2xl border border-slate-200 p-2 md:p-4 shadow-sm w-full md:h-full gap-4 md:gap-2">
+                        <div class="text-xs text-slate-400 font-bold hidden md:block">PITCH</div>
+                        <div id="tuner-note" class="text-3xl md:text-4xl font-brand font-bold text-slate-800">-</div>
+                        <div id="tuner-cents" class="text-sm font-medium mt-1 text-slate-500"></div>
+                        <div class="md:hidden flex-grow"></div>
+                        <!-- Mobile mic meter -->
+                        <div class="md:hidden flex items-center gap-2 h-10">
+                            <i class="fas fa-microphone text-slate-400 text-xs"></i>
+                            <div class="w-2 h-full bg-slate-200 rounded overflow-hidden flex items-end">
+                                <div id="mic-level-fill-mobile" class="w-full bg-green-400" style="height:0%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Status & Action Bar -->
-                <div class="mt-6 flex justify-between items-center">
-                    <div id="arena-status" class="text-lg font-bold text-slate-600">
-                        กดปุ่มเริ่มเพื่อฟังโจทย์
-                    </div>
-                    
-                    <div class="flex gap-4">
-                        <button id="action-sing-btn" class="btn-success py-2 px-8 rounded-full font-bold text-lg hidden">
-                            <i class="fas fa-microphone"></i> เริ่มร้อง (Sing)
-                        </button>
-                    </div>
+                <div class="mt-4 md:mt-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div id="arena-status" class="text-lg font-bold text-slate-600">กดปุ่มเริ่มเพื่อร้องพร้อมโจทย์</div>
+                    <button id="action-sing-btn" class="btn-success py-3 px-8 rounded-full font-bold text-lg w-full md:w-auto shadow-lg hover:shadow-xl">
+                        <i class="fas fa-microphone"></i> เริ่มร้อง (Start)
+                    </button>
                 </div>
 
-                <!-- End Screen / Results (Hidden initially) -->
+                <!-- Results -->
                 <div id="results-panel" class="hidden mt-6 bg-blue-50 border border-blue-100 p-6 rounded-2xl text-center">
                     <h3 class="text-2xl font-bold text-slate-800 mb-2">สรุปผลการร้อง</h3>
-                    <div class="text-5xl font-brand font-black text-blue-600 mb-4" id="score-display">--%</div>
-                    <p class="text-slate-600 mb-6" id="feedback-display">วิเคราะห์ความแม่นยำของเสียง...</p>
-                    
-                    <div class="flex justify-center gap-4">
-                        <button onclick="replayAudio()" class="btn-secondary py-2 px-6 rounded-full font-medium">
-                            <i class="fas fa-headphones"></i> ฟังเสียงตัวเอง
-                        </button>
-                        <button onclick="stopAndGoBack()" class="btn-primary py-2 px-6 rounded-full font-medium">
-                            เสร็จสิ้น / เลือกด่านใหม่
-                        </button>
+                    <div class="text-6xl font-brand font-black text-blue-600 mb-4 drop-shadow-md" id="score-display">--%</div>
+                    <p class="text-slate-600 mb-6 text-lg" id="feedback-display">วิเคราะห์ความแม่นยำของเสียง...</p>
+                    <div class="flex flex-col md:flex-row justify-center gap-3 md:gap-4">
+                        <button onclick="startSingPhase()" class="btn-success py-3 px-6 rounded-full font-medium w-full md:w-auto"><i class="fas fa-redo"></i> ลองอีกครั้ง</button>
+                        <button onclick="replayAudio()" class="btn-secondary py-3 px-6 rounded-full font-medium w-full md:w-auto"><i class="fas fa-headphones"></i> ฟังเสียงตัวเอง</button>
+                        <button onclick="stopAndGoBack()" class="btn-primary py-3 px-6 rounded-full font-medium w-full md:w-auto">เลือกด่านใหม่</button>
                     </div>
                 </div>
             </div>
@@ -308,6 +350,10 @@
 
     </main>
 
+    <script type="module">
+        import { gamesExt } from './api.js';
+        window.SupabaseAPI = gamesExt;
+    </script>
     <script src="vocal-trainer.js"></script>
 </body>
 </html>

@@ -31,6 +31,16 @@ try {
         window.history.replaceState({}, document.title, newUrl);
         console.log('[QR] Saved pendingScanId to localStorage:', scanId);
     }
+
+    // ⏰ มาจากปุ่ม "คืนเลย" ในการแจ้งเตือน — ตั้งธงไว้ให้ dashboard เปิดหน้าคืนทันที
+    if (urlParams.get('return') === 'my') {
+        sessionStorage.setItem('pendingReturnAll', urlParams.get('auto') === '1' ? 'auto' : '1');
+        urlParams.delete('return');
+        urlParams.delete('auto');
+        const s = urlParams.toString();
+        window.history.replaceState({}, document.title,
+            window.location.pathname + (s ? '?' + s : ''));
+    }
 } catch (e) {
     console.error('[QR] Failed to parse scan URL parameter:', e);
 }
@@ -346,6 +356,13 @@ function registerServiceWorker() {
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!refreshing) { refreshing = true; window.location.reload(); }
+    });
+
+    // ⏰ ผู้ใช้กด "คืนเลย" จากการแจ้งเตือนขณะที่แอปเปิดอยู่
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type !== 'RETURN_ALL_REQUEST') return;
+        sessionStorage.setItem('pendingReturnAll', 'auto');
+        window.dispatchEvent(new CustomEvent('oad:return-all-request'));
     });
 
     // Re-subscribe when the SW reports a subscription rotation/expiry

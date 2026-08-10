@@ -830,15 +830,19 @@ export const borrowExt = {
             return { data, error: null };
         } catch (error) { return { data: null, error }; }
     },
-    async borrowInstrumentAtomic(instrumentId, userId, isTakeHome, dueDate, parentAck, borrowType) {
+    async borrowInstrumentAtomic(instrumentId, userId, isTakeHome, dueDate, parentAck, borrowType, eventId = null) {
         try {
+            // borrowType ต้องไม่เป็น undefined เด็ดขาด — เดิมผู้เรียกบางจุดส่งไม่ครบ
+            // ทำให้ RPC ได้ค่า NULL และ borrow_type ในฐานว่าง 4,035/4,036 แถว
+            const resolvedType = borrowType || (isTakeHome ? 'take_home' : 'in_school');
             const { data, error } = await supabase.rpc('borrow_instrument_atomic', {
                 p_instrument_id: parseInt(instrumentId),
                 p_user_id: userId,
                 p_is_take_home: isTakeHome,
                 p_due_date: dueDate || null,
                 p_parent_acknowledged: parentAck,
-                p_borrow_type: borrowType
+                p_borrow_type: resolvedType,
+                p_event_id: eventId
             });
             if (error) throw error;
             return { data, error: null };
@@ -1587,5 +1591,182 @@ export const studentLoopsApi = {
         } catch (error) {
             return { error };
         }
+    }
+};
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎭 EVENTS — งานที่ครูเปิด (Phase 3)
+// ═══════════════════════════════════════════════════════════════════════════
+const _wrap = async (fn) => {
+    try {
+        const { data, error } = await fn();
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) { return { data: null, error }; }
+};
+
+export const eventsApi = {
+    getOpen()               { return _wrap(() => supabase.rpc('get_open_events')); },
+    getSummary(eventId)     { return _wrap(() => supabase.rpc('get_event_summary', { p_event_id: eventId })); },
+    create({ name, eventDate, returnDueAt, needsInstrument = true, needsUniform = true, openTo = 'club' }) {
+        return _wrap(() => supabase.rpc('admin_create_event', {
+            p_name: name, p_event_date: eventDate, p_return_due_at: returnDueAt,
+            p_needs_instrument: needsInstrument, p_needs_uniform: needsUniform, p_open_to: openTo
+        }));
+    },
+    close(eventId, note = null) {
+        return _wrap(() => supabase.rpc('admin_close_event', { p_event_id: eventId, p_note: note }));
+    },
+    list() {
+        return _wrap(() => supabase.from('events').select('*').order('event_date', { ascending: false }));
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎺 SECTIONS — กลุ่มเครื่องของวง (Phase 2)
+// ═══════════════════════════════════════════════════════════════════════════
+export const sectionsApi = {
+    list()                  { return _wrap(() => supabase.from('sections').select('*').order('sort_order')); },
+    listTypeMapping()       { return _wrap(() => supabase.rpc('admin_list_type_sections')); },
+    setTypeSection(type, sectionId) {
+        return _wrap(() => supabase.rpc('admin_set_type_section', { p_type: type, p_section_id: sectionId }));
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎖 STAFF — หัวหน้าวง / กลุ่มเครื่อง / งาน / ฝ่ายเสื้อผ้า (Phase 4)
+//    สิทธิ์: อ่านในขอบเขตตน + เขียนได้เฉพาะใบตรวจ ไม่มีสิทธิ์คืน/บล็อกใคร
+// ═══════════════════════════════════════════════════════════════════════════
+export const staffApi = {
+    myScopes()              { return _wrap(() => supabase.rpc('get_my_staff_scopes')); },
+    getOutstanding(eventId = null) {
+        return _wrap(() => supabase.rpc('staff_get_outstanding', { p_event_id: eventId }));
+    },
+    submitReport({ targetKind, finding, eventId = null, subjectId = null,
+                   targetId = null, targetLabel = null, note = null, photoUrl = null }) {
+        return _wrap(() => supabase.rpc('staff_submit_report', {
+            p_target_kind: targetKind, p_finding: finding, p_event_id: eventId,
+            p_subject_id: subjectId, p_target_id: targetId, p_target_label: targetLabel,
+            p_note: note, p_photo_url: photoUrl
+        }));
+    },
+    listReports(onlyOpen = true) {
+        let q = supabase.from('staff_reports').select('*').order('created_at', { ascending: false });
+        if (onlyOpen) q = q.is('teacher_ack_at', null);
+        return _wrap(() => q);
+    },
+    ackReport(reportId)     { return _wrap(() => supabase.rpc('admin_ack_staff_report', { p_report_id: reportId })); },
+    grant(userId, scopeType, scopeValue = null) {
+        return _wrap(() => supabase.from('staff_roles')
+            .upsert({ user_id: userId, scope_type: scopeType, scope_value: scopeValue, is_active: true },
+                    { onConflict: 'user_id,scope_type,scope_value' }));
+    },
+    revoke(roleId)          { return _wrap(() => supabase.from('staff_roles').update({ is_active: false }).eq('id', roleId)); },
+    listAll()               { return _wrap(() => supabase.from('staff_roles').select('*, users(prefix, first_name, last_name)').eq('is_active', true)); }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 👔 UNIFORMS — ชุดวงโยธวาทิต 60 ชุด (Phase 6)
+// ═══════════════════════════════════════════════════════════════════════════
+export const uniformApi = {
+    scanKit(qr, eventId = null) {
+        return _wrap(() => supabase.rpc('get_kit_scan_details', { p_qr: qr, p_event_id: eventId }));
+    },
+    checkout(eventId, kitId, studentId, partIds) {
+        return _wrap(() => supabase.rpc('uniform_checkout', {
+            p_event_id: eventId, p_kit_id: kitId, p_student_id: studentId, p_part_ids: partIds
+        }));
+    },
+    returnPart(checkoutId, partId, condition, note = null) {
+        return _wrap(() => supabase.rpc('uniform_return_part', {
+            p_checkout_id: checkoutId, p_part_id: partId, p_condition: condition, p_note: note
+        }));
+    },
+    getOutstanding(eventId)  { return _wrap(() => supabase.rpc('get_uniform_outstanding', { p_event_id: eventId })); },
+    requestSwap(kitId, partId, wantSize, reason) {
+        return _wrap(() => supabase.rpc('uniform_request_swap', {
+            p_kit_id: kitId, p_part_id: partId, p_want_size: wantSize, p_reason: reason
+        }));
+    },
+    approveSwap(requestId, replacementPartId) {
+        return _wrap(() => supabase.rpc('admin_approve_swap', {
+            p_request_id: requestId, p_replacement_part_id: replacementPartId
+        }));
+    },
+    listSwapRequests(status = 'pending') {
+        return _wrap(() => supabase.from('uniform_swap_requests')
+            .select('*, users!uniform_swap_requests_requester_id_fkey(prefix, first_name, last_name)')
+            .eq('status', status).order('created_at', { ascending: false }));
+    },
+    listKits()              { return _wrap(() => supabase.from('uniform_kits').select('*').order('kit_no')); },
+
+    // ── จัดการชุด (Phase 7)
+    setTypes()              { return _wrap(() => supabase.from('uniform_set_types').select('*').order('sort_order')); },
+    adminListKits(setTypeId = null) {
+        return _wrap(() => supabase.rpc('admin_list_kits', { p_set_type_id: setTypeId }));
+    },
+    adminListPartTypes()    { return _wrap(() => supabase.rpc('admin_list_part_types')); },
+    assignKit(kitId, studentId) {
+        return _wrap(() => supabase.rpc('admin_assign_kit', { p_kit_id: kitId, p_student_id: studentId }));
+    },
+    claimKit(qr)            { return _wrap(() => supabase.rpc('claim_kit', { p_qr: qr })); },
+
+    // ── วงจรเจ้าของชุด (Phase 8)
+    releaseKit(kitId, reason = null) {
+        return _wrap(() => supabase.rpc('admin_release_kit', { p_kit_id: kitId, p_reason: reason }));
+    },
+    transferKit(kitId, studentId, reason = null) {
+        return _wrap(() => supabase.rpc('admin_transfer_kit', {
+            p_kit_id: kitId, p_new_student_id: studentId, p_reason: reason }));
+    },
+    releaseInactiveKits()   { return _wrap(() => supabase.rpc('admin_release_inactive_kits')); },
+    kitHistory(kitId)       { return _wrap(() => supabase.rpc('admin_kit_history', { p_kit_id: kitId })); },
+
+    // ── ฝั่งนักเรียน: เลือกชุดเองจากรายการ ไม่ต้องสแกน
+    availableKits(setTypeId = null) {
+        return _wrap(() => supabase.rpc('get_available_kits', { p_set_type_id: setTypeId }));
+    },
+    selectMyKit(kitId)      { return _wrap(() => supabase.rpc('select_my_kit', { p_kit_id: kitId })); },
+    myKit()                 { return _wrap(() => supabase.rpc('get_my_kit')); },
+
+    // ── รายงาน + ล็อกกันลงเบอร์มั่ว (Phase 9)
+    sizeReport(setTypeId = null) {
+        return _wrap(() => supabase.rpc('admin_uniform_size_report', { p_set_type_id: setTypeId }));
+    },
+    damagedList(setTypeId = null) {
+        return _wrap(() => supabase.rpc('admin_uniform_damaged', { p_set_type_id: setTypeId }));
+    },
+    setPartCondition(partId, condition) {
+        return _wrap(() => supabase.rpc('admin_set_part_condition', { p_part_id: partId, p_condition: condition }));
+    },
+    getSelfSelect()         { return _wrap(() => supabase.rpc('get_uniform_self_select')); },
+    setSelfSelect(on)       { return _wrap(() => supabase.rpc('admin_set_uniform_self_select', { p_on: on })); },
+    lockKit(kitId, selectable) {
+        return _wrap(() => supabase.rpc('admin_lock_kit', { p_kit_id: kitId, p_selectable: selectable }));
+    },
+    // ผูกกับหน้าจัดการผู้ใช้ — ดึงจาก uniform_kits แหล่งเดียว ไม่เก็บซ้ำใน users
+    userKits()              { return _wrap(() => supabase.rpc('admin_user_kits')); },
+    setPartSizes(items)     { return _wrap(() => supabase.rpc('admin_set_part_sizes', { p_items: items })); },
+    createKits(setTypeId, count) {
+        return _wrap(() => supabase.rpc('admin_create_kits', { p_set_type_id: setTypeId, p_count: count }));
+    },
+    addPartType({ setTypeId, code, nameTh, prefix, icon = null, isRequired = true }) {
+        return _wrap(() => supabase.rpc('admin_add_part_type', {
+            p_set_type_id: setTypeId, p_code: code, p_name_th: nameTh,
+            p_prefix: prefix, p_icon: icon, p_is_required: isRequired
+        }));
+    },
+    retirePartType(partTypeId) {
+        return _wrap(() => supabase.rpc('admin_retire_part_type', { p_part_type_id: partTypeId }));
+    },
+    syncKitParts(setTypeId = null) {
+        return _wrap(() => supabase.rpc('admin_sync_kit_parts', { p_set_type_id: setTypeId }));
+    },
+    listParts(kitId = null) {
+        let q = supabase.from('uniform_parts').select('*, uniform_part_types(code, name_th, icon, sort_order)');
+        if (kitId) q = q.eq('kit_id', kitId);
+        return _wrap(() => q.order('id'));
+    },
+    setPartSize(partId, size) {
+        return _wrap(() => supabase.from('uniform_parts').update({ size }).eq('id', partId));
     }
 };

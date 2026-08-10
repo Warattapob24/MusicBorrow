@@ -8,7 +8,7 @@
 //   6. [NEW] Added 'push' event listener for background notifications
 //   7. [NEW] Enhanced 'notificationclick' to focus existing tabs instead of always opening new ones
 
-const CACHE_NAME = 'music-borrow-v6.0.149'; // boss history + student video history
+const CACHE_NAME = 'music-borrow-v6.1.0'; // events + staff roles + uniforms + return-reminder actions
 
 const PRECACHE_URLS = [
     '/',
@@ -168,6 +168,15 @@ self.addEventListener('push', event => {
     }
 
     const title = data.title || 'การแจ้งเตือน';
+
+    // ⭐ เตือนคืน = ให้กดคืนได้จากตัวแจ้งเตือนเลย ไม่ต้องเปิดแอป
+    // นี่คือจุดที่ลดแรงเสียดทานของ "ลืมกดคืน" ได้มากที่สุด
+    const isReturnReminder = /ครบกำหนดคืน|เลยกำหนดคืน/.test(title);
+    const actions = isReturnReminder
+        ? [{ action: 'return-now', title: '✅ คืนเลย' },
+           { action: 'snooze',     title: '⏰ อีก 15 นาที' }]
+        : [];
+
     const options = {
         body:  data.body || '',
         icon:  data.icon  || '/assets/logo.png',
@@ -176,10 +185,13 @@ self.addEventListener('push', event => {
         // send one, we omit both — Chrome was throwing
         // "Notifications which set the renotify flag must specify a non-empty tag".
         ...(data.tag ? { tag: data.tag, renotify: true } : {}),
+        ...(actions.length ? { actions } : {}),
         vibrate: [200, 100, 200],
-        requireInteraction: false,           // auto-dismiss after a few seconds
+        // เตือนคืนต้องค้างไว้จนกว่าจะกด ไม่ให้หายไปเอง
+        requireInteraction: isReturnReminder,
         data: {
-            url: data.url || '/',
+            url: isReturnReminder ? '/?return=my' : (data.url || '/'),
+            kind: isReturnReminder ? 'return-reminder' : 'generic',
             dateOfArrival: Date.now(),
         }
     };
@@ -218,10 +230,34 @@ self.addEventListener('pushsubscriptionchange', event => {
 self.addEventListener('notificationclick', event => {
     event.notification.close(); // ปิดกล่องการแจ้งเตือนทันทีที่กด
 
-    const urlToOpen = new URL(event.notification.data?.url || '/', self.location.origin).href;
+    // ⏰ เลื่อนเตือน 15 นาที — ไม่ต้องเปิดแอป
+    if (event.action === 'snooze') {
+        const n = event.notification;
+        event.waitUntil(new Promise(resolve => {
+            setTimeout(() => {
+                self.registration.showNotification(n.title, {
+                    body: n.body, icon: n.icon, badge: n.badge,
+                    requireInteraction: true,
+                    actions: [{ action: 'return-now', title: '✅ คืนเลย' }],
+                    data: n.data
+                }).then(resolve, resolve);
+            }, 15 * 60 * 1000);
+        }));
+        return;
+    }
+
+    // ✅ กด "คืนเลย" → เปิดแอปที่หน้ารายการค้างพร้อมสั่งคืนทันที
+    const base = event.notification.data?.url || '/';
+    const target = event.action === 'return-now' ? '/?return=my&auto=1' : base;
+    const urlToOpen = new URL(target, self.location.origin).href;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+            // ถ้าแอปเปิดอยู่แล้ว ส่งข้อความเข้าไปแทนการเปิดแท็บใหม่
+            if (event.action === 'return-now' && windowClients.length) {
+                windowClients[0].postMessage({ type: 'RETURN_ALL_REQUEST' });
+                return 'focus' in windowClients[0] ? windowClients[0].focus() : undefined;
+            }
             // 💡 [Creative Problem-Solving] 
             // ตรวจสอบก่อนว่าผู้ใช้เปิดแท็บของแอปเราค้างไว้อยู่แล้วหรือไม่
             // หากมีให้ทำการ Focus กลับไปที่แท็บนั้นเพื่อป้องกันการเปิดแท็บซ้ำซ้อน

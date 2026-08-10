@@ -10,7 +10,8 @@
 // นำ supabase ออกและ import api เข้ามาแทน
 import { authApi, notificationsExt, borrowExt, usersExt, repair,
          instrumentsExt, realtimeApi, gamesExt, knowledgeExt, statsApi,
-         badgesExt, rankingsExt, bossesApi, raidApi, studentLoopsApi } from './api.js';
+         badgesExt, rankingsExt, bossesApi, raidApi, studentLoopsApi,
+         uniformApi } from './api.js';
 import { currentUser, setCurrentUser, getCurrentUser } from './auth.js';
 import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
 import { buildPlayerCardHTML, triggerLevelUp, sharePlayerCard  } from './player-card.js';
@@ -248,19 +249,26 @@ export async function loadAndRenderMyBorrowedItems(userId) {
         if (!data?.length) {
             borrowedSection.style.display = 'none';
             listEl.innerHTML = '';
+            _setAppBadge(0);
             updateAllTimers();
             return;
         }
 
         borrowedSection.style.display = 'block';
-        const sixHoursAgo = new Date(Date.now() - 6 * 3600 * 1000);
-        
-        const overdueWarningHtml = data.some(l => !l.is_take_home && l.borrow_type !== 'performance' && new Date(l.borrow_timestamp) < sixHoursAgo)
+
+        // 🔔 ตัวเลขแดงบนไอคอนแอป (PWA) — เห็นทุกครั้งที่มองมือถือแม้ไม่เปิดแอป
+        _setAppBadge(data.length);
+
+        // 🟢 FIX: เดิมตัดสินว่า "ลืมคืน" จาก 6 ชม. ตายตัวกับทุกคน
+        // ทั้งที่นักเรียนทั่วไปมีสิทธิ์แค่ 1 ชม. และการยืมออกงานไม่ควรถูกเตือนเลย
+        // ตอนนี้ใช้ is_overdue ที่ RPC คำนวณจาก expected_return_at ตามกติกาของแต่ละกลุ่ม
+        const overdueItems = data.filter(l => l.is_overdue === true);
+        const overdueWarningHtml = overdueItems.length
             ? `<div style="background-color:var(--pico-form-element-background-color); border-left:4px solid var(--pico-del-color); border-radius:8px; padding:1.2rem; margin-bottom:1.5rem; display: flex; gap: 1rem; align-items: flex-start; box-shadow: var(--pico-box-shadow);">
                 <div style="font-size: 1.5rem; line-height: 1;">⚠️</div>
                 <div>
-                    <h5 style="margin:0 0 0.25rem 0; color:var(--pico-del-color); font-size:1rem; font-weight:700;">พบรายการที่อาจลืมคืน!</h5>
-                    <p style="margin:0; font-size:0.85rem; color:var(--pico-color); line-height: 1.4;">คุณมีรายการยืมในโรงเรียนที่นานเกิน 6 ชั่วโมง หากใช้งานเสร็จแล้ว กรุณากด <b>คืน</b> เพื่อบันทึกเวลา</p>
+                    <h5 style="margin:0 0 0.25rem 0; color:var(--pico-del-color); font-size:1rem; font-weight:700;">เลยกำหนดคืนแล้ว ${overdueItems.length} รายการ</h5>
+                    <p style="margin:0; font-size:0.85rem; color:var(--pico-color); line-height: 1.4;">${overdueItems.map(l => escapeHtml(l.instrument_name || '—')).join(', ')} — หากใช้งานเสร็จแล้ว กรุณากด <b>คืน</b> เพื่อบันทึกเวลา</p>
                 </div>
                </div>`
             : '';
@@ -899,6 +907,11 @@ const VIEWS = {
                     <div id="borrowed-list" aria-busy="true" class="sd-list-container"></div>
                 </div>
 
+                <div id="my-kit-section" style="margin-bottom: 2.5rem;">
+                    <h3 class="sd-section-title">👔 ชุดประจำตัว</h3>
+                    <div id="my-kit-box" aria-busy="true" class="sd-list-container"></div>
+                </div>
+
                 <div>
                     <h3 class="sd-section-title">➕ ทำรายการยืมใหม่</h3>
                     <div id="borrow-form-container" aria-busy="true">
@@ -909,6 +922,7 @@ const VIEWS = {
         },
         async afterRender(user) {
             await loadAndRenderMyBorrowedItems(user.id);
+            await renderMyKit();
             await renderBorrowForm(user);
         }
     },
@@ -6158,3 +6172,123 @@ window.__sdChallengeBoss = async (bossId, bossTitle) => {
         }
     }
 };
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔔 App Badge — ตัวเลขค้างคืนบนไอคอน PWA
+//    รองรับเฉพาะเบราว์เซอร์ที่มี Badging API (Chrome/Edge บน Android/Desktop)
+//    ที่อื่นเงียบไปเฉย ๆ ไม่ throw
+// ─────────────────────────────────────────────────────────────────────────────
+function _setAppBadge(count) {
+    try {
+        if (!('setAppBadge' in navigator)) return;
+        if (count > 0) navigator.setAppBadge(count).catch(() => {});
+        else navigator.clearAppBadge?.().catch(() => {});
+    } catch { /* ไม่รองรับ — ข้ามไป */ }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 👔 ชุดประจำตัว — นักเรียนเลือกชุดเองได้จากรายการ ไม่ต้องรอครูจับคู่ทีละคน
+//    และไม่ต้องพิมพ์เลขชุดเอง (เสี่ยงพิมพ์ผิด/แย่งกัน) — เลือกจากชุดที่ว่างจริง
+// ─────────────────────────────────────────────────────────────────────────────
+export async function renderMyKit() {
+    const box = document.getElementById('my-kit-box');
+    const section = document.getElementById('my-kit-section');
+    if (!box) return;
+
+    // 👔 ชุดประจำตัวมีเฉพาะสมาชิกชุมนุม — กลุ่มอื่นซ่อนทั้งส่วน
+    // (คนนอกยืมชุดออกงานได้ผ่านการสแกน QR แต่ไม่ผูกถาวร)
+    if (getCurrentUser()?.student_group !== 'club') {
+        if (section) section.style.display = 'none';
+        box.innerHTML = '';
+        return;
+    }
+    if (section) section.style.display = '';
+    box.setAttribute('aria-busy', 'true');
+
+    const { data: kit, error } = await uniformApi.myKit();
+    box.removeAttribute('aria-busy');
+
+    if (error) {
+        box.innerHTML = `<p style="color:var(--pico-del-color);font-size:.85rem;">โหลดข้อมูลชุดไม่สำเร็จ</p>`;
+        return;
+    }
+
+    if (!kit) {
+        box.innerHTML = `
+            <div style="padding:1.2rem;background:var(--pico-card-background-color);
+                        border:1px dashed var(--pico-muted-border-color);border-radius:12px;text-align:center;">
+                <div style="font-size:1.8rem;">👔</div>
+                <p style="margin:.4rem 0 .8rem;font-size:.9rem;">คุณยังไม่มีชุดประจำตัว</p>
+                <button type="button" id="pick-kit-btn" class="sd-btn-primary"
+                        style="padding:.6rem 1.4rem;font-size:.9rem;">เลือกชุดของฉัน</button>
+            </div>`;
+        document.getElementById('pick-kit-btn')?.addEventListener('click', pickMyKit);
+        return;
+    }
+
+    const parts = kit.parts || [];
+    box.innerHTML = `
+        <div style="padding:1.1rem;background:var(--pico-card-background-color);
+                    border:1px solid var(--pico-muted-border-color);border-radius:12px;">
+            <div style="display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;">
+                <strong style="font-size:1.35rem;">${kit.set_icon || '👔'} ชุด #${kit.kit_no}</strong>
+                <span style="font-size:.8rem;opacity:.7;">${escapeHtml(kit.set_name || '')} · ${escapeHtml(kit.qr_code || '')}</span>
+            </div>
+            <table style="width:100%;margin-top:.7rem;font-size:.85rem;border-collapse:collapse;">
+                ${parts.map(p => `<tr>
+                    <td style="padding:.3rem 0;border-top:1px solid var(--pico-muted-border-color);">
+                        ${p.icon || ''} ${escapeHtml(p.type_name)}</td>
+                    <td style="padding:.3rem 0;border-top:1px solid var(--pico-muted-border-color);opacity:.6;font-size:.78rem;">
+                        ${escapeHtml(p.part_code)}</td>
+                    <td style="padding:.3rem 0;border-top:1px solid var(--pico-muted-border-color);text-align:right;font-weight:700;">
+                        ${p.size ? escapeHtml(p.size) : '<span style="opacity:.5;font-weight:400;">ยังไม่ระบุไซส์</span>'}</td>
+                </tr>`).join('')}
+            </table>
+            <p style="margin:.8rem 0 0;font-size:.78rem;opacity:.7;">
+                ต้องการเปลี่ยนชุดหรือสลับบางชิ้น — แจ้งครูได้จากหน้าสแกน QR ถุงชุด
+            </p>
+        </div>`;
+}
+
+async function pickMyKit() {
+    Swal.fire({ title: 'กำลังโหลดชุดที่ว่าง...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    const { data: kits, error } = await uniformApi.availableKits();
+    if (error) return Swal.fire('ผิดพลาด', error.message, 'error');
+    if (!kits?.length) {
+        return Swal.fire('ไม่มีชุดว่าง', 'ชุดถูกเลือกไปหมดแล้ว — กรุณาแจ้งครู', 'info');
+    }
+
+    const result = await Swal.fire({
+        title: '👔 เลือกชุดของคุณ',
+        width: 520,
+        html: `<div style="text-align:left;font-size:.88rem;max-height:60vh;overflow:auto;">
+                 <p style="margin:0 0 .6rem;opacity:.75;">เลือกได้คนละ 1 ชุด — เปลี่ยนได้เฉพาะครู เลือกให้ตรงไซส์ตัวเอง</p>
+                 ${kits.map(k => `
+                   <button type="button" class="kit-pick" data-id="${k.kit_id}"
+                     style="display:block;width:100%;margin:0 0 .45rem;padding:.7rem .9rem;border-radius:10px;
+                            border:1px solid var(--pico-muted-border-color);background:transparent;
+                            color:inherit;text-align:left;cursor:pointer;">
+                     <strong>${k.set_icon || '👔'} ชุด #${k.kit_no}</strong>
+                     <span style="font-size:.75rem;opacity:.6;"> ${escapeHtml(k.qr_code || '')}</span>
+                     <div style="font-size:.76rem;opacity:.75;margin-top:.15rem;">
+                       ${k.sizes ? escapeHtml(k.sizes) : 'ยังไม่ได้ระบุไซส์'}
+                     </div>
+                   </button>`).join('')}
+               </div>`,
+        showConfirmButton: false, showCancelButton: true, cancelButtonText: 'ยกเลิก',
+        didOpen: () => {
+            document.querySelectorAll('.kit-pick').forEach(b =>
+                b.addEventListener('click', () => Swal.close({ isConfirmed: true, value: b.dataset.id })));
+        }
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
+    const { data, error: selErr } = await uniformApi.selectMyKit(Number(result.value));
+    if (selErr) {
+        await Swal.fire('เลือกไม่สำเร็จ', selErr.message, 'error');
+        return renderMyKit();
+    }
+    await Swal.fire('เรียบร้อย', `ชุด #${data.kit_no} เป็นชุดประจำตัวของคุณแล้ว`, 'success');
+    renderMyKit();
+}
