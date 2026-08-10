@@ -6226,7 +6226,7 @@ window.__oadEventDetail = async (eventId) => {
 // 👔 UNIFORMS TAB — จัดการถุงชุด เจ้าของ ไซส์ และอุปกรณ์ในชุด
 // ═══════════════════════════════════════════════════════════════════════════
 
-const _uni = { setTypes: [], kits: [], partTypes: [], setTypeId: null, selected: new Set() };
+const _uni = { setTypes: [], kits: [], partTypes: [], setTypeId: null, selected: new Set(), stock: new Map() };
 
 // อัปเดตป้ายจำนวนที่เลือกบนปุ่มพิมพ์บัตร
 function _syncKitSelectionUI(visibleIds) {
@@ -6266,8 +6266,10 @@ async function renderUniformsTab() {
         });
     }
 
+    // ต้องรอทั้ง _renderKitTable (ให้ _uni.kits มีข้อมูล) และ _renderUniformReport
+    // (ให้ _uni.stock มีข้อมูล) ก่อน ตารางกรอกไซส์ถึงจะแสดง "เหลือกี่ตัว" ได้
     await Promise.all([_renderKitTable(), _renderPartTypeTable(), _renderUniformReport()]);
-    renderSizeGrid();   // ต้องรอ _renderKitTable ให้ _uni.kits มีข้อมูลก่อน
+    renderSizeGrid();
 }
 
 async function _renderKitTable() {
@@ -6395,7 +6397,7 @@ async function _renderPartTypeTable() {
     wrap.innerHTML = `
         <table class="oad-table">
             <thead><tr><th>ประเภทชุด</th><th>อุปกรณ์</th><th>รหัสนำหน้า</th>
-                       <th>ตัวเลือกไซส์</th><th>จำนวนชิ้น</th><th>บังคับติ๊ก</th><th>จัดการ</th></tr></thead>
+                       <th>สต๊อกรายไซส์ (มีกี่ตัว)</th><th>จำนวนชิ้น</th><th>บังคับติ๊ก</th><th>จัดการ</th></tr></thead>
             <tbody>
             ${_uni.partTypes.map(p => {
                 const nameEsc = escapeHtml(p.name_th).replace(/'/g, "\\'");
@@ -6404,17 +6406,24 @@ async function _renderPartTypeTable() {
                 <td class="nowrap">${escapeHtml(p.set_name || '—')}</td>
                 <td>${p.icon || ''} <strong>${escapeHtml(p.name_th)}</strong></td>
                 <td><code>${escapeHtml(p.prefix)}-001</code></td>
-                <td style="font-size:.82rem;max-width:230px;">
-                    ${opts.length
-                        ? `${escapeHtml(opts.join(', '))} <span style="opacity:.6;">(${opts.length})</span>`
-                        : '<span style="color:#f59e0b;">พิมพ์อิสระ</span>'}
+                <td style="font-size:.82rem;max-width:280px;">
+                    ${(p.size_stock || []).length
+                        ? (p.size_stock || []).map(r =>
+                            `<span style="display:inline-block;margin:0 .3rem .2rem 0;padding:.1rem .35rem;
+                                          border-radius:5px;background:var(--oad-surface2);white-space:nowrap;">
+                               ${escapeHtml(r.size)} <strong>${r.qty ?? '∞'}</strong>
+                             </span>`).join('')
+                        : '<span style="color:#f59e0b;">ยังไม่กำหนด</span>'}
+                    ${p.stock_total != null
+                        ? `<div style="opacity:.65;font-size:.75rem;margin-top:.15rem;">รวม ${p.stock_total} ตัว</div>`
+                        : ''}
                 </td>
                 <td>${p.part_count}</td>
                 <td>${p.is_required
                     ? '<span class="oad-badge oad-badge-green">บังคับ</span>'
                     : '<span class="oad-badge oad-badge-gray">ปลดแล้ว</span>'}</td>
                 <td><div class="actions">
-                    <button class="oad-btn" onclick='window.__oadEditSizeOptions(${p.id}, "${nameEsc}", ${JSON.stringify(opts)})'>📏 ไซส์</button>
+                    <button class="oad-btn" onclick='window.__oadEditSizeStock(${p.id}, "${nameEsc}", ${JSON.stringify(p.size_stock || [])})'>📦 สต๊อก</button>
                     ${p.is_required
                         ? `<button class="oad-btn oad-btn-red" onclick="window.__oadRetirePart(${p.id}, '${nameEsc}')">ปลดออก</button>`
                         : ''}
@@ -6745,10 +6754,13 @@ async function _renderUniformReport() {
     if (!box) return;
     box.innerHTML = '<div class="oad-skel" style="height:80px;"></div>';
 
-    const [repRes, dmgRes] = await Promise.all([
+    const [repRes, dmgRes, stkRes] = await Promise.all([
         uniformApi.sizeReport(_uni.setTypeId),
-        uniformApi.damagedList(_uni.setTypeId)
+        uniformApi.damagedList(_uni.setTypeId),
+        uniformApi.sizeStock(_uni.setTypeId)
     ]);
+    // เก็บไว้ให้ตารางกรอกไซส์ใช้แสดง "เหลือกี่ตัว" ใน dropdown
+    _uni.stock = new Map((stkRes.data || []).map(r => [`${r.part_type_id}|${r.size}`, r]));
 
     if (repRes.error) { box.innerHTML = `<div class="oad-empty">${escapeHtml(repRes.error.message)}</div>`; return; }
 
@@ -6782,16 +6794,23 @@ async function _renderUniformReport() {
                 <div style="font-weight:700; margin-bottom:.5rem;">${t.icon || ''} ${escapeHtml(t.name)}</div>
                 <table style="width:100%; font-size:.83rem; border-collapse:collapse;">
                     <thead><tr style="opacity:.6; font-size:.75rem;">
-                        <th style="text-align:left;">ไซส์</th><th>ทั้งหมด</th><th>ใช้ได้</th><th>ซ่อม</th><th>หาย</th>
+                        <th style="text-align:left;">ไซส์</th><th>มี</th><th>ใช้</th><th>เหลือ</th><th>ซ่อม</th><th>หาย</th>
                     </tr></thead>
                     <tbody>
-                    ${t.sizes.map(s => `<tr${s.size === '(ยังไม่ระบุ)' ? ' style="color:#f59e0b;"' : ''}>
+                    ${t.sizes.map(s => {
+                        const st = _uni.stock?.get(`${s.type_id}|${s.size}`);
+                        const qty = st?.qty;
+                        const rem = st?.remaining;
+                        return `<tr${s.size === '(ยังไม่ระบุ)' ? ' style="color:#f59e0b;"' : ''}>
                         <td style="padding:.2rem 0;"><strong>${escapeHtml(s.size)}</strong></td>
+                        <td style="text-align:center;">${qty ?? '<span style="opacity:.4;">—</span>'}</td>
                         <td style="text-align:center;">${s.n}</td>
-                        <td style="text-align:center;color:#10b981;">${s.ok_n}</td>
+                        <td style="text-align:center;font-weight:700;color:${
+                            rem == null ? 'inherit' : rem === 0 ? '#ef4444' : rem < 0 ? '#ef4444' : '#10b981'};">
+                            ${rem ?? '<span style="opacity:.4;font-weight:400;">—</span>'}</td>
                         <td style="text-align:center;color:${Number(s.damaged_n) ? '#f59e0b' : 'inherit'};">${s.damaged_n}</td>
                         <td style="text-align:center;color:${Number(s.lost_n) ? '#ef4444' : 'inherit'};">${s.lost_n}</td>
-                    </tr>`).join('')}
+                    </tr>`; }).join('')}
                     </tbody>
                 </table>
             </div>`).join('')}
@@ -7234,28 +7253,78 @@ function _sizeField(part, widthPx, cls = 'size-in') {
             </select>`;
 }
 
-// ── แก้ชุดตัวเลือกไซส์ของประเภทชิ้น
-window.__oadEditSizeOptions = async (partTypeId, name, current) => {
+// ── แก้สต๊อกรายไซส์: มีไซส์อะไรบ้าง และแต่ละไซส์มีกี่ตัว
+//    ตารางนี้เป็นแหล่งเดียว — ตัวเลือกใน dropdown ก็มาจากที่นี่
+window.__oadEditSizeStock = async (partTypeId, name, rows) => {
+    const list = Array.isArray(rows) ? rows : [];
+
+    const rowHtml = (r, i) => `<tr data-i="${i}">
+        <td style="padding:.15rem;"><input class="ss-size" value="${escapeHtml(r.size || '')}"
+            placeholder="ไซส์" style="width:88px;padding:.28rem;border-radius:5px;"></td>
+        <td style="padding:.15rem;"><input class="ss-qty" type="number" min="0"
+            value="${r.qty === null || r.qty === undefined ? '' : r.qty}"
+            placeholder="ไม่จำกัด" style="width:96px;padding:.28rem;border-radius:5px;"></td>
+        <td style="padding:.15rem;"><button type="button" class="ss-del oad-btn oad-btn-red"
+            style="padding:.2rem .5rem;">✕</button></td>
+    </tr>`;
+
     const { value, isConfirmed } = await Swal.fire({
-        title: `📏 ตัวเลือกไซส์ — ${name}`,
-        html: `<div style="text-align:left;font-size:.88rem;">
-                 <p style="margin:0 0 .5rem;opacity:.75;">
-                   คั่นด้วยจุลภาค เรียงตามลำดับที่อยากให้แสดง<br>
-                   เช่น <code>3,4,5,6,7,8,9,10,11,12</code> หรือ <code>S,M,L,XL</code><br>
-                   เว้นว่าง = ให้พิมพ์ไซส์เองอิสระ
+        title: `📦 สต๊อกไซส์ — ${name}`,
+        width: 460,
+        html: `<div style="text-align:left;font-size:.87rem;">
+                 <p style="margin:0 0 .6rem;opacity:.75;">
+                   ใส่ว่าโรงเรียนมีไซส์ไหน <strong>กี่ตัว</strong> —
+                   ระบบจะไม่ให้กรอกไซส์เกินจำนวนนี้<br>
+                   เว้นช่องจำนวนว่าง = ไม่จำกัด
                  </p>
-                 <input id="so-in" class="swal2-input" style="width:100%;margin:0;"
-                        value="${escapeHtml((current || []).join(','))}">
+                 <table style="width:100%;border-collapse:collapse;">
+                   <thead><tr style="font-size:.78rem;opacity:.7;">
+                     <th style="text-align:left;">ไซส์</th><th style="text-align:left;">มีกี่ตัว</th><th></th>
+                   </tr></thead>
+                   <tbody id="ss-body">${list.map(rowHtml).join('')}</tbody>
+                 </table>
+                 <button type="button" id="ss-add" class="oad-btn" style="margin-top:.6rem;">➕ เพิ่มไซส์</button>
+                 <div id="ss-total" style="margin-top:.6rem;font-weight:700;"></div>
                </div>`,
         showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
-        preConfirm: () => document.getElementById('so-in').value
-            .split(',').map(s => s.trim()).filter(Boolean)
+        didOpen: () => {
+            const body = document.getElementById('ss-body');
+            const total = document.getElementById('ss-total');
+            const sync = () => {
+                const n = [...body.querySelectorAll('.ss-qty')]
+                    .reduce((s, i) => s + (i.value === '' ? 0 : Number(i.value) || 0), 0);
+                total.textContent = `รวม ${n} ตัว`;
+            };
+            const wire = () => {
+                body.querySelectorAll('.ss-del').forEach(b => b.onclick = () => { b.closest('tr').remove(); sync(); });
+                body.querySelectorAll('.ss-qty').forEach(i => i.oninput = sync);
+            };
+            document.getElementById('ss-add').onclick = () => {
+                body.insertAdjacentHTML('beforeend', rowHtml({ size: '', qty: null }, body.children.length));
+                wire(); sync();
+            };
+            wire(); sync();
+        },
+        preConfirm: () => {
+            const out = [];
+            const seen = new Set();
+            for (const tr of document.querySelectorAll('#ss-body tr')) {
+                const size = tr.querySelector('.ss-size').value.trim();
+                if (!size) continue;
+                if (seen.has(size)) { Swal.showValidationMessage(`ไซส์ "${size}" ซ้ำ`); return false; }
+                seen.add(size);
+                const q = tr.querySelector('.ss-qty').value.trim();
+                out.push({ size, qty: q === '' ? null : Number(q) });
+            }
+            if (!out.length) { Swal.showValidationMessage('ต้องมีอย่างน้อย 1 ไซส์'); return false; }
+            return out;
+        }
     });
     if (!isConfirmed) return;
 
-    const { data, error } = await uniformApi.setSizeOptions(partTypeId, value);
-    if (error) return toast(error.message, 'error');   // เช่น ยังมีชิ้นใช้ไซส์ที่จะลบอยู่
-    toast(`บันทึก ${data?.count ?? 0} ตัวเลือกแล้ว`);
+    const { error } = await uniformApi.setSizeStock(partTypeId, value);
+    if (error) return toast(error.message, 'error');   // เกินที่ใช้ไปแล้ว / ลบไซส์ที่มีคนใช้
+    toast('บันทึกสต๊อกแล้ว');
     renderUniformsTab();
 };
 
@@ -7311,6 +7380,14 @@ async function _sgFlush() {
     _sg.dirty.clear();
     _sgSetStatus(`✓ บันทึกแล้ว ${batch.length} ช่อง`, '#10b981');
     _sgProgress();
+
+    // ของคงเหลือเปลี่ยนไปแล้ว — ดึงสต๊อกใหม่ให้ป้าย "เหลือ N" ตรงความจริง
+    const { data: stk } = await uniformApi.sizeStock(_uni.setTypeId);
+    if (stk) {
+        _uni.stock = new Map(stk.map(r => [`${r.part_type_id}|${r.size}`, r]));
+        renderSizeGrid();
+        _renderUniformReport();
+    }
 }
 
 function _sgTouch(partId, value) {
@@ -7356,9 +7433,9 @@ function renderSizeGrid() {
             ${types.map(t => `<th style="text-align:center;">
               ${t.options.length ? `
                 <select class="sg-fillcol" data-type="${t.id}"
-                        style="width:88px;padding:.22rem;border-radius:5px;font-size:.78rem;">
+                        style="width:112px;padding:.22rem;border-radius:5px;font-size:.78rem;">
                   <option value="">— เลือก —</option>
-                  ${t.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
+                  ${t.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}${_sgStockNote(t.id, o)}</option>`).join('')}
                 </select>` : '<span style="font-size:.72rem;opacity:.5;">พิมพ์อิสระ</span>'}
             </th>`).join('')}
           </tr>
@@ -7380,7 +7457,10 @@ function renderSizeGrid() {
               t.options.length
                 ? `<select ${common}>
                      <option value=""${cur ? '' : ' selected'}>—</option>
-                     ${t.options.map(o => `<option value="${escapeHtml(o)}"${o === cur ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}
+                     ${t.options.map(o => {
+                        const note = _sgStockNote(t.id, o, cur === o);
+                        return `<option value="${escapeHtml(o)}"${o === cur ? ' selected' : ''}>${escapeHtml(o)}${note}</option>`;
+                     }).join('')}
                    </select>`
                 : `<input ${common} value="${escapeHtml(cur)}" placeholder="—">`
             }</td>`;
@@ -7445,3 +7525,13 @@ window.__oadSizeJump = () => {
     empty.scrollIntoView({ block: 'center', behavior: 'smooth' });
     empty.focus();
 };
+
+// ป้ายบอกของคงเหลือในตัวเลือกไซส์ เช่น "8 (เหลือ 2)" / "8 (หมด)"
+// ช่องที่กำลังเลือกไซส์นั้นอยู่แล้วไม่ต้องเตือนว่าหมด เพราะมันคือของที่ถืออยู่
+function _sgStockNote(typeId, size, isCurrent = false) {
+    const st = _uni.stock?.get(`${typeId}|${size}`);
+    if (!st || st.qty == null) return '';
+    const left = st.remaining;
+    if (left > 0) return ` (เหลือ ${left})`;
+    return isCurrent ? '' : ' (หมด)';
+}

@@ -1746,9 +1746,14 @@ export const uniformApi = {
     // ผูกกับหน้าจัดการผู้ใช้ — ดึงจาก uniform_kits แหล่งเดียว ไม่เก็บซ้ำใน users
     userKits()              { return _wrap(() => supabase.rpc('admin_user_kits')); },
     setPartSizes(items)     { return _wrap(() => supabase.rpc('admin_set_part_sizes', { p_items: items })); },
-    setSizeOptions(partTypeId, options) {
-        return _wrap(() => supabase.rpc('admin_set_size_options', {
-            p_part_type_id: partTypeId, p_options: options
+    // สต๊อกรายไซส์ — "โรงเรียนมีเสื้อเบอร์ 8 อยู่กี่ตัว"
+    // เป็นแหล่งเดียวของทั้งตัวเลือกไซส์และจำนวนที่มีจริง
+    sizeStock(setTypeId = null) {
+        return _wrap(() => supabase.rpc('admin_size_stock', { p_set_type_id: setTypeId }));
+    },
+    setSizeStock(partTypeId, rows) {
+        return _wrap(() => supabase.rpc('admin_set_size_stock', {
+            p_part_type_id: partTypeId, p_rows: rows
         }));
     },
     createKits(setTypeId, count) {
