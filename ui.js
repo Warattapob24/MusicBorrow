@@ -10,7 +10,7 @@ import {
     eventsApi
 } from './api.js';
 import { supabase, ICONS, VAPID_PUBLIC_KEY } from './config.js';
-import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
+import { escapeHtml, translateGroup, parseMediaUrl, fmtEventTimes } from './utils.js';
 import { parseKitCode, processKitScan } from './uniform-kit.js';
 import { initAdminDashboard, destroyAdminDashboard } from './admin-dashboard.js';
 import { initStudentDashboard, destroyStudentDashboard } from './student-dashboard.js';
@@ -1792,7 +1792,7 @@ async function _pickBorrowContext(instrumentName) {
                        border:1px solid #f59e0b;background:rgba(245,158,11,.1);color:inherit;
                        text-align:left;cursor:pointer;font-size:.95rem;">
             🎭 <strong>${escapeHtml(e.name)}</strong><br>
-            <span style="font-size:.78rem;opacity:.75;">คืน ${new Date(e.return_due_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</span>
+            <span style="font-size:.78rem;opacity:.75;">${fmtEventTimes(e)}</span>
         </button>`).join('');
 
     const result = await Swal.fire({

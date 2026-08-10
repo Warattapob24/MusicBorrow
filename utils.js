@@ -158,3 +158,18 @@ export function addSafeEventListener(selectorOrElement, eventType, callback) {
         : selectorOrElement;
     if (el) el.addEventListener(eventType, callback);
 }
+/**
+ * เวลานัด + กำหนดคืนของงาน ในบรรทัดเดียว
+ * งานวันเดียวไม่ต้องเขียนวันที่ซ้ำสองรอบ
+ */
+export function fmtEventTimes(e) {
+    const t = d => new Date(d).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const d = x => new Date(x).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+    const due = e.return_due_at;
+    if (!e.start_at) return `คืน ${d(due)} ${t(due)} น.`;
+
+    const sameDay = new Date(e.start_at).toDateString() === new Date(due).toDateString();
+    return sameDay
+        ? `⏰ นัด ${t(e.start_at)} น. · คืนภายใน ${t(due)} น. (${d(due)})`
+        : `⏰ นัด ${d(e.start_at)} ${t(e.start_at)} น. · คืน ${d(due)} ${t(due)} น.`;
+}

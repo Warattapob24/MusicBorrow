@@ -1607,9 +1607,11 @@ const _wrap = async (fn) => {
 export const eventsApi = {
     getOpen()               { return _wrap(() => supabase.rpc('get_open_events')); },
     getSummary(eventId)     { return _wrap(() => supabase.rpc('get_event_summary', { p_event_id: eventId })); },
-    create({ name, eventDate, returnDueAt, needsInstrument = true, needsUniform = true, openTo = 'club' }) {
+    create({ name, eventDate, returnDueAt, startAt = null,
+             needsInstrument = true, needsUniform = true, openTo = 'club' }) {
         return _wrap(() => supabase.rpc('admin_create_event', {
             p_name: name, p_event_date: eventDate, p_return_due_at: returnDueAt,
+            p_start_at: startAt,
             p_needs_instrument: needsInstrument, p_needs_uniform: needsUniform, p_open_to: openTo
         }));
     },

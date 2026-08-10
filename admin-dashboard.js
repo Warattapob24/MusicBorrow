@@ -863,6 +863,10 @@ function buildShell() {
                         <input id="oad-ev-date" type="date" class="oad-input">
                     </div>
                     <div>
+                        <label style="font-size:.8rem; font-weight:700;">⏰ เวลานัด (เริ่มงาน)</label>
+                        <input id="oad-ev-start" type="time" class="oad-input" value="08:00">
+                    </div>
+                    <div>
                         <label style="font-size:.8rem; font-weight:700;">กำหนดคืน*</label>
                         <input id="oad-ev-due" type="datetime-local" class="oad-input">
                     </div>
@@ -5481,14 +5485,12 @@ function wireListeners() {
     // 🎭 Events tab
     document.getElementById('oad-ev-create')?.addEventListener('click', () => _createEvent(false));
     document.getElementById('oad-ev-quick')?.addEventListener('click', () => _createEvent(true));
-    // เลือกวันที่จัดงาน → เดากำหนดคืนให้เป็นวันถัดไป 12:00 (แก้ได้)
+    // เลือกวันที่จัดงาน → เดากำหนดคืนเป็น "เย็นวันเดียวกัน"
+    // งานส่วนใหญ่จบในวันเดียว ไม่ควรบังคับให้ค้างข้ามคืน (ครูแก้ได้อิสระ)
     document.getElementById('oad-ev-date')?.addEventListener('change', e => {
         const dueEl = document.getElementById('oad-ev-due');
         if (!dueEl || dueEl.value || !e.target.value) return;
-        const d = new Date(e.target.value + 'T12:00');
-        d.setDate(d.getDate() + 1);
-        const pad = n => String(n).padStart(2, '0');
-        dueEl.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T12:00`;
+        dueEl.value = `${e.target.value}T18:00`;
     });
 
     // 🎖 Staff roles
@@ -6069,7 +6071,7 @@ async function renderEventsTab() {
     wrap.innerHTML = `
         <table class="oad-table">
             <thead><tr>
-                <th>งาน</th><th>วันที่</th><th>กำหนดคืน</th>
+                <th>งาน</th><th>วันที่</th><th>⏰ เวลานัด</th><th>กำหนดคืน</th>
                 <th>เครื่องดนตรี</th><th>ชุด</th><th>สถานะ</th><th>จัดการ</th>
             </tr></thead>
             <tbody>
@@ -6084,6 +6086,9 @@ async function renderEventsTab() {
                 return `<tr>
                     <td><strong>${escapeHtml(e.name)}</strong></td>
                     <td class="nowrap">${fmtDateShort(e.event_date)}</td>
+                    <td class="nowrap">${e.start_at
+                        ? new Date(e.start_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+                        : '<span style="opacity:.4;">—</span>'}</td>
                     <td class="nowrap">${fmtDate(e.return_due_at)}</td>
                     <td class="nowrap">${cell(s.instrument_back, s.instrument_out, iPend)}</td>
                     <td class="nowrap">${cell(s.uniform_back, s.uniform_out, uPend)}</td>
@@ -6107,7 +6112,7 @@ function _updateEventsBadge(n) {
 }
 
 async function _createEvent(quick = false) {
-    let name, date, due, openTo, needsInst, needsUni;
+    let name, date, start, due, openTo, needsInst, needsUni;
 
     if (quick) {
         // ⚡ ปุ่มลัด — เปิดงานให้เสร็จใน 15 วิ กันครูลืมเปิดจนเด็กเบิกออกงานไม่ได้
@@ -6119,14 +6124,17 @@ async function _createEvent(quick = false) {
             inputValidator: v => (!v || !v.trim()) ? 'กรุณาใส่ชื่องาน' : undefined
         });
         if (!qName) return;
-        const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(12, 0, 0, 0);
+        // งานวันเดียวจบ — คืนเย็นวันนี้ ไม่ต้องค้างข้ามคืน
+        const today = new Date().toISOString().slice(0, 10);
         name = qName.trim();
-        date = new Date().toISOString().slice(0, 10);
-        due = t.toISOString();
+        date = today;
+        start = new Date(`${today}T08:00`).toISOString();
+        due   = new Date(`${today}T18:00`).toISOString();
         openTo = 'club'; needsInst = true; needsUni = true;
     } else {
         name      = document.getElementById('oad-ev-name')?.value?.trim();
         date      = document.getElementById('oad-ev-date')?.value;
+        const startLocal = document.getElementById('oad-ev-start')?.value;
         const dueLocal = document.getElementById('oad-ev-due')?.value;
         openTo    = document.getElementById('oad-ev-open')?.value || 'club';
         needsInst = document.getElementById('oad-ev-inst')?.checked ?? true;
@@ -6135,15 +6143,19 @@ async function _createEvent(quick = false) {
         if (!name || !date || !dueLocal) {
             return toast('กรอกชื่องาน วันที่ และกำหนดคืนให้ครบ', 'error');
         }
-        // datetime-local ให้เวลาท้องถิ่นแบบไม่มี timezone — แปลงเป็น ISO ก่อนส่ง
+        // datetime-local / time ให้เวลาท้องถิ่นแบบไม่มี timezone — แปลงเป็น ISO ก่อนส่ง
+        start = startLocal ? new Date(`${date}T${startLocal}`).toISOString() : null;
         due = new Date(dueLocal).toISOString();
+        if (start && new Date(due) <= new Date(start)) {
+            return toast('กำหนดคืนต้องอยู่หลังเวลานัด', 'error');
+        }
         if (new Date(due) <= new Date()) {
             return toast('กำหนดคืนต้องเป็นเวลาในอนาคต', 'error');
         }
     }
 
     const { data, error } = await eventsApi.create({
-        name, eventDate: date, returnDueAt: due,
+        name, eventDate: date, returnDueAt: due, startAt: start,
         needsInstrument: needsInst, needsUniform: needsUni, openTo
     });
 

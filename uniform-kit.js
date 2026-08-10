@@ -11,7 +11,7 @@
  */
 
 import { uniformApi, eventsApi } from './api.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, fmtEventTimes } from './utils.js';
 import { getCurrentUser } from './auth.js';
 
 const COND_LABEL = {
@@ -58,7 +58,7 @@ async function _pickUniformEvent() {
                        border:1px solid #f59e0b;background:rgba(245,158,11,.1);color:inherit;
                        text-align:left;cursor:pointer;font-size:.95rem;">
               🎭 <strong>${escapeHtml(e.name)}</strong><br>
-              <span style="font-size:.78rem;opacity:.75;">คืน ${new Date(e.return_due_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</span>
+              <span style="font-size:.78rem;opacity:.75;">${fmtEventTimes(e)}</span>
             </button>`).join('')}</div>`,
         showConfirmButton: false, showCancelButton: true, cancelButtonText: 'ยกเลิก',
         didOpen: () => {
@@ -156,7 +156,7 @@ async function _renderCheckoutChecklist(kit, ev, user) {
         width: 520,
         html: `<div style="text-align:left;font-size:.9rem;">
                  <div style="padding:.5rem .7rem;border-radius:8px;background:rgba(245,158,11,.12);margin-bottom:.7rem;">
-                   🎭 ${escapeHtml(ev.name)} — คืน ${new Date(ev.return_due_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                   🎭 ${escapeHtml(ev.name)}<br><span style="font-size:.82rem;">${fmtEventTimes(ev)}</span>
                  </div>
                  ${isTemp ? `<div style="padding:.45rem .7rem;border-radius:8px;background:rgba(59,130,246,.12);margin-bottom:.7rem;font-size:.83rem;">
                    ℹ️ <strong>ยืมชั่วคราว</strong> — ไม่ผูกเป็นชุดประจำตัว คืนครบเมื่อไหร่ชุดว่างทันที
