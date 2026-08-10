@@ -6366,20 +6366,31 @@ async function _renderPartTypeTable() {
     wrap.innerHTML = `
         <table class="oad-table">
             <thead><tr><th>ประเภทชุด</th><th>อุปกรณ์</th><th>รหัสนำหน้า</th>
-                       <th>จำนวนชิ้น</th><th>บังคับติ๊ก</th><th>จัดการ</th></tr></thead>
+                       <th>ตัวเลือกไซส์</th><th>จำนวนชิ้น</th><th>บังคับติ๊ก</th><th>จัดการ</th></tr></thead>
             <tbody>
-            ${_uni.partTypes.map(p => `<tr>
+            ${_uni.partTypes.map(p => {
+                const nameEsc = escapeHtml(p.name_th).replace(/'/g, "\\'");
+                const opts = p.size_options || [];
+                return `<tr>
                 <td class="nowrap">${escapeHtml(p.set_name || '—')}</td>
                 <td>${p.icon || ''} <strong>${escapeHtml(p.name_th)}</strong></td>
                 <td><code>${escapeHtml(p.prefix)}-001</code></td>
+                <td style="font-size:.82rem;max-width:230px;">
+                    ${opts.length
+                        ? `${escapeHtml(opts.join(', '))} <span style="opacity:.6;">(${opts.length})</span>`
+                        : '<span style="color:#f59e0b;">พิมพ์อิสระ</span>'}
+                </td>
                 <td>${p.part_count}</td>
                 <td>${p.is_required
                     ? '<span class="oad-badge oad-badge-green">บังคับ</span>'
                     : '<span class="oad-badge oad-badge-gray">ปลดแล้ว</span>'}</td>
-                <td>${p.is_required
-                    ? `<button class="oad-btn oad-btn-red" onclick="window.__oadRetirePart(${p.id}, '${escapeHtml(p.name_th).replace(/'/g, "\\'")}')">ปลดออก</button>`
-                    : ''}</td>
-            </tr>`).join('')}
+                <td><div class="actions">
+                    <button class="oad-btn" onclick='window.__oadEditSizeOptions(${p.id}, "${nameEsc}", ${JSON.stringify(opts)})'>📏 ไซส์</button>
+                    ${p.is_required
+                        ? `<button class="oad-btn oad-btn-red" onclick="window.__oadRetirePart(${p.id}, '${nameEsc}')">ปลดออก</button>`
+                        : ''}
+                </div></td>
+            </tr>`; }).join('')}
             </tbody>
         </table>`;
 }
@@ -6469,9 +6480,7 @@ window.__oadKitSizes = async (kitId) => {
                    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;">
                      <span style="flex:1;">${p.icon || ''} ${escapeHtml(p.type_name)}
                        <span style="opacity:.6;font-size:.78rem;">${escapeHtml(p.part_code)}</span></span>
-                     <input class="size-in" data-part="${p.part_id}" value="${escapeHtml(p.size || '')}"
-                            placeholder="เช่น L / 42"
-                            style="width:110px;padding:.35rem .5rem;border-radius:6px;">
+                     ${_sizeField(p, 120)}
                    </div>`).join('')}
                </div>`,
         showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
@@ -6513,10 +6522,7 @@ window.__oadBulkSizes = async () => {
                      </td>
                      ${types.map(t => {
                         const p = (k.parts || []).find(x => x.type_id === t.id);
-                        return `<td style="padding:.15rem;">${p
-                          ? `<input class="bulk-size" data-part="${p.part_id}" value="${escapeHtml(p.size || '')}"
-                                    style="width:66px;padding:.25rem;border-radius:5px;font-size:.8rem;">`
-                          : '—'}</td>`;
+                        return `<td style="padding:.15rem;">${p ? _sizeField(p, 74, 'bulk-size') : '—'}</td>`;
                      }).join('')}
                    </tr>`).join('')}
                    </tbody>
@@ -6582,7 +6588,10 @@ window.__oadAddPartType = async () => {
                  <input id="pt-icon" class="swal2-input" style="width:100%;margin:.2rem 0 .6rem;" placeholder="🧤">
                  <label style="font-weight:700;">รหัสนำหน้า (ตัวอักษร ไม่ซ้ำของเดิม)</label>
                  <input id="pt-prefix" class="swal2-input" style="width:100%;margin:.2rem 0 .3rem;" placeholder="G" maxlength="3">
-                 <p style="margin:0;font-size:.75rem;opacity:.7;">ชิ้นจะได้รหัสเช่น G-001, G-002 …</p>
+                 <p style="margin:0 0 .6rem;font-size:.75rem;opacity:.7;">ชิ้นจะได้รหัสเช่น G-001, G-002 …</p>
+                 <label style="font-weight:700;">ตัวเลือกไซส์ (คั่นด้วยจุลภาค)</label>
+                 <input id="pt-sizes" class="swal2-input" style="width:100%;margin:.2rem 0 .3rem;" placeholder="S,M,L,XL">
+                 <p style="margin:0;font-size:.75rem;opacity:.7;">เว้นว่าง = ให้พิมพ์ไซส์เองอิสระ · แก้ทีหลังได้</p>
                </div>`,
         showCancelButton: true, confirmButtonText: 'เพิ่ม', cancelButtonText: 'ยกเลิก',
         preConfirm: () => {
@@ -6594,6 +6603,8 @@ window.__oadAddPartType = async () => {
                 setTypeId: Number(document.getElementById('pt-set').value),
                 nameTh: name, prefix,
                 icon: document.getElementById('pt-icon').value.trim() || null,
+                sizeOptions: (document.getElementById('pt-sizes').value || '')
+                    .split(',').map(s => s.trim()).filter(Boolean),
                 code: prefix.toLowerCase() + '_' + Date.now().toString(36)
             };
         }
@@ -7216,3 +7227,48 @@ async function renderSectionMap() {
         });
     });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 📏 ช่องกรอกไซส์ — เป็น dropdown เมื่อประเภทชิ้นกำหนดตัวเลือกไว้
+//    ถ้ายังไม่กำหนดตัวเลือก (เช่น อุปกรณ์ที่เพิ่งเพิ่ม) จะกลับไปเป็นช่องพิมพ์อิสระ
+//    ทั้งสองแบบใช้ class เดียวกัน ตัวเก็บค่าจึงไม่ต้องแยกกรณี
+// ─────────────────────────────────────────────────────────────────────────────
+function _sizeField(part, widthPx, cls = 'size-in') {
+    const opts = part.size_options || [];
+    const cur  = part.size || '';
+    const style = `width:${widthPx}px;padding:.3rem .4rem;border-radius:6px;font-size:.83rem;`;
+
+    if (!opts.length) {
+        return `<input class="${cls}" data-part="${part.part_id}" value="${escapeHtml(cur)}"
+                       placeholder="ไซส์" style="${style}">`;
+    }
+    return `<select class="${cls}" data-part="${part.part_id}" style="${style}">
+              <option value=""${cur ? '' : ' selected'}>—</option>
+              ${opts.map(o => `<option value="${escapeHtml(o)}"${o === cur ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}
+            </select>`;
+}
+
+// ── แก้ชุดตัวเลือกไซส์ของประเภทชิ้น
+window.__oadEditSizeOptions = async (partTypeId, name, current) => {
+    const { value, isConfirmed } = await Swal.fire({
+        title: `📏 ตัวเลือกไซส์ — ${name}`,
+        html: `<div style="text-align:left;font-size:.88rem;">
+                 <p style="margin:0 0 .5rem;opacity:.75;">
+                   คั่นด้วยจุลภาค เรียงตามลำดับที่อยากให้แสดง<br>
+                   เช่น <code>3,4,5,6,7,8,9,10,11,12</code> หรือ <code>S,M,L,XL</code><br>
+                   เว้นว่าง = ให้พิมพ์ไซส์เองอิสระ
+                 </p>
+                 <input id="so-in" class="swal2-input" style="width:100%;margin:0;"
+                        value="${escapeHtml((current || []).join(','))}">
+               </div>`,
+        showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => document.getElementById('so-in').value
+            .split(',').map(s => s.trim()).filter(Boolean)
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.setSizeOptions(partTypeId, value);
+    if (error) return toast(error.message, 'error');   // เช่น ยังมีชิ้นใช้ไซส์ที่จะลบอยู่
+    toast(`บันทึก ${data?.count ?? 0} ตัวเลือกแล้ว`);
+    renderUniformsTab();
+};

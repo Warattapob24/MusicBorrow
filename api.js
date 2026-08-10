@@ -1746,13 +1746,19 @@ export const uniformApi = {
     // ผูกกับหน้าจัดการผู้ใช้ — ดึงจาก uniform_kits แหล่งเดียว ไม่เก็บซ้ำใน users
     userKits()              { return _wrap(() => supabase.rpc('admin_user_kits')); },
     setPartSizes(items)     { return _wrap(() => supabase.rpc('admin_set_part_sizes', { p_items: items })); },
+    setSizeOptions(partTypeId, options) {
+        return _wrap(() => supabase.rpc('admin_set_size_options', {
+            p_part_type_id: partTypeId, p_options: options
+        }));
+    },
     createKits(setTypeId, count) {
         return _wrap(() => supabase.rpc('admin_create_kits', { p_set_type_id: setTypeId, p_count: count }));
     },
-    addPartType({ setTypeId, code, nameTh, prefix, icon = null, isRequired = true }) {
+    addPartType({ setTypeId, code, nameTh, prefix, icon = null, isRequired = true, sizeOptions = [] }) {
         return _wrap(() => supabase.rpc('admin_add_part_type', {
             p_set_type_id: setTypeId, p_code: code, p_name_th: nameTh,
-            p_prefix: prefix, p_icon: icon, p_is_required: isRequired
+            p_prefix: prefix, p_icon: icon, p_is_required: isRequired,
+            p_size_options: sizeOptions
         }));
     },
     retirePartType(partTypeId) {
