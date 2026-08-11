@@ -496,14 +496,13 @@ const VIEWS = {
     home: {
         label: 'ภาพรวม',
         render(user) {
+            // ปฏิทิน Google ย้ายไปอยู่หน้าโปรไฟล์ที่เดียว หน้านี้ใช้ตารางกิจกรรมของแอปแทน
             const calendarHtml = user.student_group === 'club' ? `
                 <div style="margin-top: 1.5rem;">
                     <div style="margin-bottom: 0.5rem;">
-                        <h3 class="sd-section-title" style="margin:0;">📅 ปฏิทินนัดหมายชุมนุม</h3>
+                        <h3 class="sd-section-title" style="margin:0;">📅 ตารางกิจกรรม</h3>
                     </div>
-                    <div style="height:250px; border-radius:12px; overflow:hidden; border: 1px solid var(--pico-muted-border-color);">
-                        <iframe src="https://calendar.google.com/calendar/embed?height=250&wkst=1&ctz=Asia%2FBangkok&showPrint=0&mode=AGENDA&hl=th&src=YjViNGNlNGE1ODdiZGIwOWI1NTcwMGQ3MDkwYmNmNjM2YThhMzFhZjY2OTlkNjQ5OTVhNTk0YjU5MDBmZWQ5OEBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&color=%23f6bf26" style="width:100%; height:100%; border:0;" scrolling="no"></iframe>
-                    </div>
+                    <div id="schedule-list" aria-busy="true" class="sd-list-container"></div>
                 </div>` : '';
 
             const avatarSrc = user.profile_image_url || 'assets/default-avatar.png';
@@ -756,6 +755,9 @@ const VIEWS = {
         async afterRender(user) {
             document.getElementById('home-qr-btn')?.addEventListener('click', handleUniversalScan);
             document.getElementById('sd-power-box')?.addEventListener('click', () => showGamificationCard());
+
+            // 📅 ตารางกิจกรรมอยู่หน้านี้ ส่วนปฏิทิน Google อยู่หน้าโปรไฟล์
+            renderSchedule();
 
             const bellBtn = document.getElementById('sd-bell-toggle');
             const notifDropdown = document.getElementById('sd-notif-dropdown');
@@ -1158,15 +1160,8 @@ const VIEWS = {
             
             const clubFeaturesHtml = user.student_group === 'club' ? `
                 <div style="margin-bottom: 2rem;">
-                    <h3 class="sd-section-title">👔 ชุดประจำตัว</h3>
-                    <div id="my-kit-box" aria-busy="true" class="sd-list-container"></div>
-                </div>
-
-                <div style="margin-bottom: 2rem;">
                     <h3 class="sd-section-title">กิจกรรมและนัดหมาย</h3>
                     <div id="appointment-button-container" style="margin-bottom:1rem;text-align:center;"></div>
-                    <div id="schedule-list" aria-busy="true" class="sd-list-container"
-                         style="margin-bottom:1rem;"></div>
                     <div style="height:400px; border-radius:12px; overflow:hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
                         <iframe
                             src="https://calendar.google.com/calendar/embed?height=600&wkst=1&ctz=Asia%2FBangkok&showPrint=0&mode=AGENDA&hl=th&src=YjViNGNlNGE1ODdiZGIwOWI1NTcwMGQ3MDkwYmNmNjM2YThhMzFhZjY2OTlkNjQ5OTVhNTk0YjU5MDBmZWQ5OEBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&color=%23f6bf26"
@@ -1186,6 +1181,12 @@ const VIEWS = {
                         <button id="sd-edit-profile-btn" class="sd-btn-outline" style="padding: 0.4rem 1.2rem; font-size: 0.85rem; border-radius: 99px; background: rgba(255,255,255,0.2); color: var(--sd-accent-color); border: 1px solid rgba(255,255,255,0.4); transition: background 0.2s;">✏️ แก้ไขโปรไฟล์</button>
                     </div>
                 </div>
+
+                ${user.student_group === 'club' ? `
+                <div style="margin-bottom: 2rem;">
+                    <h3 class="sd-section-title">👔 ชุดประจำตัว</h3>
+                    <div id="my-kit-box" aria-busy="true" class="sd-list-container"></div>
+                </div>` : ''}
 
                 <div id="badge-section" style="margin-bottom: 2rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 0 0.5rem 0;">
@@ -1225,10 +1226,8 @@ const VIEWS = {
 
             // ✨ ลบตรรกะการซ่อน DOM ทิ้งเพราะเราจัดการตั้งแต่ตอนดึงข้อมูลแล้ว
             if (user.student_group === 'club') {
-                // ชุดประจำตัว + ตารางกิจกรรม เป็นเรื่องตั้งค่า/นัดหมาย จึงอยู่หน้าโปรไฟล์
-                // ไม่ใช่หน้ายืม-คืน และวางคู่กับปฏิทินเดิมที่มีอยู่แล้ว
+                // ชุดประจำตัวเป็นเรื่องตั้งค่าส่วนตัว จึงอยู่ต่อจากปุ่มแก้ไขโปรไฟล์
                 renderMyKit();
-                renderSchedule();
                 await renderPracticeRanking();
             }
 
