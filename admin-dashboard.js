@@ -7014,31 +7014,47 @@ async function _renderUniformReport() {
             <span style="color:${totalUnsized ? '#f59e0b' : 'inherit'};">📏 ยังไม่ระบุไซส์ <strong>${totalUnsized}</strong></span>
         </div>
 
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:1rem;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:1rem;">
         ${[...byType.values()].map(t => `
-            <div style="border:1px solid var(--oad-border); border-radius:10px; padding:.8rem;">
+            <div style="border:1px solid var(--oad-border); border-radius:10px; padding:.8rem;
+                        min-width:0; overflow:hidden;">
                 <div style="font-weight:700; margin-bottom:.5rem;">${t.icon || ''} ${escapeHtml(t.name)}</div>
-                <table style="width:100%; font-size:.83rem; border-collapse:collapse;">
+                <div style="overflow-x:auto;">
+                <table style="width:100%; min-width:300px; font-size:.83rem;
+                              border-collapse:collapse; table-layout:fixed;">
+                    <colgroup>
+                        <col style="width:26%"><col style="width:14%"><col style="width:14%">
+                        <col style="width:16%"><col style="width:15%"><col style="width:15%">
+                    </colgroup>
                     <thead><tr style="opacity:.6; font-size:.75rem;">
-                        <th style="text-align:left;">ไซส์</th><th>มี</th><th>ใช้</th><th>เหลือ</th><th>ซ่อม</th><th>หาย</th>
+                        <th style="text-align:left; white-space:nowrap; padding:.2rem 0;">ไซส์</th>
+                        <th style="white-space:nowrap;">มี</th>
+                        <th style="white-space:nowrap;">ใช้</th>
+                        <th style="white-space:nowrap;">เหลือ</th>
+                        <th style="white-space:nowrap;">ซ่อม</th>
+                        <th style="white-space:nowrap;">หาย</th>
                     </tr></thead>
                     <tbody>
                     ${t.sizes.map(s => {
                         const st = _uni.stock?.get(`${s.type_id}|${s.size}`);
                         const qty = st?.qty;
                         const rem = st?.remaining;
-                        return `<tr${s.size === '(ยังไม่ระบุ)' ? ' style="color:#f59e0b;"' : ''}>
-                        <td style="padding:.2rem 0;"><strong>${escapeHtml(s.size)}</strong></td>
+                        const unset = s.size === '(ยังไม่ระบุ)';
+                        return `<tr${unset ? ' style="color:#f59e0b;"' : ''}>
+                        <td style="padding:.2rem 0; white-space:nowrap; overflow:hidden;
+                                   text-overflow:ellipsis;" title="${escapeHtml(s.size)}">
+                            <strong>${escapeHtml(unset ? 'ไม่ระบุ' : s.size)}</strong></td>
                         <td style="text-align:center;">${qty ?? '<span style="opacity:.4;">—</span>'}</td>
                         <td style="text-align:center;">${s.n}</td>
                         <td style="text-align:center;font-weight:700;color:${
-                            rem == null ? 'inherit' : rem === 0 ? '#ef4444' : rem < 0 ? '#ef4444' : '#10b981'};">
+                            rem == null ? 'inherit' : rem <= 0 ? '#ef4444' : '#10b981'};">
                             ${rem ?? '<span style="opacity:.4;font-weight:400;">—</span>'}</td>
                         <td style="text-align:center;color:${Number(s.damaged_n) ? '#f59e0b' : 'inherit'};">${s.damaged_n}</td>
                         <td style="text-align:center;color:${Number(s.lost_n) ? '#ef4444' : 'inherit'};">${s.lost_n}</td>
                     </tr>`; }).join('')}
                     </tbody>
                 </table>
+                </div>
             </div>`).join('')}
         </div>
 
