@@ -345,14 +345,22 @@ function registerServiceWorker() {
                 const newWorker = reg.installing;
                 newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        Swal.fire({
-                            title: 'อัปเดตระบบ 🚀',
-                            text: 'มีระบบเวอร์ชันใหม่พร้อมใช้งาน กรุณากดปุ่มเพื่อรีเฟรชและป้องกันอาการค้าง',
-                            icon: 'info',
-                            confirmButtonText: 'อัปเดตและรีเฟรช',
-                            confirmButtonColor: '#3B82F6',
-                            allowOutsideClick: false
-                        }).then(() => newWorker.postMessage({ action: 'skipWaiting' }));
+                        // ⚠️ ห้ามเด้งทับกล่องที่เปิดอยู่ — SweetAlert2 แสดงได้ทีละกล่อง
+                        //    ถ้าแย่งกล่อง "อัปเดตข้อมูลก่อนใช้งาน" ของนักเรียนไป
+                        //    ข้างหลังคือหน้าเปล่าที่ยังไม่ได้ render อะไร = ค้างทันที
+                        //    รอจนกล่องเดิมปิดก่อนค่อยชวนอัปเดต
+                        const askToUpdate = () => {
+                            if (Swal.isVisible()) { setTimeout(askToUpdate, 1500); return; }
+                            Swal.fire({
+                                title: 'อัปเดตระบบ 🚀',
+                                text: 'มีระบบเวอร์ชันใหม่พร้อมใช้งาน กรุณากดปุ่มเพื่อรีเฟรชและป้องกันอาการค้าง',
+                                icon: 'info',
+                                confirmButtonText: 'อัปเดตและรีเฟรช',
+                                confirmButtonColor: '#3B82F6',
+                                allowOutsideClick: false
+                            }).then(() => newWorker.postMessage({ action: 'skipWaiting' }));
+                        };
+                        askToUpdate();
                     }
                 });
             });

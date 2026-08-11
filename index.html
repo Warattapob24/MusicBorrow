@@ -79,6 +79,35 @@
         setTimeout(function () {
             if (!document.documentElement.hasAttribute('data-app-booted')) hardReset('timeout');
         }, 20000);
+
+        // 4) หน้าเปล่าตาย: เข้าหน้าแดชบอร์ดแล้วแต่ไม่มีอะไรเลย และไม่มีกล่องเปิดอยู่
+        //    ไม่ว่าสาเหตุจะเป็นอะไร ต้องมีปุ่มให้กดเสมอ ห้ามปล่อยให้จอขาวตัน
+        setInterval(function () {
+            var sec = document.getElementById('dashboard-section');
+            var box = document.getElementById('dashboard-content');
+            if (!sec || !box || sec.classList.contains('hidden')) return;
+            // มีกล่องเปิดอยู่ = ปกติ (เช่นฟอร์มบังคับอัปเดตโปรไฟล์ที่จงใจเว้นหน้าหลังว่าง)
+            // ⚠️ เช็คแค่ว่ามี .swal2-container ใน DOM ไม่พอ — มันค้างอยู่ได้หลังปิดกล่อง
+            //    ถ้าเชื่อแค่นั้นตัวกู้จะถูกปิดตายถาวร ต้องถาม Swal ว่ามองเห็นอยู่จริงไหม
+            var swalUp = (window.Swal && typeof Swal.isVisible === 'function')
+                ? Swal.isVisible()
+                : !!document.querySelector('.swal2-container');
+            if (swalUp) return;
+            if (box.innerText.trim().length || box.querySelector('button,a,article')) return;
+            if (box.getAttribute('data-rescued')) return;
+            box.setAttribute('data-rescued', '1');
+            box.innerHTML =
+                '<article style="text-align:center;padding:2rem;">' +
+                '<h4 style="margin-top:0;">หน้าไม่แสดงผล</h4>' +
+                '<p style="font-size:.9rem;">ระบบโหลดค้าง กรุณากดปุ่มเพื่อล้างข้อมูลชั่วคราวแล้วเข้าใหม่</p>' +
+                '<button id="blank-page-rescue" class="contrast">🔄 ล้างแคชแล้วเข้าใหม่</button>' +
+                '</article>';
+            document.getElementById('blank-page-rescue').onclick = function () {
+                mark(null);              // ปลดล็อกให้ hardReset ทำงานได้แม้เคยรีเซ็ตไปแล้ว
+                done = false;
+                hardReset('blank');
+            };
+        }, 4000);
     })();
     </script>
 

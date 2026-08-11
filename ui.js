@@ -422,9 +422,25 @@ export async function showDashboardView(user) {
         }
 
         if (profile.needs_profile_update) {
+            // ⚠️ ห้ามล้างหน้าเป็นค่าว่าง — เดิมทำ innerHTML = '' แล้วเรียก modal
+            //    แบบไม่ await ไม่ catch ถ้า modal ไม่ขึ้นด้วยเหตุใดก็ตาม
+            //    (เช่นกล่อง "อัปเดตระบบ" ของ service worker เด้งมาแทนที่)
+            //    นักเรียนจะเจอหน้าขาวเปล่า ไม่มีปุ่ม ไม่มี error กดอะไรไม่ได้เลย
+            //    จึงต้องมีการ์ดที่มองเห็นได้ + ปุ่มเปิดฟอร์มซ้ำค้างไว้เสมอ
             const dc = document.getElementById('dashboard-content');
-            if (dc) dc.innerHTML = '';
-            showForcedProfileUpdateModal({ ...user, ...profile });
+            if (dc) {
+                dc.innerHTML = `
+                    <article style="text-align:center; padding:2rem;">
+                        <h4 style="margin-top:0;">🎓 อัปเดตข้อมูลก่อนใช้งาน</h4>
+                        <p style="color:var(--pico-muted-color); font-size:.9rem;">
+                            กรุณากรอกชั้นเรียนปัจจุบันเพื่อเริ่มใช้งานปีการศึกษาใหม่
+                        </p>
+                        <button id="reopen-profile-form" class="contrast">📝 เปิดแบบฟอร์ม</button>
+                    </article>`;
+                document.getElementById('reopen-profile-form')
+                        ?.addEventListener('click', () => openForcedProfileUpdate({ ...user, ...profile }));
+            }
+            openForcedProfileUpdate({ ...user, ...profile });
             return;
         }
 
@@ -481,6 +497,31 @@ export async function showDashboardView(user) {
                 </article>`;
         }
     }
+}
+
+// เปิดฟอร์มบังคับอัปเดตโปรไฟล์แบบปลอดภัย
+//   - กันเปิดซ้อน: showDashboardView ถูกเรียกได้หลายรอบจาก auth event
+//     ถ้าปล่อยให้ Swal.fire ซ้อน กล่องแรกจะถูกปิดทิ้งกลายเป็นหน้าเปล่า
+//   - ต้อง catch เสมอ: เดิมเรียกแบบลอย ๆ error เลยหายเข้ากลีบเมฆ
+let _forcedProfileOpen = false;
+function openForcedProfileUpdate(userData) {
+    if (_forcedProfileOpen) return;
+    _forcedProfileOpen = true;
+    Promise.resolve()
+        .then(() => showForcedProfileUpdateModal(userData))
+        .catch(err => {
+            console.error('[UI] forced profile modal failed:', err);
+            const dc = document.getElementById('dashboard-content');
+            if (dc) {
+                dc.innerHTML = `
+                    <article style="text-align:center; padding:2rem;">
+                        <h4 style="color:var(--pico-del-color); margin-top:0;">⚠️ เปิดแบบฟอร์มไม่สำเร็จ</h4>
+                        <p style="font-size:.9rem;">${escapeHtml(err?.message || String(err))}</p>
+                        <button onclick="window.location.reload()" class="contrast">🔄 ลองอีกครั้ง</button>
+                    </article>`;
+            }
+        })
+        .finally(() => { _forcedProfileOpen = false; });
 }
 
 async function showForcedProfileUpdateModal(userData) {
