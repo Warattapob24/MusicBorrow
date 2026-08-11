@@ -8,7 +8,7 @@
 //   6. [NEW] Added 'push' event listener for background notifications
 //   7. [NEW] Enhanced 'notificationclick' to focus existing tabs instead of always opening new ones
 
-const CACHE_NAME = 'music-borrow-v6.2.0'; // instrument picklist + forced profile refresh
+const CACHE_NAME = 'music-borrow-v6.2.2'; // kit owner: section filter
 
 const PRECACHE_URLS = [
     '/',
@@ -88,7 +88,10 @@ self.addEventListener('fetch', event => {
     // 4a. JS / CSS files: Network-First so users always get the latest deploys.
     //     Was Cache-First — that caused stale ui.js / styles.css to keep being
     //     served even after fresh deploys, so colour fixes never took effect.
-    if (url.endsWith('.js') || url.endsWith('.css')) {
+    // ⚠️ ต้องเทียบจาก pathname ไม่ใช่ URL เต็ม — '/ui.js?v=123' ไม่ลงท้ายด้วย .js
+    //    ทำให้คำขอที่ใส่ query กันแคชตกไปทาง cache-first ซึ่งตรงข้ามกับที่ตั้งใจ
+    const path = new URL(url).pathname;
+    if (path.endsWith('.js') || path.endsWith('.css')) {
         event.respondWith(
             fetch(event.request).then(networkResponse => {
                 if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {

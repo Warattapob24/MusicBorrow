@@ -6664,7 +6664,6 @@ window.__oadAssignKit = async (kitId) => {
     const kit = _uni.kits.find(k => k.kit_id === kitId);
 
     // ชุดประจำตัวเป็นของสมาชิกชุมนุมเท่านั้น
-    // จัดกลุ่มตามกลุ่มเครื่อง + บอกเครื่องดนตรีและชั้น ไม่งั้นหาชื่อในลิสต์ยาว ๆ ไม่เจอ
     const { data: cands, error: cErr } = await staffApi.candidates();
     if (cErr) return toast(cErr.message, 'error');
 
@@ -6675,9 +6674,10 @@ window.__oadAssignKit = async (kitId) => {
     const owned = new Map();
     (_uni.kits || []).forEach(k => { if (k.owner_id) owned.set(k.owner_id, k.kit_no); });
 
+    const groupOf = (c) => c.section_name || 'ยังไม่ระบุเครื่อง';
     const groups = new Map();
     for (const c of club) {
-        const key = c.section_name || 'ยังไม่ระบุเครื่อง';
+        const key = groupOf(c);
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(c);
     }
@@ -6685,7 +6685,7 @@ window.__oadAssignKit = async (kitId) => {
     const optionOf = (c) => {
         const has = owned.get(c.user_id);
         const tail = [c.main_instrument, c.class_level].filter(Boolean).join(' · ');
-        return '<option value="' + c.user_id + '"' +
+        return '<option value="' + c.user_id + '" data-grp="' + escapeHtml(groupOf(c)) + '"' +
                (kit?.owner_id === c.user_id ? ' selected' : '') + '>' +
                escapeHtml(c.full_name) +
                (tail ? ' · ' + escapeHtml(tail) : '') +
@@ -6697,35 +6697,48 @@ window.__oadAssignKit = async (kitId) => {
         '<optgroup label="' + escapeHtml(name) + ' (' + list.length + ')">' +
         list.map(optionOf).join('') + '</optgroup>').join('');
 
+    const groupOptions = [...groups.entries()].map(([name, list]) =>
+        '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + ' (' + list.length + ')</option>'
+    ).join('');
+
     const { value, isConfirmed } = await Swal.fire({
         title: '👤 เจ้าของชุด #' + (kit?.kit_no ?? ''),
-        width: 480,
+        width: 500,
         html: '<div style="text-align:left;font-size:.9rem;">' +
-              '<p style="margin:0 0 .5rem;font-size:.78rem;opacity:.75;">' +
-                'สมาชิกชุมนุม ' + club.length + ' คน · จัดกลุ่มตามกลุ่มเครื่อง' +
-              '</p>' +
-              '<input id="assign-search" class="swal2-input" style="width:100%;margin:0 0 .5rem;"' +
-                ' placeholder="🔍 พิมพ์ชื่อเพื่อค้นหา">' +
+              '<label style="font-weight:700;">กลุ่มเครื่อง</label>' +
+              '<select id="assign-group" class="swal2-input" style="width:100%;margin:.2rem 0 .6rem;">' +
+                '<option value="">— ทุกกลุ่ม (' + club.length + ' คน) —</option>' + groupOptions +
+              '</select>' +
+              '<input id="assign-search" class="swal2-input" style="width:100%;margin:0 0 .6rem;"' +
+                ' placeholder="🔍 พิมพ์ชื่อหรือเครื่องดนตรี">' +
+              '<label style="font-weight:700;">นักเรียน</label>' +
               '<select id="assign-stu" class="swal2-input" size="10"' +
-                ' style="width:100%;margin:0;height:auto;">' +
+                ' style="width:100%;margin:.2rem 0 0;height:auto;">' +
                 '<option value="">— ไม่มีเจ้าของ —</option>' + groupHtml +
               '</select></div>',
         showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
         didOpen: () => {
-            const q = document.getElementById('assign-search');
+            const grp = document.getElementById('assign-group');
+            const q   = document.getElementById('assign-search');
             const sel = document.getElementById('assign-stu');
-            q.addEventListener('input', () => {
+
+            const apply = () => {
+                const want = grp.value;
                 const term = q.value.trim().toLowerCase();
                 sel.querySelectorAll('optgroup').forEach(g => {
                     let shown = 0;
                     [...g.children].forEach(o => {
-                        const hit = !term || o.text.toLowerCase().includes(term);
+                        const hit = (!want || o.dataset.grp === want) &&
+                                    (!term || o.text.toLowerCase().includes(term));
                         o.hidden = !hit;
                         if (hit) shown++;
                     });
                     g.hidden = shown === 0;
                 });
-            });
+            };
+
+            grp.addEventListener('change', apply);
+            q.addEventListener('input', apply);
             q.focus();
         },
         preConfirm: () => document.getElementById('assign-stu').value || null
