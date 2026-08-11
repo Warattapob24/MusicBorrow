@@ -1725,6 +1725,20 @@ export const uniformApi = {
             p_request_id: requestId, p_replacement_part_id: replacementPartId
         }));
     },
+    // ขออนุมัติใช้ชุดที่ไม่ใช่ของตัวเอง (คนนอกชุมนุม / คนในที่ต้องใช้ชุดคนอื่น)
+    requestKitUse(kitId, eventId = null, reason = null) {
+        return _wrap(() => supabase.rpc('request_kit_use', {
+            p_kit_id: kitId, p_event_id: eventId, p_reason: reason
+        }));
+    },
+    listKitRequests(status = 'pending') {
+        return _wrap(() => supabase.rpc('admin_list_kit_requests', { p_status: status }));
+    },
+    decideKitRequest(requestId, approve, note = null) {
+        return _wrap(() => supabase.rpc('admin_decide_kit_request', {
+            p_request_id: requestId, p_approve: approve, p_note: note
+        }));
+    },
     listSwapRequests(status = 'pending') {
         return _wrap(() => supabase.from('uniform_swap_requests')
             .select('*, users!uniform_swap_requests_requester_id_fkey(prefix, first_name, last_name)')

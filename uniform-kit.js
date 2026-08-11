@@ -117,6 +117,20 @@ export async function processKitScan(qrCode) {
     if (kit.checkout_id && kit.checkout_status !== 'closed') {
         return _renderReturnChecklist(kit, ev);
     }
+
+    // ── ชุดของคนอื่น → ต้องได้รับอนุมัติจากครูก่อน
+    //    (คนนอกชุมนุมก็มาทางนี้ เพราะไม่มีชุดประจำตัว)
+    if (kit.owner_id && kit.owner_id !== user.id) {
+        const { isConfirmed } = await Swal.fire({
+            title: `ชุด #${kit.kit_no} เป็นของคนอื่น`,
+            html: `เจ้าของคือ <strong>${escapeHtml(kit.owner_name || 'นักเรียนคนอื่น')}</strong><br><br>
+                   ถ้าจำเป็นต้องใช้ชุดนี้ ส่งคำขอให้ครูอนุมัติก่อนได้`,
+            icon: 'info', showCancelButton: true,
+            confirmButtonText: '🙋 ขออนุมัติใช้ชุดนี้', cancelButtonText: 'ยกเลิก'
+        });
+        if (!isConfirmed) return;
+        return _requestKitUse(kit, ev);
+    }
     if (kit.checkout_status === 'closed') {
         return Swal.fire('คืนครบแล้ว', `ชุด #${kit.kit_no} คืนครบทุกชิ้นสำหรับงานนี้แล้ว`, 'success');
     }
@@ -318,4 +332,27 @@ async function _requestSwap(kit) {
     return error
         ? Swal.fire('ส่งไม่สำเร็จ', error.message, 'error')
         : Swal.fire('ส่งคำขอแล้ว', data?.message || 'ครูจะพิจารณาให้', 'success');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🙋 ขออนุมัติใช้ชุดที่ไม่ใช่ของตัวเอง
+//    ครูเป็นคนตัดสิน — อนุมัติแล้วถึงจะเบิกได้ (บังคับที่ฐานข้อมูลด้วย)
+// ─────────────────────────────────────────────────────────────────────────────
+async function _requestKitUse(kit, ev) {
+    const { value: reason, isConfirmed } = await Swal.fire({
+        title: `🙋 ขอใช้ชุด #${kit.kit_no}`,
+        input: 'text',
+        inputLabel: `สำหรับงาน: ${ev.name}`,
+        inputPlaceholder: 'เหตุผล เช่น ชุดตัวเองส่งซ่อม / ไซส์ไม่พอดี',
+        showCancelButton: true,
+        confirmButtonText: 'ส่งคำขอ', cancelButtonText: 'ยกเลิก',
+        inputValidator: v => (!v || !v.trim()) ? 'กรุณาระบุเหตุผล' : undefined
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.requestKitUse(kit.kit_id, ev.id, reason.trim());
+    return error
+        ? Swal.fire('ส่งไม่สำเร็จ', error.message, 'error')
+        : Swal.fire('ส่งคำขอแล้ว',
+            (data?.message || '') + '\nรอครูอนุมัติ แล้วค่อยกลับมาสแกนใหม่', 'success');
 }

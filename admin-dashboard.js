@@ -991,6 +991,18 @@ function buildShell() {
 
         <div class="oad-tab-panel" id="oad-panel-uniforms">
             <div class="oad-panel">
+                <div class="oad-panel-title">
+                    🙋 คำขอใช้ชุดของคนอื่น
+                    <span class="oad-tab-badge hidden" id="oad-kitreq-badge" style="margin-left:.5rem;">0</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    ปกติใช้ได้เฉพาะชุดประจำตัวของตัวเอง — คนนอกชุมนุม
+                    หรือคนที่ต้องใช้ชุดคนอื่น ต้องผ่านการอนุมัติที่นี่ก่อนถึงจะเบิกได้
+                </p>
+                <div class="oad-table-wrap" id="oad-kitreq-wrap"></div>
+            </div>
+
+            <div class="oad-panel">
                 <div class="oad-panel-title">👔 ถุงชุด</div>
                 <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
                     <select id="oad-uni-settype" class="oad-input" style="width:auto; min-width:170px;"></select>
@@ -6463,7 +6475,7 @@ async function renderUniformsTab() {
 
     // ต้องรอทั้ง _renderKitTable (ให้ _uni.kits มีข้อมูล) และ _renderUniformReport
     // (ให้ _uni.stock มีข้อมูล) ก่อน ตารางกรอกไซส์ถึงจะแสดง "เหลือกี่ตัว" ได้
-    await Promise.all([_renderKitTable(), _renderPartTypeTable(), _renderUniformReport()]);
+    await Promise.all([_renderKitTable(), _renderPartTypeTable(), _renderUniformReport(), _renderKitRequests()]);
     _renderKitAvailability();
 }
 
@@ -7702,3 +7714,66 @@ async function _renderKitAvailability() {
               : 'ยังไม่พร้อม';
     el.innerHTML = `<span style="color:#f59e0b;">⚠️ นักเรียนยังเลือกไม่ได้ — ${escapeHtml(why)}</span>`;
 }
+
+// ── คำขอใช้ชุดของคนอื่น (คนนอกชุมนุม / คนในที่ต้องใช้ชุดคนอื่น)
+async function _renderKitRequests() {
+    const wrap  = document.getElementById('oad-kitreq-wrap');
+    const badge = document.getElementById('oad-kitreq-badge');
+    if (!wrap) return;
+
+    const { data, error } = await uniformApi.listKitRequests('pending');
+    if (error) { wrap.innerHTML = `<div class="oad-empty">${escapeHtml(error.message)}</div>`; return; }
+
+    const rows = data || [];
+    if (badge) {
+        if (rows.length) { badge.textContent = String(rows.length); badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+    }
+    if (!rows.length) {
+        wrap.innerHTML = '<div class="oad-empty"><span class="oad-empty-icon">✨</span>ไม่มีคำขอค้าง</div>';
+        return;
+    }
+
+    wrap.innerHTML = `
+        <table class="oad-table">
+            <thead><tr><th>ผู้ขอ</th><th>กลุ่ม</th><th>ขอใช้</th><th>งาน</th>
+                       <th>เหตุผล</th><th>เมื่อ</th><th>จัดการ</th></tr></thead>
+            <tbody>
+            ${rows.map(r => `<tr>
+                <td><strong>${escapeHtml(r.requester_name || '—')}</strong>
+                    ${r.main_instrument || r.class_level
+                      ? `<div style="font-size:.72rem;opacity:.65;">${
+                          [r.main_instrument, r.class_level].filter(Boolean).map(escapeHtml).join(' · ')}</div>`
+                      : ''}</td>
+                <td class="nowrap">${r.student_group === 'club'
+                    ? '<span class="oad-badge oad-badge-green">ชุมนุม</span>'
+                    : '<span class="oad-badge oad-badge-gray">ทั่วไป</span>'}</td>
+                <td class="nowrap"><strong>ชุด #${r.kit_no}</strong></td>
+                <td class="nowrap">${escapeHtml(r.event_name || 'ทุกงาน')}</td>
+                <td style="font-size:.85rem;">${escapeHtml(r.reason || '—')}</td>
+                <td class="nowrap" style="font-size:.78rem;">${fmtDate(r.created_at)}</td>
+                <td><div class="actions">
+                    <button class="oad-btn oad-btn-approve" onclick="window.__oadDecideKitReq(${r.id}, true)">✅ อนุมัติ</button>
+                    <button class="oad-btn oad-btn-red" onclick="window.__oadDecideKitReq(${r.id}, false)">❌ ไม่อนุมัติ</button>
+                </div></td>
+            </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+window.__oadDecideKitReq = async (id, approve) => {
+    const { value: note, isConfirmed } = await Swal.fire({
+        title: approve ? 'อนุมัติให้ใช้ชุดนี้?' : 'ไม่อนุมัติ',
+        input: 'text',
+        inputPlaceholder: approve ? 'หมายเหตุถึงนักเรียน (ไม่บังคับ)' : 'เหตุผล (ไม่บังคับ)',
+        showCancelButton: true,
+        confirmButtonText: approve ? '✅ อนุมัติ' : '❌ ไม่อนุมัติ',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!isConfirmed) return;
+
+    const { error } = await uniformApi.decideKitRequest(id, approve, note || null);
+    if (error) return toast(error.message, 'error');
+    toast(approve ? 'อนุมัติแล้ว — นักเรียนเบิกชุดนี้ได้' : 'ไม่อนุมัติแล้ว');
+    _renderKitRequests();
+};
