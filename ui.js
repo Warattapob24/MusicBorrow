@@ -7,7 +7,7 @@ import { currentUser, getUserProfile, isUserBlocked, setCurrentUser, getCurrentU
 import {
     borrow, borrowExt, repair, usersExt, authApi, instrumentsExt, realtimeApi,
     badgesExt, knowledgeExt, rankingsExt, gamesExt, notificationsExt, adminExt,
-    eventsApi
+    eventsApi, fillInstrumentSelect
 } from './api.js';
 import { supabase, ICONS, VAPID_PUBLIC_KEY } from './config.js';
 import { escapeHtml, translateGroup, parseMediaUrl, fmtEventTimes } from './utils.js';
@@ -738,7 +738,9 @@ export async function handleEditProfile(e) {
                         </div>
                         <div id="main-instrument-field-profile" class="${currentUser.student_group === 'club' ? '' : 'hidden'}" style="grid-column: span 2;">
                             <label>เครื่องดนตรีหลัก</label>
-                            <input id="swal-main-instrument" class="swal2-input" value="${escapeHtml(currentUser.main_instrument || '')}">
+                            <select id="swal-main-instrument" class="swal2-input" style="width:100%;">
+                                <option value="">— เลือกเครื่องดนตรี —</option>
+                            </select>
                         </div>
                     </div>
                     <hr>
@@ -749,6 +751,10 @@ export async function handleEditProfile(e) {
             showCancelButton: true,
             confirmButtonText: 'บันทึก',
             cancelButtonText: 'ยกเลิก',
+            didOpen: () => {
+                fillInstrumentSelect(document.getElementById('swal-main-instrument'),
+                                     currentUser.main_instrument || null);
+            },
             preConfirm: () => {
                 const imageFile = document.getElementById('swal-profile-file').files[0];
                 if (imageFile && !imageFile.name.toLowerCase().endsWith('.jpg')) {

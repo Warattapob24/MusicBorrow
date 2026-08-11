@@ -4,7 +4,7 @@
  * เรียกใช้ฟังก์ชันทั้งหมดผ่าน api.js แทน
  */
 
-import { adminDashboard as api, adminExt, authApi, bossesApi, raidApi, instrumentsExt, notifications, adminKnowledgeApi, scheduledNotificationsApi, adminNotifications, recoveryApi, studentLoopsApi, eventsApi, uniformApi, staffApi, sectionsApi } from './api.js';
+import { adminDashboard as api, adminExt, authApi, bossesApi, raidApi, instrumentsExt, notifications, adminKnowledgeApi, scheduledNotificationsApi, adminNotifications, recoveryApi, studentLoopsApi, eventsApi, uniformApi, staffApi, sectionsApi, instrumentKindsApi } from './api.js';
 import { escapeHtml, translateGroup } from './utils.js';
 import { SUPABASE_URL } from './config.js';
 import { getCurrentUser } from './auth.js';
@@ -6662,21 +6662,72 @@ async function _renderPartTypeTable() {
 // ── กำหนดเจ้าของชุด ────────────────────────────────────────────────────────
 window.__oadAssignKit = async (kitId) => {
     const kit = _uni.kits.find(k => k.kit_id === kitId);
-    const candidates = (state.users || [])
-        .filter(u => u.role !== 'admin' && u.student_group !== 'deactivated')
-        .sort((a, b) => (a.class_level || '').localeCompare(b.class_level || ''));
+
+    // ชุดประจำตัวเป็นของสมาชิกชุมนุมเท่านั้น
+    // จัดกลุ่มตามกลุ่มเครื่อง + บอกเครื่องดนตรีและชั้น ไม่งั้นหาชื่อในลิสต์ยาว ๆ ไม่เจอ
+    const { data: cands, error: cErr } = await staffApi.candidates();
+    if (cErr) return toast(cErr.message, 'error');
+
+    const club = (cands || []).filter(c => c.student_group === 'club');
+    if (!club.length) return toast('ยังไม่มีสมาชิกชุมนุม', 'error');
+
+    // ใครถือชุดอยู่แล้วบ้าง — กันเลือกซ้ำโดยไม่รู้ตัว
+    const owned = new Map();
+    (_uni.kits || []).forEach(k => { if (k.owner_id) owned.set(k.owner_id, k.kit_no); });
+
+    const groups = new Map();
+    for (const c of club) {
+        const key = c.section_name || 'ยังไม่ระบุเครื่อง';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(c);
+    }
+
+    const optionOf = (c) => {
+        const has = owned.get(c.user_id);
+        const tail = [c.main_instrument, c.class_level].filter(Boolean).join(' · ');
+        return '<option value="' + c.user_id + '"' +
+               (kit?.owner_id === c.user_id ? ' selected' : '') + '>' +
+               escapeHtml(c.full_name) +
+               (tail ? ' · ' + escapeHtml(tail) : '') +
+               (has && has !== kit?.kit_no ? ' — ถือชุด #' + has + ' อยู่' : '') +
+               '</option>';
+    };
+
+    const groupHtml = [...groups.entries()].map(([name, list]) =>
+        '<optgroup label="' + escapeHtml(name) + ' (' + list.length + ')">' +
+        list.map(optionOf).join('') + '</optgroup>').join('');
 
     const { value, isConfirmed } = await Swal.fire({
-        title: `👤 เจ้าของชุด #${kit?.kit_no}`,
-        html: `<select id="assign-stu" class="swal2-input" style="width:100%;margin:0;">
-                 <option value="">— ไม่มีเจ้าของ —</option>
-                 ${candidates.map(u => `<option value="${u.id}"${kit?.owner_id === u.id ? ' selected' : ''}>
-                    ${escapeHtml((u.prefix || '') + u.first_name + ' ' + u.last_name)}
-                    ${u.class_level ? ' · ' + escapeHtml(u.class_level) : ''}
-                    ${u.main_instrument ? ' · ' + escapeHtml(u.main_instrument) : ''}
-                 </option>`).join('')}
-               </select>`,
+        title: '👤 เจ้าของชุด #' + (kit?.kit_no ?? ''),
+        width: 480,
+        html: '<div style="text-align:left;font-size:.9rem;">' +
+              '<p style="margin:0 0 .5rem;font-size:.78rem;opacity:.75;">' +
+                'สมาชิกชุมนุม ' + club.length + ' คน · จัดกลุ่มตามกลุ่มเครื่อง' +
+              '</p>' +
+              '<input id="assign-search" class="swal2-input" style="width:100%;margin:0 0 .5rem;"' +
+                ' placeholder="🔍 พิมพ์ชื่อเพื่อค้นหา">' +
+              '<select id="assign-stu" class="swal2-input" size="10"' +
+                ' style="width:100%;margin:0;height:auto;">' +
+                '<option value="">— ไม่มีเจ้าของ —</option>' + groupHtml +
+              '</select></div>',
         showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
+        didOpen: () => {
+            const q = document.getElementById('assign-search');
+            const sel = document.getElementById('assign-stu');
+            q.addEventListener('input', () => {
+                const term = q.value.trim().toLowerCase();
+                sel.querySelectorAll('optgroup').forEach(g => {
+                    let shown = 0;
+                    [...g.children].forEach(o => {
+                        const hit = !term || o.text.toLowerCase().includes(term);
+                        o.hidden = !hit;
+                        if (hit) shown++;
+                    });
+                    g.hidden = shown === 0;
+                });
+            });
+            q.focus();
+        },
         preConfirm: () => document.getElementById('assign-stu').value || null
     });
     if (!isConfirmed) return;
@@ -6688,6 +6739,7 @@ window.__oadAssignKit = async (kitId) => {
     if (error) return toast(error.message, 'error');
     toast(data?.message || 'บันทึกเจ้าของชุดแล้ว');
     _renderKitTable();
+    loadUserKitMap();
 };
 
 // ── ปลดเจ้าของ (คนเดิมออก / เปลี่ยนชุด) ────────────────────────────────────
@@ -7240,10 +7292,11 @@ window.__oadUserKit = async (userId, fullName) => {
 //    หัวหน้า = อ่านอย่างเดียว + ส่งใบตรวจ ไม่มีสิทธิ์คืน/ปิดงาน/บล็อก
 // ═══════════════════════════════════════════════════════════════════════════
 const _SCOPE_LABEL = {
-    band:    { icon: '🎖', name: 'หัวหน้าวง',        hint: 'เห็นทั้งวง' },
-    section: { icon: '🎺', name: 'หัวหน้ากลุ่มเครื่อง', hint: 'เห็นเฉพาะกลุ่มตน' },
-    event:   { icon: '🎭', name: 'หัวหน้างาน',        hint: 'เห็นเฉพาะงานนั้น' },
-    uniform: { icon: '👔', name: 'ฝ่ายเสื้อผ้า',      hint: 'ดูแลชุด' }
+    band:       { icon: '🎖', name: 'หัวหน้าวง',         hint: 'เห็นทั้งวง' },
+    section:    { icon: '🎺', name: 'หัวหน้ากลุ่มเครื่อง', hint: 'เห็นเฉพาะกลุ่มตน' },
+    instrument: { icon: '🎵', name: 'หัวหน้าเครื่อง',     hint: 'เห็นเฉพาะเครื่องของตน' },
+    event:      { icon: '🎭', name: 'หัวหน้างาน',        hint: 'เห็นเฉพาะงานนั้น' },
+    uniform:    { icon: '👔', name: 'ฝ่ายเสื้อผ้า',       hint: 'ดูแลชุด' }
 };
 
 async function _renderStaffRoles() {
@@ -7262,7 +7315,7 @@ async function _renderStaffRoles() {
 
     wrap.innerHTML = `
         <table class="oad-table">
-            <thead><tr><th>ชื่อ</th><th>ชั้น</th><th>เครื่องดนตรี</th>
+            <thead><tr><th>ชื่อ</th><th>กลุ่ม</th><th>เครื่องดนตรี</th>
                        <th>ตำแหน่ง</th><th>ขอบเขต</th><th>จัดการ</th></tr></thead>
             <tbody>
             ${rows.map(r => {
@@ -7270,7 +7323,9 @@ async function _renderStaffRoles() {
                 return `<tr>
                     <td><strong>${escapeHtml(r.full_name || '—')}</strong>
                         ${r.nickname ? `<span style="opacity:.6;"> (${escapeHtml(r.nickname)})</span>` : ''}</td>
-                    <td class="nowrap">${escapeHtml(r.class_level || '—')}</td>
+                    <td class="nowrap">${r.student_group === 'club'
+                        ? '<span class="oad-badge oad-badge-green">ชุมนุม</span>'
+                        : '<span class="oad-badge oad-badge-gray">ทั่วไป</span>'}</td>
                     <td class="nowrap">${escapeHtml(r.main_instrument || '—')}</td>
                     <td class="nowrap">${sc.icon} ${escapeHtml(sc.name)}</td>
                     <td style="font-size:.85rem;opacity:.8;">${escapeHtml(r.scope_label || '')}</td>
@@ -7334,99 +7389,113 @@ window.__oadRevokeStaff = async (roleId) => {
 };
 
 window.__oadAddStaff = async () => {
-    const [{ data: sections }, { data: events }, { data: cands, error: cErr }] = await Promise.all([
-        sectionsApi.list(), eventsApi.list(), staffApi.candidates()
-    ]);
+    const [{ data: sections }, { data: events }, { data: cands, error: cErr }, { data: kinds }] =
+        await Promise.all([
+            sectionsApi.list(), eventsApi.list(), staffApi.candidates(), instrumentKindsApi.list()
+        ]);
     if (cErr) return toast(cErr.message, 'error');
-    if (!cands?.length) return toast('ยังไม่มีสมาชิกชุมนุมให้แต่งตั้ง', 'error');
+    if (!cands?.length) return toast('ยังไม่มีนักเรียนให้แต่งตั้ง', 'error');
 
-    // แต่งตั้งได้เฉพาะสมาชิกชุมนุม — รายชื่อมาจาก RPC ที่กรองมาแล้ว
-    // และติดป้ายบอกว่าใครถือตำแหน่งอะไรอยู่ จะได้ไม่แต่งตั้งซ้ำโดยไม่รู้ตัว
-    const classes = [...new Set(cands.map(c => c.class_level).filter(Boolean))].sort();
-
-    const optionOf = c => {
-        const held = c.current_roles ? ` — ${c.current_roles}` : '';
-        return `<option value="${c.user_id}" data-class="${escapeHtml(c.class_level || '')}"
-                        data-held="${c.current_roles ? '1' : '0'}">
-                  ${escapeHtml(c.full_name)}${c.class_level ? ' · ' + escapeHtml(c.class_level) : ''}${escapeHtml(held)}
-                </option>`;
+    // กรองด้วย "กลุ่ม" (ชุมนุม / ทั่วไป) — ชั้นเรียนไม่เกี่ยวกับการแต่งตั้ง
+    const optionOf = (c) => {
+        const held = c.current_roles ? ' — ' + c.current_roles : '';
+        const inst = c.main_instrument ? ' · ' + c.main_instrument : ' · ยังไม่ระบุเครื่อง';
+        return '<option value="' + c.user_id + '" data-group="' + escapeHtml(c.student_group) +
+               '" data-inst="' + escapeHtml(c.main_instrument || '') + '">' +
+               escapeHtml(c.full_name) + escapeHtml(inst) + escapeHtml(held) + '</option>';
     };
+    const nClub = cands.filter(c => c.student_group === 'club').length;
 
     const result = await Swal.fire({
         title: '🎖 แต่งตั้งหัวหน้า',
-        width: 520,
-        html: `<div style="text-align:left;font-size:.9rem;">
-                 <p style="margin:0 0 .7rem;font-size:.8rem;opacity:.75;">
-                   แต่งตั้งได้เฉพาะ<strong>สมาชิกชุมนุม</strong> (${cands.length} คน) ·
-                   ชื่อที่มีตำแหน่งอยู่แล้วจะแสดงต่อท้าย
-                 </p>
-
-                 <label style="font-weight:700;">กรองชั้นเรียน</label>
-                 <select id="st-class" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">
-                   <option value="">— ทุกชั้น —</option>
-                   ${classes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
-                 </select>
-
-                 <label style="font-weight:700;">นักเรียน</label>
-                 <select id="st-user" class="swal2-input" size="8"
-                         style="width:100%;margin:.2rem 0 .7rem;height:auto;">
-                   ${cands.map(optionOf).join('')}
-                 </select>
-
-                 <label style="font-weight:700;">ตำแหน่ง</label>
-                 <select id="st-scope" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">
-                   ${Object.entries(_SCOPE_LABEL).map(([k, v]) =>
-                      `<option value="${k}">${v.icon} ${v.name} — ${v.hint}</option>`).join('')}
-                 </select>
-
-                 <div id="st-value-wrap" style="display:none;">
-                   <label style="font-weight:700;">ขอบเขต</label>
-                   <select id="st-value" class="swal2-input" style="width:100%;margin:.2rem 0 0;"></select>
-                 </div>
-               </div>`,
+        width: 540,
+        html: '<div style="text-align:left;font-size:.9rem;">' +
+              '<label style="font-weight:700;">กลุ่ม</label>' +
+              '<select id="st-group" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">' +
+                '<option value="club" selected>สมาชิกชุมนุม (' + nClub + ')</option>' +
+                '<option value="student">นักเรียนทั่วไป (' + (cands.length - nClub) + ')</option>' +
+                '<option value="">ทั้งหมด (' + cands.length + ')</option>' +
+              '</select>' +
+              '<label style="font-weight:700;">นักเรียน</label>' +
+              '<select id="st-user" class="swal2-input" size="8" style="width:100%;margin:.2rem 0 .7rem;height:auto;">' +
+                cands.map(optionOf).join('') +
+              '</select>' +
+              '<label style="font-weight:700;">ตำแหน่ง</label>' +
+              '<select id="st-scope" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">' +
+                Object.entries(_SCOPE_LABEL).map(([k, v]) =>
+                  '<option value="' + k + '">' + v.icon + ' ' + v.name + ' — ' + v.hint + '</option>').join('') +
+              '</select>' +
+              '<div id="st-value-wrap" style="display:none;">' +
+                '<label style="font-weight:700;" id="st-value-label">ขอบเขต</label>' +
+                '<select id="st-value" class="swal2-input" style="width:100%;margin:.2rem 0 0;"></select>' +
+                '<p id="st-value-hint" style="margin:.3rem 0 0;font-size:.75rem;opacity:.7;"></p>' +
+              '</div></div>',
         showCancelButton: true, confirmButtonText: 'แต่งตั้ง', cancelButtonText: 'ยกเลิก',
         didOpen: () => {
-            const cls   = document.getElementById('st-class');
+            const grp   = document.getElementById('st-group');
             const user  = document.getElementById('st-user');
             const scope = document.getElementById('st-scope');
             const wrap  = document.getElementById('st-value-wrap');
+            const label = document.getElementById('st-value-label');
+            const hint  = document.getElementById('st-value-hint');
             const val   = document.getElementById('st-value');
 
-            cls.addEventListener('change', () => {
-                const want = cls.value;
-                let firstVisible = null;
-                [...user.options].forEach(o => {
-                    const show = !want || o.dataset.class === want;
-                    o.hidden = !show;
-                    if (show && !firstVisible) firstVisible = o;
-                });
-                if (firstVisible) user.value = firstVisible.value;
-            });
-
-            const sync = () => {
+            const syncScope = () => {
                 const sv = scope.value;
                 if (sv === 'section') {
                     wrap.style.display = 'block';
+                    label.textContent = 'กลุ่มเครื่อง';
+                    hint.textContent = 'จะเห็นของทุกเครื่องในกลุ่มนี้';
                     val.innerHTML = (sections || []).map(x =>
-                        `<option value="${escapeHtml(x.code)}">${x.icon || ''} ${escapeHtml(x.name_th)}</option>`).join('');
+                        '<option value="' + escapeHtml(x.code) + '">' + (x.icon || '') + ' ' +
+                        escapeHtml(x.name_th) + '</option>').join('');
+                } else if (sv === 'instrument') {
+                    wrap.style.display = 'block';
+                    label.textContent = 'เครื่องดนตรีที่ดูแล';
+                    // ตั้งค่าเริ่มต้นเป็นเครื่องของคนที่เลือก — กรณีที่พบบ่อยที่สุด
+                    const own = user.selectedOptions[0]?.dataset.inst || '';
+                    hint.textContent = own
+                        ? 'เครื่องของนักเรียนคนนี้คือ ' + own
+                        : 'นักเรียนคนนี้ยังไม่ได้ระบุเครื่อง';
+                    val.innerHTML = (kinds || []).map(k =>
+                        '<option value="' + escapeHtml(k.name) + '"' + (k.name === own ? ' selected' : '') + '>' +
+                        (k.section_icon || '') + ' ' + escapeHtml(k.name) + '</option>').join('');
+                    if (own) val.value = own;
                 } else if (sv === 'event') {
                     wrap.style.display = 'block';
+                    label.textContent = 'งาน';
+                    hint.textContent = '';
                     const open = (events || []).filter(e => e.status === 'open' || e.status === 'active');
                     val.innerHTML = open.length
-                        ? open.map(e => `<option value="${e.id}">🎭 ${escapeHtml(e.name)}</option>`).join('')
+                        ? open.map(e => '<option value="' + e.id + '">🎭 ' + escapeHtml(e.name) + '</option>').join('')
                         : '<option value="">— ยังไม่มีงานที่เปิดอยู่ —</option>';
                 } else {
                     wrap.style.display = 'none';
                 }
             };
-            scope.addEventListener('change', sync);
-            sync();
+
+            const applyGroup = () => {
+                const want = grp.value;
+                let first = null;
+                [...user.options].forEach(o => {
+                    const show = !want || o.dataset.group === want;
+                    o.hidden = !show;
+                    if (show && !first) first = o;
+                });
+                if (first) user.value = first.value;
+                syncScope();
+            };
+
+            grp.addEventListener('change', applyGroup);
+            user.addEventListener('change', syncScope);
+            scope.addEventListener('change', syncScope);
+            applyGroup();
         },
         preConfirm: () => {
             const userId = document.getElementById('st-user').value;
             if (!userId) { Swal.showValidationMessage('เลือกนักเรียนก่อน'); return false; }
             const scope = document.getElementById('st-scope').value;
-            const needsValue = scope === 'section' || scope === 'event';
+            const needsValue = ['section', 'instrument', 'event'].includes(scope);
             const value = needsValue ? document.getElementById('st-value').value : null;
             if (needsValue && !value) { Swal.showValidationMessage('ต้องเลือกขอบเขต'); return false; }
             return { userId, scope, value };

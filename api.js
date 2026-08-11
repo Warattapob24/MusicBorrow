@@ -1817,3 +1817,43 @@ export const uniformApi = {
         return _wrap(() => supabase.from('uniform_parts').update({ size }).eq('id', partId));
     }
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎵 ชนิดเครื่องดนตรี — รายการกลางสำหรับให้เลือกตอนสมัคร/แก้โปรไฟล์
+//    เดิมให้พิมพ์เอง ทำให้ ทรัมเป็ต/ทัมเป็ต/ทรัมเป็ด กลายเป็นคนละเครื่อง
+// ═══════════════════════════════════════════════════════════════════════════
+export const instrumentKindsApi = {
+    list()                { return _wrap(() => supabase.rpc('get_instrument_kinds')); },
+    setMine(name)         { return _wrap(() => supabase.rpc('set_my_instrument', { p_name: name || null })); },
+    merge(fromName, toName) {
+        return _wrap(() => supabase.rpc('admin_merge_instrument_kind',
+            { p_from: fromName, p_to: toName }));
+    }
+};
+
+/**
+ * เติมตัวเลือกเครื่องดนตรีลง <select> พร้อมจัดกลุ่มตามกลุ่มเครื่องของวง
+ * ใช้ได้ทั้งหน้าสมัคร (ยังไม่ล็อกอิน) และหน้าแก้ไขโปรไฟล์
+ */
+export async function fillInstrumentSelect(selectEl, selected = null) {
+    if (!selectEl) return;
+    const { data, error } = await instrumentKindsApi.list();
+    if (error || !data?.length) return;
+
+    const groups = new Map();
+    for (const k of data) {
+        const key = k.section_name || 'อื่น ๆ';
+        if (!groups.has(key)) groups.set(key, { icon: k.section_icon || '', items: [] });
+        groups.get(key).items.push(k.name);
+    }
+
+    const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+    let html = selectEl.querySelector('option')?.outerHTML || '<option value="">— เลือก —</option>';
+    for (const [name, g] of groups) {
+        html += `<optgroup label="${g.icon} ${esc(name)}">` +
+                g.items.map(n => `<option value="${esc(n)}"${n === selected ? ' selected' : ''}>${esc(n)}</option>`).join('') +
+                `</optgroup>`;
+    }
+    selectEl.innerHTML = html;
+    if (selected) selectEl.value = selected;
+}

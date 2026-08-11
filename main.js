@@ -14,6 +14,7 @@ import { login, register, loginWithGoogle, resetPassword, getUserProfile } from 
 import { supabase } from './config.js';
 import { showDashboardView, showAuthView } from './ui.js';
 import { addSafeEventListener } from './utils.js';
+import { fillInstrumentSelect } from './api.js';
 import { scheduledNotificationsApi } from './api.js';
 
 // ─────────────────────────────────────────────
@@ -443,6 +444,10 @@ function addInitialEventListeners() {
     // Register form (v2 - Unified Form Logic)
     const registerForm = document.getElementById('register-form');
     if (registerForm) {
+        // 🎵 เครื่องเอกเป็นตัวเลือก ไม่ใช่ช่องพิมพ์เอง
+        // ของเดิมพิมพ์เองทำให้ ทรัมเป็ต/ทัมเป็ต/ทรัมเป็ด กลายเป็นคนละเครื่อง
+        fillInstrumentSelect(document.getElementById('register-instrument'));
+
         addSafeEventListener(registerForm, 'submit', async (e) => {
             e.preventDefault();
             const btn = registerForm.querySelector('button[type="submit"]');
