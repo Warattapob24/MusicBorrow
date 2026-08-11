@@ -902,19 +902,9 @@ const VIEWS = {
             return `
                 ${renderUnifiedCard({ emoji: '🎸', title: 'ยืม และ คืนเครื่องดนตรี', subtitle: 'จัดการเครื่องดนตรีของคุณในหน้าเดียว' })}
 
-                <div id="schedule-section" style="margin-bottom: 2.5rem;">
-                    <h3 class="sd-section-title">📅 ตารางกิจกรรม</h3>
-                    <div id="schedule-list" aria-busy="true" class="sd-list-container"></div>
-                </div>
-
                 <div id="borrowed-section" style="margin-bottom: 2.5rem; display: none;">
                     <h3 class="sd-section-title" style="color: var(--pico-color-green-500);">🎸 เครื่องดนตรีที่กำลังยืม</h3>
                     <div id="borrowed-list" aria-busy="true" class="sd-list-container"></div>
-                </div>
-
-                <div id="my-kit-section" style="margin-bottom: 2.5rem;">
-                    <h3 class="sd-section-title">👔 ชุดประจำตัว</h3>
-                    <div id="my-kit-box" aria-busy="true" class="sd-list-container"></div>
                 </div>
 
                 <div>
@@ -926,9 +916,7 @@ const VIEWS = {
                 <div class="sd-bottom-spacer"></div>`;
         },
         async afterRender(user) {
-            renderSchedule();   // ไม่ต้อง await — โหลดคู่ขนานกับส่วนอื่น
             await loadAndRenderMyBorrowedItems(user.id);
-            await renderMyKit();
             await renderBorrowForm(user);
         }
     },
@@ -1170,8 +1158,15 @@ const VIEWS = {
             
             const clubFeaturesHtml = user.student_group === 'club' ? `
                 <div style="margin-bottom: 2rem;">
+                    <h3 class="sd-section-title">👔 ชุดประจำตัว</h3>
+                    <div id="my-kit-box" aria-busy="true" class="sd-list-container"></div>
+                </div>
+
+                <div style="margin-bottom: 2rem;">
                     <h3 class="sd-section-title">กิจกรรมและนัดหมาย</h3>
                     <div id="appointment-button-container" style="margin-bottom:1rem;text-align:center;"></div>
+                    <div id="schedule-list" aria-busy="true" class="sd-list-container"
+                         style="margin-bottom:1rem;"></div>
                     <div style="height:400px; border-radius:12px; overflow:hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
                         <iframe
                             src="https://calendar.google.com/calendar/embed?height=600&wkst=1&ctz=Asia%2FBangkok&showPrint=0&mode=AGENDA&hl=th&src=YjViNGNlNGE1ODdiZGIwOWI1NTcwMGQ3MDkwYmNmNjM2YThhMzFhZjY2OTlkNjQ5OTVhNTk0YjU5MDBmZWQ5OEBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&color=%23f6bf26"
@@ -1230,6 +1225,10 @@ const VIEWS = {
 
             // ✨ ลบตรรกะการซ่อน DOM ทิ้งเพราะเราจัดการตั้งแต่ตอนดึงข้อมูลแล้ว
             if (user.student_group === 'club') {
+                // ชุดประจำตัว + ตารางกิจกรรม เป็นเรื่องตั้งค่า/นัดหมาย จึงอยู่หน้าโปรไฟล์
+                // ไม่ใช่หน้ายืม-คืน และวางคู่กับปฏิทินเดิมที่มีอยู่แล้ว
+                renderMyKit();
+                renderSchedule();
                 await renderPracticeRanking();
             }
 
@@ -6197,17 +6196,14 @@ function _setAppBadge(count) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function renderMyKit() {
     const box = document.getElementById('my-kit-box');
-    const section = document.getElementById('my-kit-section');
-    if (!box) return;
+    if (!box) return;   // อยู่หน้าโปรไฟล์ และเรนเดอร์เฉพาะสมาชิกชุมนุมเท่านั้น
 
-    // 👔 ชุดประจำตัวมีเฉพาะสมาชิกชุมนุม — กลุ่มอื่นซ่อนทั้งส่วน
+    // 👔 ชุดประจำตัวมีเฉพาะสมาชิกชุมนุม
     // (คนนอกยืมชุดออกงานได้ผ่านการสแกน QR แต่ไม่ผูกถาวร)
     if (getCurrentUser()?.student_group !== 'club') {
-        if (section) section.style.display = 'none';
         box.innerHTML = '';
         return;
     }
-    if (section) section.style.display = '';
     box.setAttribute('aria-busy', 'true');
 
     const { data: kit, error } = await uniformApi.myKit();
@@ -6334,11 +6330,13 @@ export async function renderSchedule() {
         const { data, error } = await eventsApi.schedule(60);
         if (error) throw error;
 
+        // ว่างแล้วยุบทิ้งไปเลย — ด้านล่างมีปฏิทินอยู่แล้ว
+        // ขึ้น "ยังไม่มีกิจกรรม" คร่อมปฏิทินที่มีนัดอยู่จะดูขัดกันเอง
         if (!data?.length) {
-            box.innerHTML = `<p style="text-align:center;color:var(--pico-muted-color);padding:1.5rem;">
-                ยังไม่มีกิจกรรมที่นัดไว้</p>`;
+            box.style.display = 'none';
             return;
         }
+        box.style.display = '';
 
         const now = Date.now();
         box.innerHTML = data.map(e => {
