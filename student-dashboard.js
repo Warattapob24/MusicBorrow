@@ -17,6 +17,8 @@ import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
 import { buildPlayerCardHTML, triggerLevelUp, sharePlayerCard  } from './player-card.js';
 import { BadgeSystem } from './badge-system.js';
 import { renderBadgeGallery, setupBadgeGalleryEvents } from './badge-gallery.js';
+// uniform-kit.js นำเข้าแค่ api/utils/auth จึงไม่เกิด import cycle กับไฟล์นี้
+import { parseKitCode, processKitScan } from './uniform-kit.js';
 
 // เปลี่ยนจากการเรียก setView โดยตรง เป็นการเปลี่ยน Hash แทน
 window.__sdSetView = (viewName) => {
@@ -745,7 +747,7 @@ const VIEWS = {
                     </div>
 
                     <button class="sd-board-btn" id="home-qr-btn">
-                        <span style="font-size: 1.2rem;">📷</span> สแกน QR ยืมเครื่องดนตรี
+                        <span style="font-size: 1.2rem;">📷</span> สแกน QR ยืมเครื่องดนตรี / ชุด
                     </button>
                 </div>
 
@@ -5803,11 +5805,21 @@ export function handleUniversalScan() {
                 (decoded) => {
                     scanner.stop().then(() => {
                         Swal.close();
+
+                        // 👔 QR ที่ถุงชุด (KIT-052 หรือ URL ที่มี ?kit=) → เข้าหน้าเบิก/คืนชุด
+                        // ⚠️ ปุ่มนี้เป็นคนละตัวกับปุ่มไอคอนบนหัวจอใน ui.js ซึ่งรองรับชุดอยู่แล้ว
+                        //    เดิมตัวนี้ทำ new URL('KIT-052') ซึ่ง throw ทันที
+                        //    นักเรียนจึงเจอ "QR Code ไม่ถูกต้อง" ทุกครั้งที่สแกนถุงชุด
+                        const kitCode = parseKitCode(decoded);
+                        if (kitCode) return processKitScan(kitCode);
+
                         try {
                             const id = new URLSearchParams(new URL(decoded).search).get('scan');
-                            if (!id) return Swal.fire('ผิดพลาด', 'QR Code ไม่ถูกต้อง', 'error');
+                            if (!id) return Swal.fire('ผิดพลาด', 'QR Code ไม่ถูกต้องหรือไม่ใช่ QR ของระบบนี้', 'error');
                             processQrScan(id);
-                        } catch (_) { Swal.fire('ผิดพลาด', 'QR Code ไม่ถูกต้อง', 'error'); }
+                        } catch (_) {
+                            Swal.fire('ผิดพลาด', 'QR Code ไม่ถูกต้องหรือไม่ใช่ QR ของระบบนี้', 'error');
+                        }
                     });
                 }).catch(() => Swal.fire('ผิดพลาด', 'ไม่สามารถเปิดกล้องได้', 'error'));
         },
