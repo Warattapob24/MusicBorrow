@@ -3571,6 +3571,17 @@ body { margin: 0; padding: 0; background-color: var(--main-bg, var(--pico-backgr
 .kit-part-size  { flex: 0 0 auto; font-size: 1.15rem; font-weight: 800; }
 .kit-part-nosize { font-size: .75rem; font-weight: 400; opacity: .5; }
 
+/* ปุ่มจุด 3 จุด — เป้ากด 38px แต่ดูบางเบาไม่แย่งสายตา */
+.kit-more {
+    flex: 0 0 auto; width: 38px; height: 38px; margin: 0; padding: 0;
+    border-radius: 10px; border: 1px solid var(--pico-muted-border-color);
+    background: transparent !important; color: var(--pico-color) !important;
+    font-size: 1.15rem; line-height: 1; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.kit-more-open { background: #2563eb !important; color: #fff !important; border-color: #2563eb; }
+.kit-more:active { transform: scale(.92); }
+
 .kit-part-chips { margin-top: .5rem; }
 .kit-chip {
     display:inline-block; font-size: .72rem; font-weight: 700;
@@ -3581,7 +3592,15 @@ body { margin: 0; padding: 0; background-color: var(--main-bg, var(--pico-backgr
 .kit-chip-blue  { background: rgba(37,99,235,.14);  color: #1d4ed8; }
 
 /* ปุ่มสองอันเต็มความกว้าง สูง 40px — เป้ากดใหญ่พอบนมือถือ */
-.kit-part-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .6rem; }
+.kit-part-actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: .45rem;
+    margin-top: .6rem; padding-top: .6rem;
+    border-top: 1px dashed var(--pico-muted-border-color);
+    animation: kit-slide .16s ease-out;
+}
+/* [hidden] ต้องชนะ display:grid ไม่งั้นปุ่มโผล่ทั้งที่สั่งซ่อน */
+.kit-part-actions[hidden] { display: none; }
+@keyframes kit-slide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
 .kit-act {
     width: 100%; margin: 0; height: 40px; padding: 0 .4rem;
     font-size: .82rem; font-weight: 700; border-radius: 9px;
@@ -6316,6 +6335,7 @@ export async function renderMyKit() {
             ? `<span class="kit-chip kit-chip-blue">⏳ รอครูอนุมัติ</span>`
             : '';
 
+        // ปุ่มซ่อนไว้ใต้จุด 3 จุด — รายการชุดอ่านง่ายขึ้น ไม่ถูกปุ่มบังจนรก
         return `
         <div class="kit-part">
             <div class="kit-part-head">
@@ -6327,9 +6347,11 @@ export async function renderMyKit() {
                 <span class="kit-part-size">${p.size
                     ? escapeHtml(p.size)
                     : '<span class="kit-part-nosize">ยังไม่ระบุ</span>'}</span>
+                <button type="button" class="kit-more" data-part="${p.part_id}"
+                        aria-expanded="false" aria-label="ตัวเลือกของ${escapeHtml(p.type_name)}">⋮</button>
             </div>
             ${chip ? `<div class="kit-part-chips">${chip}</div>` : ''}
-            <div class="kit-part-actions">
+            <div class="kit-part-actions" data-actions="${p.part_id}" hidden>
                 <button type="button" class="kit-act kit-act-swap" data-part="${p.part_id}"
                         ${p.swap_pending ? 'disabled' : ''}>
                     🔁 ${p.swap_pending ? 'ส่งคำขอแล้ว' : 'ขอเปลี่ยน/สลับ'}
@@ -6352,10 +6374,26 @@ export async function renderMyKit() {
             </div>
             <div class="kit-part-list">${parts.map(partCard).join('')}</div>
             <p class="kit-card-foot">
-                ใส่ไม่พอดีกด <strong>🔁 ขอเปลี่ยน/สลับ</strong> — เลือกไซส์ที่อยากได้
-                หรือระบุชิ้นของเพื่อนที่ตกลงกันไว้ได้เลย ครูเป็นคนอนุมัติ
+                กด <strong>⋮</strong> ที่ชิ้นที่ต้องการ เพื่อขอเปลี่ยน/สลับไซส์ หรือแจ้งชำรุด-หาย
             </p>
         </div>`;
+
+    // ⋮ เปิดได้ทีละชิ้น — เปิดอันใหม่ปิดอันเก่าเอง จะได้ไม่ยาวรกทั้งหน้า
+    box.querySelectorAll('.kit-more').forEach(btn =>
+        btn.addEventListener('click', () => {
+            const panel = box.querySelector(`[data-actions="${btn.dataset.part}"]`);
+            const open  = !panel.hidden;
+            box.querySelectorAll('.kit-part-actions').forEach(a => { a.hidden = true; });
+            box.querySelectorAll('.kit-more').forEach(b => {
+                b.setAttribute('aria-expanded', 'false');
+                b.classList.remove('kit-more-open');
+            });
+            if (!open) {
+                panel.hidden = false;
+                btn.setAttribute('aria-expanded', 'true');
+                btn.classList.add('kit-more-open');
+            }
+        }));
 
     box.querySelectorAll('.kit-act-swap').forEach(b =>
         b.addEventListener('click', () => requestPartSwap(kit, Number(b.dataset.part))));
