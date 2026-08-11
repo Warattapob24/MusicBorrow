@@ -527,6 +527,16 @@ function buildShell() {
 
             <div class="oad-panel">
                 <div class="oad-panel-title">
+                    👔 ชุดวงโยธวาทิต
+                    <span style="font-size:0.7rem; color:var(--oad-muted); font-weight:normal; margin-left:auto;">
+                        กดการ์ดเพื่อไปหน้าจัดการ
+                    </span>
+                </div>
+                <div id="oad-uni-summary"></div>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">
                     📋 ใบตรวจจากหัวหน้า
                     <span class="oad-tab-badge hidden" id="oad-staffrep-badge" style="margin-left:.5rem;">0</span>
                 </div>
@@ -5555,7 +5565,8 @@ function switchTab(tabName) {
 function renderActiveTab() {
     switch (state.activeTab) {
         case 'overview':     renderStats(); renderOverviewPanels(); _renderStaffReports();
-                             _renderKitRequests(); _renderSwapRequests(); break;
+                             _renderKitRequests(); _renderSwapRequests();
+                             _renderUniformSummary(); break;
         case 'borrows':      renderBorrowsTable(); break;
         case 'events':       renderEventsTab(); _loadCalendarUrl(); _loadGcalStatus(); break;
         case 'uniforms':     renderUniformsTab(); break;
@@ -7039,61 +7050,73 @@ async function _renderUniformReport() {
     const totalLost    = rows.reduce((s, r) => s + Number(r.lost_n), 0);
     const totalUnsized = rows.filter(r => r.size === '(ยังไม่ระบุ)').reduce((s, r) => s + Number(r.n), 0);
 
+    const totalAll = rows.reduce((s, r) => s + Number(r.n), 0);
+
+    // เก็บไว้ให้การ์ดกดดูรายละเอียดทีละอย่าง — ตารางเต็มความกว้างจะได้ไม่ถูกบีบจนเลขขาด
+    _uni.report = { byType, dmg };
+
+    const chip = (n, color, label) => Number(n)
+        ? `<span style="color:${color};font-weight:700;">${label} ${n}</span>` : '';
+
     box.innerHTML = `
-        <div style="display:flex; gap:1.2rem; flex-wrap:wrap; margin-bottom:1rem; font-size:.9rem;">
-            <span>🧾 ทั้งหมด <strong>${rows.reduce((s, r) => s + Number(r.n), 0)}</strong> ชิ้น</span>
-            <span style="color:#f59e0b;">🔧 ชำรุด/ต้องซ่อม <strong>${totalDamaged}</strong></span>
-            <span style="color:#ef4444;">❌ สูญหาย <strong>${totalLost}</strong></span>
-            <span style="color:${totalUnsized ? '#f59e0b' : 'inherit'};">📏 ยังไม่ระบุไซส์ <strong>${totalUnsized}</strong></span>
+        <div class="oad-stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-bottom:1rem;">
+            <div class="oad-stat-card" style="border-left:4px solid #6366f1;">
+                <span class="oad-stat-label">🧾 ชิ้นทั้งหมด</span>
+                <span class="oad-stat-value" style="color:#6366f1">${totalAll}</span>
+                <span class="oad-stat-sub">${byType.size} ประเภท</span>
+            </div>
+            <div class="oad-stat-card" style="border-left:4px solid #f59e0b;">
+                <span class="oad-stat-label">🔧 ชำรุด/ต้องซ่อม</span>
+                <span class="oad-stat-value" style="color:${totalDamaged ? '#f59e0b' : 'inherit'}">${totalDamaged}</span>
+            </div>
+            <div class="oad-stat-card" style="border-left:4px solid #ef4444;">
+                <span class="oad-stat-label">❌ สูญหาย</span>
+                <span class="oad-stat-value" style="color:${totalLost ? '#ef4444' : 'inherit'}">${totalLost}</span>
+            </div>
+            <div class="oad-stat-card" style="border-left:4px solid #0ea5e9;">
+                <span class="oad-stat-label">📏 ยังไม่ระบุไซส์</span>
+                <span class="oad-stat-value" style="color:${totalUnsized ? '#f59e0b' : 'inherit'}">${totalUnsized}</span>
+            </div>
         </div>
 
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:1rem;">
-        ${[...byType.values()].map(t => `
-            <div style="border:1px solid var(--oad-border); border-radius:10px; padding:.8rem;
-                        min-width:0; overflow:hidden;">
-                <div style="font-weight:700; margin-bottom:.5rem;">${t.icon || ''} ${escapeHtml(t.name)}</div>
-                <div style="overflow-x:auto;">
-                <table style="width:100%; min-width:300px; font-size:.83rem;
-                              border-collapse:collapse; table-layout:fixed;">
-                    <colgroup>
-                        <col style="width:26%"><col style="width:14%"><col style="width:14%">
-                        <col style="width:16%"><col style="width:15%"><col style="width:15%">
-                    </colgroup>
-                    <thead><tr style="opacity:.6; font-size:.75rem;">
-                        <th style="text-align:left; white-space:nowrap; padding:.2rem 0;">ไซส์</th>
-                        <th style="white-space:nowrap;">มี</th>
-                        <th style="white-space:nowrap;">ใช้</th>
-                        <th style="white-space:nowrap;">เหลือ</th>
-                        <th style="white-space:nowrap;">ซ่อม</th>
-                        <th style="white-space:nowrap;">หาย</th>
-                    </tr></thead>
-                    <tbody>
-                    ${t.sizes.map(s => {
-                        const st = _uni.stock?.get(`${s.type_id}|${s.size}`);
-                        const qty = st?.qty;
-                        const rem = st?.remaining;
-                        const unset = s.size === '(ยังไม่ระบุ)';
-                        return `<tr${unset ? ' style="color:#f59e0b;"' : ''}>
-                        <td style="padding:.2rem 0; white-space:nowrap; overflow:hidden;
-                                   text-overflow:ellipsis;" title="${escapeHtml(s.size)}">
-                            <strong>${escapeHtml(unset ? 'ไม่ระบุ' : s.size)}</strong></td>
-                        <td style="text-align:center;">${qty ?? '<span style="opacity:.4;">—</span>'}</td>
-                        <td style="text-align:center;">${s.n}</td>
-                        <td style="text-align:center;font-weight:700;color:${
-                            rem == null ? 'inherit' : rem <= 0 ? '#ef4444' : '#10b981'};">
-                            ${rem ?? '<span style="opacity:.4;font-weight:400;">—</span>'}</td>
-                        <td style="text-align:center;color:${Number(s.damaged_n) ? '#f59e0b' : 'inherit'};">${s.damaged_n}</td>
-                        <td style="text-align:center;color:${Number(s.lost_n) ? '#ef4444' : 'inherit'};">${s.lost_n}</td>
-                    </tr>`; }).join('')}
-                    </tbody>
-                </table>
+        <p style="font-size:.82rem;color:var(--oad-muted);margin:0 0 .6rem;">
+            กดที่ประเภทเพื่อดูรายละเอียดรายไซส์
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.7rem;">
+        ${[...byType.entries()].map(([tid, t]) => {
+            const n    = t.sizes.reduce((a, r) => a + Number(r.n), 0);
+            const dmgN = t.sizes.reduce((a, r) => a + Number(r.damaged_n), 0);
+            const lstN = t.sizes.reduce((a, r) => a + Number(r.lost_n), 0);
+            const uns  = t.sizes.filter(r => r.size === '(ยังไม่ระบุ)').reduce((a, r) => a + Number(r.n), 0);
+            const bad  = dmgN + lstN + uns;
+            return `
+            <button type="button" class="oad-unitype" data-type="${tid}"
+                    style="text-align:left;width:100%;margin:0;cursor:pointer;
+                           border:1px solid ${bad ? '#f59e0b' : 'var(--oad-border)'};
+                           border-radius:10px;padding:.75rem .85rem;
+                           background:var(--oad-surface2);color:var(--oad-text);">
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <span style="font-size:1.5rem;line-height:1;">${t.icon || '👕'}</span>
+                    <span style="font-weight:700;flex:1;">${escapeHtml(t.name)}</span>
+                    <span style="opacity:.5;font-size:.8rem;">▾</span>
                 </div>
-            </div>`).join('')}
+                <div style="font-size:1.5rem;font-weight:800;margin-top:.3rem;">${n}
+                    <span style="font-size:.75rem;font-weight:400;opacity:.6;">ชิ้น · ${t.sizes.length} ไซส์</span></div>
+                <div style="font-size:.75rem;margin-top:.25rem;display:flex;gap:.6rem;flex-wrap:wrap;">
+                    ${chip(dmgN, '#f59e0b', '🔧')}
+                    ${chip(lstN, '#ef4444', '❌')}
+                    ${chip(uns,  '#f59e0b', '📏')}
+                    ${bad ? '' : '<span style="color:#10b981;">✅ ครบดี</span>'}
+                </div>
+            </button>`; }).join('')}
         </div>
+
+        <div id="oad-uni-detail" style="margin-top:1rem;"></div>
 
         ${dmg.length ? `
         <div style="margin-top:1.2rem;">
             <div style="font-weight:700; margin-bottom:.5rem;">🔧 ชิ้นที่ต้องจัดการ (${dmg.length})</div>
+            <div class="oad-table-wrap">
             <table class="oad-table">
                 <thead><tr><th>ชิ้น</th><th>รหัส</th><th>ไซส์</th><th>สภาพ</th><th>ถุง</th><th>เจ้าของ</th><th>แก้สภาพ</th></tr></thead>
                 <tbody>
@@ -7108,7 +7131,113 @@ async function _renderUniformReport() {
                 </tr>`).join('')}
                 </tbody>
             </table>
+            </div>
         </div>` : '<p style="margin-top:1rem;font-size:.85rem;color:#10b981;">✅ ไม่มีชิ้นที่ชำรุดหรือสูญหาย</p>'}`;
+
+    box.querySelectorAll('.oad-unitype').forEach(b =>
+        b.addEventListener('click', () => _showUniTypeDetail(Number(b.dataset.type))));
+}
+
+// 👔 สรุปชุดวงโยธวาทิตบนหน้าภาพรวม — แบบเดียวกับสรุปการยืมเครื่อง
+async function _renderUniformSummary() {
+    const box = document.getElementById('oad-uni-summary');
+    if (!box) return;
+    box.innerHTML = skeleton(1, 4);
+
+    const [repRes, availRes] = await Promise.all([
+        uniformApi.sizeReport(null),
+        uniformApi.availability()
+    ]);
+    if (repRes.error) {
+        box.innerHTML = `<div class="oad-empty">${escapeHtml(repRes.error.message)}</div>`;
+        return;
+    }
+
+    const rows  = repRes.data || [];
+    const av    = availRes.data || {};
+    const sum   = (f) => rows.reduce((s, r) => s + Number(r[f]), 0);
+    const total = sum('n');
+    const dmg   = sum('damaged_n');
+    const lost  = sum('lost_n');
+    const uns   = rows.filter(r => r.size === '(ยังไม่ระบุ)').reduce((s, r) => s + Number(r.n), 0);
+
+    const cards = [
+        { icon: '👔', value: av.free ?? '—',  label: 'ชุดที่ยังว่าง',
+          sub: `เลือกได้ ${av.selectable ?? 0} ชุด`, color: '#10b981' },
+        { icon: '🧾', value: total,           label: 'ชิ้นส่วนทั้งหมด',
+          sub: `${rows.length} ไซส์ที่ใช้จริง`,      color: '#6366f1' },
+        { icon: '🔧', value: dmg,             label: 'ชำรุด/ต้องซ่อม',
+          sub: dmg ? 'รอครูจัดการ' : 'ไม่มีค้าง',     color: '#f59e0b' },
+        { icon: '❌', value: lost,            label: 'สูญหาย',
+          sub: lost ? 'ต้องตามคืน' : 'ครบทุกชิ้น',    color: '#ef4444' },
+    ];
+    if (uns) cards.push({ icon: '📏', value: uns, label: 'ยังไม่ระบุไซส์',
+                          sub: 'กรอกก่อนให้เด็กเลือกชุด', color: '#0ea5e9' });
+    if (av.no_size)  cards.push({ icon: '⏳', value: av.no_size, label: 'ชุดที่ยังเลือกไม่ได้',
+                                  sub: 'รอกรอกไซส์ให้ครบ', color: '#f59e0b' });
+
+    box.innerHTML = `
+        <div class="oad-stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr));margin:0;">
+        ${cards.map(c => `
+            <div class="oad-stat-card" style="border-left:4px solid ${c.color}; cursor:pointer;"
+                 onclick="window.__oadQuickNav('uniforms','all')">
+                <span class="oad-stat-label">${c.icon} ${c.label}</span>
+                <span class="oad-stat-value" style="color:${c.color}">${c.value}</span>
+                <span class="oad-stat-sub">${escapeHtml(c.sub)}</span>
+            </div>`).join('')}
+        </div>`;
+}
+
+// รายละเอียดรายไซส์ของประเภทเดียว — กินความกว้างเต็มแผง ตัวเลขจึงไม่ถูกตัด
+function _showUniTypeDetail(typeId) {
+    const host = document.getElementById('oad-uni-detail');
+    const t    = _uni.report?.byType.get(typeId);
+    if (!host || !t) return;
+
+    // กดซ้ำที่อันเดิม = ปิด
+    if (host.dataset.open === String(typeId)) {
+        host.dataset.open = ''; host.innerHTML = '';
+        document.querySelectorAll('.oad-unitype').forEach(b => { b.style.outline = ''; });
+        return;
+    }
+    host.dataset.open = String(typeId);
+    document.querySelectorAll('.oad-unitype').forEach(b => {
+        b.style.outline = Number(b.dataset.type) === typeId ? '2px solid #6366f1' : '';
+    });
+
+    host.innerHTML = `
+        <div class="oad-panel" style="margin:0;">
+            <div class="oad-panel-title">${t.icon || ''} ${escapeHtml(t.name)} — รายไซส์</div>
+            <div class="oad-table-wrap">
+            <table class="oad-table">
+                <thead><tr>
+                    <th>ไซส์</th><th style="text-align:center;">มีทั้งหมด</th>
+                    <th style="text-align:center;">ใช้อยู่</th><th style="text-align:center;">เหลือ</th>
+                    <th style="text-align:center;">สภาพดี</th><th style="text-align:center;">ชำรุด</th>
+                    <th style="text-align:center;">สูญหาย</th>
+                </tr></thead>
+                <tbody>
+                ${t.sizes.map(s => {
+                    const st    = _uni.stock?.get(`${s.type_id}|${s.size}`);
+                    const qty   = st?.qty;
+                    const rem   = st?.remaining;
+                    const unset = s.size === '(ยังไม่ระบุ)';
+                    return `<tr${unset ? ' style="color:#f59e0b;"' : ''}>
+                        <td><strong>${escapeHtml(unset ? 'ยังไม่ระบุ' : s.size)}</strong></td>
+                        <td style="text-align:center;">${qty ?? '<span style="opacity:.4;">—</span>'}</td>
+                        <td style="text-align:center;">${s.n}</td>
+                        <td style="text-align:center;font-weight:700;color:${
+                            rem == null ? 'inherit' : rem <= 0 ? '#ef4444' : '#10b981'};">
+                            ${rem ?? '<span style="opacity:.4;font-weight:400;">—</span>'}</td>
+                        <td style="text-align:center;">${s.ok_n}</td>
+                        <td style="text-align:center;color:${Number(s.damaged_n) ? '#f59e0b' : 'inherit'};">${s.damaged_n}</td>
+                        <td style="text-align:center;color:${Number(s.lost_n) ? '#ef4444' : 'inherit'};">${s.lost_n}</td>
+                    </tr>`; }).join('')}
+                </tbody>
+            </table>
+            </div>
+        </div>`;
+    host.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 window.__oadFixPart = async (partId, code) => {
