@@ -7394,32 +7394,41 @@ window.__oadAddStaff = async () => {
             sectionsApi.list(), eventsApi.list(), staffApi.candidates(), instrumentKindsApi.list()
         ]);
     if (cErr) return toast(cErr.message, 'error');
-    if (!cands?.length) return toast('ยังไม่มีนักเรียนให้แต่งตั้ง', 'error');
+    if (!cands?.length) return toast('ยังไม่มีสมาชิกชุมนุมให้แต่งตั้ง', 'error');
 
-    // กรองด้วย "กลุ่ม" (ชุมนุม / ทั่วไป) — ชั้นเรียนไม่เกี่ยวกับการแต่งตั้ง
+    // แต่งตั้งได้เฉพาะสมาชิกชุมนุม — จัดกลุ่มตามกลุ่มเครื่องของคลัง
+    // เพื่อให้ชื่อและการจัดกลุ่มตรงกันทั้งระบบ
+    const groups = new Map();
+    for (const c of cands) {
+        const key = c.section_name || 'ยังไม่ระบุเครื่อง';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(c);
+    }
+
     const optionOf = (c) => {
         const held = c.current_roles ? ' — ' + c.current_roles : '';
         const inst = c.main_instrument ? ' · ' + c.main_instrument : ' · ยังไม่ระบุเครื่อง';
-        return '<option value="' + c.user_id + '" data-group="' + escapeHtml(c.student_group) +
-               '" data-inst="' + escapeHtml(c.main_instrument || '') + '">' +
+        return '<option value="' + c.user_id + '" data-sec="' +
+               escapeHtml(c.section_name || '') + '">' +
                escapeHtml(c.full_name) + escapeHtml(inst) + escapeHtml(held) + '</option>';
     };
-    const nClub = cands.filter(c => c.student_group === 'club').length;
+
+    const groupHtml = [...groups.entries()].map(([name, list]) =>
+        '<optgroup label="' + escapeHtml(name) + ' (' + list.length + ')">' +
+        list.map(optionOf).join('') + '</optgroup>').join('');
 
     const result = await Swal.fire({
         title: '🎖 แต่งตั้งหัวหน้า',
         width: 540,
         html: '<div style="text-align:left;font-size:.9rem;">' +
-              '<label style="font-weight:700;">กลุ่ม</label>' +
-              '<select id="st-group" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">' +
-                '<option value="club" selected>สมาชิกชุมนุม (' + nClub + ')</option>' +
-                '<option value="student">นักเรียนทั่วไป (' + (cands.length - nClub) + ')</option>' +
-                '<option value="">ทั้งหมด (' + cands.length + ')</option>' +
-              '</select>' +
+              '<p style="margin:0 0 .5rem;font-size:.78rem;opacity:.75;">' +
+                'สมาชิกชุมนุม ' + cands.length + ' คน · จัดกลุ่มตามกลุ่มเครื่อง' +
+              '</p>' +
+              '<input id="st-search" class="swal2-input" style="width:100%;margin:0 0 .5rem;"' +
+                ' placeholder="🔍 พิมพ์ชื่อหรือเครื่องดนตรีเพื่อค้นหา">' +
               '<label style="font-weight:700;">นักเรียน</label>' +
-              '<select id="st-user" class="swal2-input" size="8" style="width:100%;margin:.2rem 0 .7rem;height:auto;">' +
-                cands.map(optionOf).join('') +
-              '</select>' +
+              '<select id="st-user" class="swal2-input" size="9"' +
+                ' style="width:100%;margin:.2rem 0 .7rem;height:auto;">' + groupHtml + '</select>' +
               '<label style="font-weight:700;">ตำแหน่ง</label>' +
               '<select id="st-scope" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">' +
                 Object.entries(_SCOPE_LABEL).map(([k, v]) =>
@@ -7428,68 +7437,63 @@ window.__oadAddStaff = async () => {
               '<div id="st-value-wrap" style="display:none;">' +
                 '<label style="font-weight:700;" id="st-value-label">ขอบเขต</label>' +
                 '<select id="st-value" class="swal2-input" style="width:100%;margin:.2rem 0 0;"></select>' +
-                '<p id="st-value-hint" style="margin:.3rem 0 0;font-size:.75rem;opacity:.7;"></p>' +
               '</div></div>',
         showCancelButton: true, confirmButtonText: 'แต่งตั้ง', cancelButtonText: 'ยกเลิก',
         didOpen: () => {
-            const grp   = document.getElementById('st-group');
+            const q     = document.getElementById('st-search');
             const user  = document.getElementById('st-user');
             const scope = document.getElementById('st-scope');
             const wrap  = document.getElementById('st-value-wrap');
             const label = document.getElementById('st-value-label');
-            const hint  = document.getElementById('st-value-hint');
             const val   = document.getElementById('st-value');
+
+            q.addEventListener('input', () => {
+                const term = q.value.trim().toLowerCase();
+                user.querySelectorAll('optgroup').forEach(g => {
+                    let shown = 0;
+                    [...g.children].forEach(o => {
+                        const hit = !term || o.text.toLowerCase().includes(term);
+                        o.hidden = !hit;
+                        if (hit) shown++;
+                    });
+                    g.hidden = shown === 0;
+                });
+            });
 
             const syncScope = () => {
                 const sv = scope.value;
                 if (sv === 'section') {
                     wrap.style.display = 'block';
                     label.textContent = 'กลุ่มเครื่อง';
-                    hint.textContent = 'จะเห็นของทุกเครื่องในกลุ่มนี้';
-                    val.innerHTML = (sections || []).map(x =>
-                        '<option value="' + escapeHtml(x.code) + '">' + (x.icon || '') + ' ' +
-                        escapeHtml(x.name_th) + '</option>').join('');
+                    val.innerHTML = '<option value="">— เลือกกลุ่มเครื่อง —</option>' +
+                        (sections || []).map(x =>
+                            '<option value="' + escapeHtml(x.code) + '">' + (x.icon || '') + ' ' +
+                            escapeHtml(x.name_th) + '</option>').join('');
                 } else if (sv === 'instrument') {
                     wrap.style.display = 'block';
                     label.textContent = 'เครื่องดนตรีที่ดูแล';
-                    // ตั้งค่าเริ่มต้นเป็นเครื่องของคนที่เลือก — กรณีที่พบบ่อยที่สุด
-                    const own = user.selectedOptions[0]?.dataset.inst || '';
-                    hint.textContent = own
-                        ? 'เครื่องของนักเรียนคนนี้คือ ' + own
-                        : 'นักเรียนคนนี้ยังไม่ได้ระบุเครื่อง';
-                    val.innerHTML = (kinds || []).map(k =>
-                        '<option value="' + escapeHtml(k.name) + '"' + (k.name === own ? ' selected' : '') + '>' +
-                        (k.section_icon || '') + ' ' + escapeHtml(k.name) + '</option>').join('');
-                    if (own) val.value = own;
+                    // ไม่เดาให้จากเครื่องของนักเรียน — คนยืมไม่ได้ยืมเครื่องตัวเองเสมอไป
+                    // ครูเป็นคนเลือกเองทุกครั้ง
+                    val.innerHTML = '<option value="">— เลือกเครื่องดนตรี —</option>' +
+                        (kinds || []).map(k =>
+                            '<option value="' + escapeHtml(k.name) + '">' +
+                            (k.section_icon || '') + ' ' + escapeHtml(k.name) + '</option>').join('');
                 } else if (sv === 'event') {
                     wrap.style.display = 'block';
                     label.textContent = 'งาน';
-                    hint.textContent = '';
                     const open = (events || []).filter(e => e.status === 'open' || e.status === 'active');
                     val.innerHTML = open.length
-                        ? open.map(e => '<option value="' + e.id + '">🎭 ' + escapeHtml(e.name) + '</option>').join('')
+                        ? '<option value="">— เลือกงาน —</option>' +
+                          open.map(e => '<option value="' + e.id + '">🎭 ' + escapeHtml(e.name) + '</option>').join('')
                         : '<option value="">— ยังไม่มีงานที่เปิดอยู่ —</option>';
                 } else {
                     wrap.style.display = 'none';
                 }
             };
 
-            const applyGroup = () => {
-                const want = grp.value;
-                let first = null;
-                [...user.options].forEach(o => {
-                    const show = !want || o.dataset.group === want;
-                    o.hidden = !show;
-                    if (show && !first) first = o;
-                });
-                if (first) user.value = first.value;
-                syncScope();
-            };
-
-            grp.addEventListener('change', applyGroup);
-            user.addEventListener('change', syncScope);
             scope.addEventListener('change', syncScope);
-            applyGroup();
+            syncScope();
+            q.focus();
         },
         preConfirm: () => {
             const userId = document.getElementById('st-user').value;
