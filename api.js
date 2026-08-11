@@ -1720,9 +1720,19 @@ export const uniformApi = {
             p_kit_id: kitId, p_part_id: partId, p_want_size: wantSize, p_reason: reason
         }));
     },
-    approveSwap(requestId, replacementPartId) {
-        return _wrap(() => supabase.rpc('admin_approve_swap', {
-            p_request_id: requestId, p_replacement_part_id: replacementPartId
+    // นักเรียนแจ้งชำรุด / ของหาย ในชุดประจำตัวตัวเอง
+    reportPartIssue(partId, kind, note = null) {
+        return _wrap(() => supabase.rpc('uniform_report_part_issue', {
+            p_part_id: partId, p_kind: kind, p_note: note
+        }));
+    },
+    swapCandidates(requestId) {
+        return _wrap(() => supabase.rpc('admin_swap_candidates', { p_request_id: requestId }));
+    },
+    decideSwap(requestId, approve, replacementPartId = null, note = null) {
+        return _wrap(() => supabase.rpc('admin_decide_swap', {
+            p_request_id: requestId, p_approve: approve,
+            p_replacement_part_id: replacementPartId, p_note: note
         }));
     },
     // ขออนุมัติใช้ชุดที่ไม่ใช่ของตัวเอง (คนนอกชุมนุม / คนในที่ต้องใช้ชุดคนอื่น)
@@ -1739,10 +1749,10 @@ export const uniformApi = {
             p_request_id: requestId, p_approve: approve, p_note: note
         }));
     },
+    // ⚠️ ต้องใช้ RPC — uniform_swap_requests มี FK ไป users สองเส้น
+    //    (requester_id, decided_by) PostgREST embed จึงกำกวมและพังง่าย
     listSwapRequests(status = 'pending') {
-        return _wrap(() => supabase.from('uniform_swap_requests')
-            .select('*, users!uniform_swap_requests_requester_id_fkey(prefix, first_name, last_name)')
-            .eq('status', status).order('created_at', { ascending: false }));
+        return _wrap(() => supabase.rpc('admin_list_swap_requests', { p_status: status }));
     },
     listKits()              { return _wrap(() => supabase.from('uniform_kits').select('*').order('kit_no')); },
 

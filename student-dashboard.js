@@ -6235,19 +6235,124 @@ export async function renderMyKit() {
                 <span style="font-size:.8rem;opacity:.7;">${escapeHtml(kit.set_name || '')} · ${escapeHtml(kit.qr_code || '')}</span>
             </div>
             <table style="width:100%;margin-top:.7rem;font-size:.85rem;border-collapse:collapse;">
-                ${parts.map(p => `<tr>
-                    <td style="padding:.3rem 0;border-top:1px solid var(--pico-muted-border-color);">
-                        ${p.icon || ''} ${escapeHtml(p.type_name)}</td>
-                    <td style="padding:.3rem 0;border-top:1px solid var(--pico-muted-border-color);opacity:.6;font-size:.78rem;">
-                        ${escapeHtml(p.part_code)}</td>
-                    <td style="padding:.3rem 0;border-top:1px solid var(--pico-muted-border-color);text-align:right;font-weight:700;">
-                        ${p.size ? escapeHtml(p.size) : '<span style="opacity:.5;font-weight:400;">ยังไม่ระบุไซส์</span>'}</td>
-                </tr>`).join('')}
+                ${parts.map(p => {
+                    const bad = p.condition === 'lost' || p.condition === 'repair';
+                    const badge = p.condition === 'lost'
+                        ? '<span style="color:var(--pico-del-color);font-size:.72rem;">🔍 แจ้งหายแล้ว</span>'
+                        : p.condition === 'repair'
+                        ? '<span style="color:#f59e0b;font-size:.72rem;">🔧 แจ้งซ่อมแล้ว</span>'
+                        : '';
+                    return `<tr style="border-top:1px solid var(--pico-muted-border-color);">
+                    <td style="padding:.45rem 0;">
+                        ${p.icon || ''} ${escapeHtml(p.type_name)}
+                        <span style="opacity:.55;font-size:.72rem;">${escapeHtml(p.part_code)}</span>
+                        ${badge ? `<br>${badge}` : ''}
+                    </td>
+                    <td style="padding:.45rem 0;text-align:right;font-weight:700;white-space:nowrap;">
+                        ${p.size ? escapeHtml(p.size) : '<span style="opacity:.5;font-weight:400;">ยังไม่ระบุไซส์</span>'}
+                    </td>
+                    <td style="padding:.45rem 0;text-align:right;white-space:nowrap;">
+                        ${p.swap_pending
+                            ? '<span style="font-size:.72rem;opacity:.7;">⏳ รอครูอนุมัติ</span>'
+                            : `<button type="button" class="kit-swap-btn" data-part="${p.part_id}"
+                                    title="ขอเปลี่ยนไซส์"
+                                    style="padding:.15rem .5rem;font-size:.75rem;margin:0 0 0 .3rem;width:auto;">🔁</button>`}
+                        ${bad ? '' : `<button type="button" class="kit-issue-btn" data-part="${p.part_id}"
+                                    title="แจ้งชำรุด / ของหาย"
+                                    style="padding:.15rem .5rem;font-size:.75rem;margin:0 0 0 .3rem;width:auto;
+                                           --pico-background-color:#f59e0b;--pico-border-color:#f59e0b;">🔧</button>`}
+                    </td>
+                </tr>`; }).join('')}
             </table>
             <p style="margin:.8rem 0 0;font-size:.78rem;opacity:.7;">
-                ต้องการเปลี่ยนชุดหรือสลับบางชิ้น — แจ้งครูได้จากหน้าสแกน QR ถุงชุด
+                🔁 ใส่ไม่พอดี = ขอเปลี่ยนไซส์ &nbsp;·&nbsp; 🔧 ชำรุดหรือหาย = แจ้งครู
             </p>
         </div>`;
+
+    // Event delegation — ตารางถูก render ใหม่ทุกครั้ง ผูก listener ที่กล่องแม่ทีเดียว
+    box.querySelectorAll('.kit-swap-btn').forEach(b =>
+        b.addEventListener('click', () => requestPartSwap(kit, Number(b.dataset.part))));
+    box.querySelectorAll('.kit-issue-btn').forEach(b =>
+        b.addEventListener('click', () => reportPartIssue(kit, Number(b.dataset.part))));
+}
+
+// 🔁 ขอเปลี่ยนไซส์ชิ้นใดชิ้นหนึ่ง (รองเท้าคับ ปลอกแขนหลวม ฯลฯ)
+async function requestPartSwap(kit, partId) {
+    const part = (kit.parts || []).find(p => p.part_id === partId);
+    if (!part) return;
+
+    const options = part.size_options || [];
+    if (!options.length) {
+        return Swal.fire('ยังเลือกไซส์ไม่ได้',
+            `ครูยังไม่ได้กำหนดไซส์ของ${part.type_name} — แจ้งครูโดยตรงได้เลย`, 'info');
+    }
+
+    const { value, isConfirmed } = await Swal.fire({
+        title: `🔁 ขอเปลี่ยน${part.type_name}`,
+        html: `
+            <div style="text-align:left;font-size:.9rem;">
+                <p style="margin:0 0 .6rem;font-size:.82rem;opacity:.75;">
+                    ชุด #${kit.kit_no} · ${escapeHtml(part.part_code)} ·
+                    ไซส์ปัจจุบัน <strong>${escapeHtml(part.size || '-')}</strong>
+                </p>
+                <label style="font-size:.82rem;font-weight:bold;">ต้องการไซส์</label>
+                <select id="swap-size" class="swal2-select" style="width:100%;margin:.3rem 0 .8rem;">
+                    ${options.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('')}
+                </select>
+                <label style="font-size:.82rem;font-weight:bold;">เหตุผล</label>
+                <textarea id="swap-reason" class="swal2-textarea" style="width:100%;margin:.3rem 0 0;"
+                          placeholder="เช่น คับเกินไป ใส่แล้วเจ็บเท้า"></textarea>
+            </div>`,
+        showCancelButton: true, confirmButtonText: 'ส่งคำขอ', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => ({
+            size: document.getElementById('swap-size').value,
+            reason: document.getElementById('swap-reason').value.trim()
+        })
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.requestSwap(
+        kit.kit_id, partId, value.size, value.reason || null);
+    if (error) return Swal.fire('ส่งคำขอไม่สำเร็จ', error.message, 'error');
+    await Swal.fire('ส่งคำขอแล้ว 🙌', data?.message || 'ครูจะตรวจสอบให้', 'success');
+    renderMyKit();
+}
+
+// 🔧 แจ้งชำรุด / ของหาย
+async function reportPartIssue(kit, partId) {
+    const part = (kit.parts || []).find(p => p.part_id === partId);
+    if (!part) return;
+
+    const { value, isConfirmed } = await Swal.fire({
+        title: `แจ้งปัญหา${part.type_name}`,
+        html: `
+            <div style="text-align:left;font-size:.9rem;">
+                <p style="margin:0 0 .6rem;font-size:.82rem;opacity:.75;">
+                    ชุด #${kit.kit_no} · ${escapeHtml(part.part_code)}
+                </p>
+                <label style="font-size:.82rem;font-weight:bold;">เกิดอะไรขึ้น</label>
+                <select id="issue-kind" class="swal2-select" style="width:100%;margin:.3rem 0 .8rem;">
+                    <option value="repair">🔧 ชำรุด (ขาด/เปื้อน/พัง)</option>
+                    <option value="lost">🔍 ของหาย</option>
+                </select>
+                <label style="font-size:.82rem;font-weight:bold;">รายละเอียด</label>
+                <textarea id="issue-note" class="swal2-textarea" style="width:100%;margin:.3rem 0 0;"
+                          placeholder="เช่น ตะเข็บขาดตรงไหล่ / หายตอนกลับจากงาน"></textarea>
+            </div>`,
+        icon: 'warning',
+        showCancelButton: true, confirmButtonText: 'แจ้งครู', cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#f59e0b',
+        preConfirm: () => ({
+            kind: document.getElementById('issue-kind').value,
+            note: document.getElementById('issue-note').value.trim()
+        })
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await uniformApi.reportPartIssue(partId, value.kind, value.note || null);
+    if (error) return Swal.fire('แจ้งไม่สำเร็จ', error.message, 'error');
+    await Swal.fire('แจ้งเรียบร้อย', data?.message || 'ครูได้รับเรื่องแล้ว', 'success');
+    renderMyKit();
 }
 
 async function pickMyKit() {

@@ -533,6 +533,30 @@ function buildShell() {
                 <div class="oad-table-wrap" id="oad-staffrep-wrap"></div>
             </div>
 
+            <div class="oad-panel">
+                <div class="oad-panel-title">
+                    🙋 คำขอใช้ชุดของคนอื่น
+                    <span class="oad-tab-badge hidden" id="oad-kitreq-badge" style="margin-left:.5rem;">0</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    ปกติใช้ได้เฉพาะชุดประจำตัวของตัวเอง — คนนอกชุมนุม
+                    หรือคนที่ต้องใช้ชุดคนอื่น ต้องผ่านการอนุมัติที่นี่ก่อนถึงจะเบิกได้
+                </p>
+                <div class="oad-table-wrap" id="oad-kitreq-wrap"></div>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">
+                    🔁 คำขอเปลี่ยน/สลับชิ้นส่วนชุด
+                    <span class="oad-tab-badge hidden" id="oad-swapreq-badge" style="margin-left:.5rem;">0</span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    นักเรียนขอเปลี่ยนไซส์รองเท้า ปลอกแขน หรือชิ้นอื่นที่ใส่ไม่พอดี
+                    — อนุมัติแล้วระบบสลับชิ้นระหว่างถุงให้อัตโนมัติ
+                </p>
+                <div class="oad-table-wrap" id="oad-swapreq-wrap"></div>
+            </div>
+
             <hr style="border: 0; border-top: 1px dashed var(--oad-border); margin: 2rem 0; opacity: 0.5;">
 
             <div class="oad-panel-title" style="margin-top: 0.75rem; color: var(--oad-text);">🎯 สถิติและผลสัมฤทธิ์ระบบ (Analytics & KPIs)</div>
@@ -990,18 +1014,6 @@ function buildShell() {
         </div>
 
         <div class="oad-tab-panel" id="oad-panel-uniforms">
-            <div class="oad-panel">
-                <div class="oad-panel-title">
-                    🙋 คำขอใช้ชุดของคนอื่น
-                    <span class="oad-tab-badge hidden" id="oad-kitreq-badge" style="margin-left:.5rem;">0</span>
-                </div>
-                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
-                    ปกติใช้ได้เฉพาะชุดประจำตัวของตัวเอง — คนนอกชุมนุม
-                    หรือคนที่ต้องใช้ชุดคนอื่น ต้องผ่านการอนุมัติที่นี่ก่อนถึงจะเบิกได้
-                </p>
-                <div class="oad-table-wrap" id="oad-kitreq-wrap"></div>
-            </div>
-
             <div class="oad-panel">
                 <div class="oad-panel-title">👔 ถุงชุด</div>
                 <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
@@ -5542,7 +5554,8 @@ function switchTab(tabName) {
 
 function renderActiveTab() {
     switch (state.activeTab) {
-        case 'overview':     renderStats(); renderOverviewPanels(); _renderStaffReports(); break;
+        case 'overview':     renderStats(); renderOverviewPanels(); _renderStaffReports();
+                             _renderKitRequests(); _renderSwapRequests(); break;
         case 'borrows':      renderBorrowsTable(); break;
         case 'events':       renderEventsTab(); _loadCalendarUrl(); _loadGcalStatus(); break;
         case 'uniforms':     renderUniformsTab(); break;
@@ -6475,7 +6488,8 @@ async function renderUniformsTab() {
 
     // ต้องรอทั้ง _renderKitTable (ให้ _uni.kits มีข้อมูล) และ _renderUniformReport
     // (ให้ _uni.stock มีข้อมูล) ก่อน ตารางกรอกไซส์ถึงจะแสดง "เหลือกี่ตัว" ได้
-    await Promise.all([_renderKitTable(), _renderPartTypeTable(), _renderUniformReport(), _renderKitRequests()]);
+    // คำขอต่าง ๆ ย้ายไปรวมกับแจ้งเตือนอื่นที่แท็บ 📊 ภาพรวมแล้ว
+    await Promise.all([_renderKitTable(), _renderPartTypeTable(), _renderUniformReport()]);
     _renderKitAvailability();
 }
 
@@ -7776,4 +7790,103 @@ window.__oadDecideKitReq = async (id, approve) => {
     if (error) return toast(error.message, 'error');
     toast(approve ? 'อนุมัติแล้ว — นักเรียนเบิกชุดนี้ได้' : 'ไม่อนุมัติแล้ว');
     _renderKitRequests();
+};
+
+// ── คำขอเปลี่ยน/สลับไซส์ชิ้นส่วนชุด (รองเท้าคับ ปลอกแขนหลวม ฯลฯ)
+async function _renderSwapRequests() {
+    const wrap  = document.getElementById('oad-swapreq-wrap');
+    const badge = document.getElementById('oad-swapreq-badge');
+    if (!wrap) return;
+    wrap.innerHTML = '<div class="oad-empty">กำลังโหลด...</div>';
+
+    const { data: rows, error } = await uniformApi.listSwapRequests('pending');
+    if (error) {
+        wrap.innerHTML = `<div class="oad-empty">โหลดไม่สำเร็จ: ${escapeHtml(error.message)}</div>`;
+        return;
+    }
+    if (badge) {
+        badge.textContent = rows?.length || 0;
+        badge.classList.toggle('hidden', !rows?.length);
+    }
+    if (!rows?.length) {
+        wrap.innerHTML = '<div class="oad-empty"><span class="oad-empty-icon">✨</span>ไม่มีคำขอค้าง</div>';
+        return;
+    }
+
+    wrap.innerHTML = `
+        <table class="oad-table">
+            <thead><tr><th>ผู้ขอ</th><th>ชุด</th><th>ชิ้น</th><th>ไซส์</th>
+                       <th>เหตุผล</th><th>เมื่อ</th><th>จัดการ</th></tr></thead>
+            <tbody>
+            ${rows.map(r => `<tr>
+                <td><strong>${escapeHtml(r.requester_name || '—')}</strong>
+                    ${r.class_level ? `<div style="font-size:.72rem;opacity:.65;">${escapeHtml(r.class_level)}</div>` : ''}</td>
+                <td class="nowrap"><strong>#${r.kit_no}</strong></td>
+                <td class="nowrap">${r.icon || ''} ${escapeHtml(r.type_name)}
+                    <div style="font-size:.72rem;opacity:.6;">${escapeHtml(r.part_code)}</div></td>
+                <td class="nowrap"><span style="opacity:.6;">${escapeHtml(r.current_size || '-')}</span>
+                    → <strong>${escapeHtml(r.want_size || 'ไม่ระบุ')}</strong></td>
+                <td style="font-size:.85rem;">${escapeHtml(r.reason || '—')}</td>
+                <td class="nowrap" style="font-size:.78rem;">${fmtDate(r.created_at)}</td>
+                <td><div class="actions">
+                    <button class="oad-btn oad-btn-approve" onclick="window.__oadDecideSwap(${r.id}, true)">✅ อนุมัติ</button>
+                    <button class="oad-btn oad-btn-red" onclick="window.__oadDecideSwap(${r.id}, false)">❌ ไม่อนุมัติ</button>
+                </div></td>
+            </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+window.__oadDecideSwap = async (id, approve) => {
+    if (!approve) {
+        const { value: note, isConfirmed } = await Swal.fire({
+            title: 'ไม่อนุมัติคำขอนี้',
+            input: 'text', inputPlaceholder: 'เหตุผล (ไม่บังคับ)',
+            showCancelButton: true, confirmButtonText: '❌ ไม่อนุมัติ', cancelButtonText: 'ยกเลิก'
+        });
+        if (!isConfirmed) return;
+        const { error } = await uniformApi.decideSwap(id, false, null, note || null);
+        if (error) return toast(error.message, 'error');
+        toast('ไม่อนุมัติแล้ว');
+        return _renderSwapRequests();
+    }
+
+    // อนุมัติต้องเลือกชิ้นที่จะสลับให้ — ระบบเสนอเฉพาะชิ้นที่สลับได้จริง
+    const { data: cands, error: cErr } = await uniformApi.swapCandidates(id);
+    if (cErr) return toast(cErr.message, 'error');
+    if (!cands?.length) {
+        return Swal.fire('ไม่มีชิ้นให้สลับ',
+            'ไม่พบชิ้นชนิดและไซส์ที่ขอ ซึ่งว่างและสภาพดีพอจะสลับให้ได้', 'info');
+    }
+
+    const { value, isConfirmed } = await Swal.fire({
+        title: '🔁 เลือกชิ้นที่จะสลับให้',
+        html: `<div style="text-align:left;font-size:.9rem;">
+                 <p style="margin:0 0 .5rem;font-size:.8rem;opacity:.75;">
+                   ระบบจะสลับชิ้นนี้เข้าถุงของนักเรียน และย้ายชิ้นเดิมไปแทนที่
+                 </p>
+                 <select id="swap-pick" class="swal2-select" size="8"
+                         style="width:100%;height:auto;margin:0 0 .6rem;">
+                   ${cands.map(c => `<option value="${c.part_id}">
+                       ${escapeHtml(c.part_code)} · ไซส์ ${escapeHtml(c.size || '-')} · ชุด #${c.kit_no}
+                       ${c.owner_name ? '— ' + escapeHtml(c.owner_name) : '(ไม่มีเจ้าของ)'}
+                     </option>`).join('')}
+                 </select>
+                 <input id="swap-note" class="swal2-input" style="width:100%;margin:0;"
+                        placeholder="หมายเหตุถึงนักเรียน (ไม่บังคับ)">
+               </div>`,
+        width: 560, showCancelButton: true,
+        confirmButtonText: '✅ อนุมัติและสลับ', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => ({
+            partId: Number(document.getElementById('swap-pick').value),
+            note: document.getElementById('swap-note').value.trim()
+        })
+    });
+    if (!isConfirmed) return;
+
+    const { error } = await uniformApi.decideSwap(id, true, value.partId, value.note || null);
+    if (error) return toast(error.message, 'error');
+    toast('สลับชิ้นให้แล้ว');
+    _renderSwapRequests();
+    _renderKitTable();
 };
