@@ -3546,6 +3546,81 @@ body { margin: 0; padding: 0; background-color: var(--main-bg, var(--pico-backgr
 .sd-btn-outline { background-color: transparent !important; color: #2563eb !important; border: 2px solid #2563eb !important; padding: 0.6rem 1.2rem; }
 /* ปุ่มสีแดง หยุดซ้อม/แจ้งซ่อม/ออกจากระบบ */
 .sd-btn-danger { background-color: #ef4444 !important; color: #ffffff !important; padding: 0.75rem 1.5rem; box-shadow: 0 4px 10px rgba(239,68,68,0.2); }
+/* ═══ 👔 ชุดประจำตัว — การ์ดต่อชิ้น ปุ่มใหญ่พอให้กดด้วยนิ้วโป้ง ═══ */
+.kit-card {
+    background: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 14px; padding: 1rem;
+}
+.kit-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; }
+.kit-card-title { font-size: 1.3rem; font-weight: 800; line-height: 1.2; }
+.kit-card-sub   { font-size: .78rem; opacity: .65; margin-top: .15rem; }
+.kit-card-foot  { margin: .9rem 0 0; font-size: .78rem; opacity: .72; line-height: 1.5; }
+
+.kit-part-list { display: flex; flex-direction: column; gap: .55rem; margin-top: .9rem; }
+.kit-part {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 11px; padding: .65rem .75rem;
+    background: var(--pico-background-color);
+}
+.kit-part-head  { display:flex; align-items:center; gap:.6rem; }
+.kit-part-icon  { font-size: 1.5rem; line-height: 1; flex: 0 0 auto; }
+.kit-part-name  { flex: 1 1 auto; min-width: 0; line-height: 1.25; }
+.kit-part-name strong { font-size: .95rem; }
+.kit-part-code  { display:block; font-size: .7rem; opacity: .5; }
+.kit-part-size  { flex: 0 0 auto; font-size: 1.15rem; font-weight: 800; }
+.kit-part-nosize { font-size: .75rem; font-weight: 400; opacity: .5; }
+
+.kit-part-chips { margin-top: .5rem; }
+.kit-chip {
+    display:inline-block; font-size: .72rem; font-weight: 700;
+    padding: .18rem .55rem; border-radius: 999px;
+}
+.kit-chip-red   { background: rgba(239,68,68,.14);  color: #dc2626; }
+.kit-chip-amber { background: rgba(245,158,11,.16); color: #b45309; }
+.kit-chip-blue  { background: rgba(37,99,235,.14);  color: #1d4ed8; }
+
+/* ปุ่มสองอันเต็มความกว้าง สูง 40px — เป้ากดใหญ่พอบนมือถือ */
+.kit-part-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .6rem; }
+.kit-act {
+    width: 100%; margin: 0; height: 40px; padding: 0 .4rem;
+    font-size: .82rem; font-weight: 700; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center; gap: .25rem;
+    border: 1px solid transparent; cursor: pointer;
+}
+.kit-act-swap  { background: #2563eb !important; color: #fff !important; }
+.kit-act-issue { background: transparent !important; color: #b45309 !important;
+                 border-color: #f59e0b !important; }
+.kit-act:disabled { opacity: .45; cursor: default; box-shadow: none; }
+.kit-act:not(:disabled):active { transform: scale(.96); }
+
+/* วัดแล้วที่ 375px สองคอลัมน์ได้ปุ่ม 156×40 ข้อความไม่ถูกตัด
+   จอที่แคบกว่านี้จริง ๆ ค่อยเรียงลงมาทีละปุ่ม */
+@media (max-width: 330px) {
+    .kit-part-actions { grid-template-columns: 1fr; }
+}
+
+/* กล่องขอเปลี่ยนไซส์ */
+.swap-form { text-align: left; font-size: .9rem; }
+.swap-current { margin: 0 0 .7rem; font-size: .82rem; opacity: .75; }
+.swap-label { display:block; font-size: .8rem; font-weight: 700; margin: .7rem 0 .25rem; }
+.swap-input {
+    width: 100%; margin: 0; padding: .55rem .6rem; font-size: .9rem;
+    border-radius: 9px; border: 1px solid var(--pico-muted-border-color);
+    background: var(--pico-form-element-background-color); color: var(--pico-color);
+    box-sizing: border-box; height: auto;
+}
+.swap-modes { display: flex; flex-direction: column; gap: .4rem; }
+.swap-mode {
+    display: flex; align-items: flex-start; gap: .55rem; cursor: pointer;
+    border: 1px solid var(--pico-muted-border-color); border-radius: 10px;
+    padding: .55rem .65rem; font-size: .85rem; line-height: 1.35;
+}
+.swap-mode input { margin: .15rem 0 0; width: auto; }
+.swap-mode small { opacity: .65; font-size: .74rem; }
+.swap-mode:has(input:checked) { border-color: #2563eb; background: rgba(37,99,235,.07); }
+.swap-hint { margin: .3rem 0 0; font-size: .72rem; opacity: .6; }
+
 /* ปุ่มแอปพลิเคชัน (เกม) */
 .sd-app-btn {
     background: var(--pico-card-background-color); border: 2px solid var(--pico-muted-border-color);
@@ -6227,52 +6302,64 @@ export async function renderMyKit() {
     }
 
     const parts = kit.parts || [];
-    box.innerHTML = `
-        <div style="padding:1.1rem;background:var(--pico-card-background-color);
-                    border:1px solid var(--pico-muted-border-color);border-radius:12px;">
-            <div style="display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;">
-                <strong style="font-size:1.35rem;">${kit.set_icon || '👔'} ชุด #${kit.kit_no}</strong>
-                <span style="font-size:.8rem;opacity:.7;">${escapeHtml(kit.set_name || '')} · ${escapeHtml(kit.qr_code || '')}</span>
+
+    // การ์ดต่อชิ้น แทนตารางที่ปุ่มเล็กจนกดยากบนมือถือ
+    // ปุ่มสูง 40px เต็มความกว้างครึ่งแถว = นิ้วโป้งกดติดแน่นอน
+    const partCard = (p) => {
+        const isLost   = p.condition === 'lost';
+        const isRepair = p.condition === 'repair';
+        const chip = isLost
+            ? `<span class="kit-chip kit-chip-red">🔍 แจ้งหายแล้ว</span>`
+            : isRepair
+            ? `<span class="kit-chip kit-chip-amber">🔧 แจ้งซ่อมแล้ว</span>`
+            : p.swap_pending
+            ? `<span class="kit-chip kit-chip-blue">⏳ รอครูอนุมัติ</span>`
+            : '';
+
+        return `
+        <div class="kit-part">
+            <div class="kit-part-head">
+                <span class="kit-part-icon">${p.icon || '👕'}</span>
+                <div class="kit-part-name">
+                    <strong>${escapeHtml(p.type_name)}</strong>
+                    <span class="kit-part-code">${escapeHtml(p.part_code)}</span>
+                </div>
+                <span class="kit-part-size">${p.size
+                    ? escapeHtml(p.size)
+                    : '<span class="kit-part-nosize">ยังไม่ระบุ</span>'}</span>
             </div>
-            <table style="width:100%;margin-top:.7rem;font-size:.85rem;border-collapse:collapse;">
-                ${parts.map(p => {
-                    const bad = p.condition === 'lost' || p.condition === 'repair';
-                    const badge = p.condition === 'lost'
-                        ? '<span style="color:var(--pico-del-color);font-size:.72rem;">🔍 แจ้งหายแล้ว</span>'
-                        : p.condition === 'repair'
-                        ? '<span style="color:#f59e0b;font-size:.72rem;">🔧 แจ้งซ่อมแล้ว</span>'
-                        : '';
-                    return `<tr style="border-top:1px solid var(--pico-muted-border-color);">
-                    <td style="padding:.45rem 0;">
-                        ${p.icon || ''} ${escapeHtml(p.type_name)}
-                        <span style="opacity:.55;font-size:.72rem;">${escapeHtml(p.part_code)}</span>
-                        ${badge ? `<br>${badge}` : ''}
-                    </td>
-                    <td style="padding:.45rem 0;text-align:right;font-weight:700;white-space:nowrap;">
-                        ${p.size ? escapeHtml(p.size) : '<span style="opacity:.5;font-weight:400;">ยังไม่ระบุไซส์</span>'}
-                    </td>
-                    <td style="padding:.45rem 0;text-align:right;white-space:nowrap;">
-                        ${p.swap_pending
-                            ? '<span style="font-size:.72rem;opacity:.7;">⏳ รอครูอนุมัติ</span>'
-                            : `<button type="button" class="kit-swap-btn" data-part="${p.part_id}"
-                                    title="ขอเปลี่ยนไซส์"
-                                    style="padding:.15rem .5rem;font-size:.75rem;margin:0 0 0 .3rem;width:auto;">🔁</button>`}
-                        ${bad ? '' : `<button type="button" class="kit-issue-btn" data-part="${p.part_id}"
-                                    title="แจ้งชำรุด / ของหาย"
-                                    style="padding:.15rem .5rem;font-size:.75rem;margin:0 0 0 .3rem;width:auto;
-                                           --pico-background-color:#f59e0b;--pico-border-color:#f59e0b;">🔧</button>`}
-                    </td>
-                </tr>`; }).join('')}
-            </table>
-            <p style="margin:.8rem 0 0;font-size:.78rem;opacity:.7;">
-                🔁 ใส่ไม่พอดี = ขอเปลี่ยนไซส์ &nbsp;·&nbsp; 🔧 ชำรุดหรือหาย = แจ้งครู
+            ${chip ? `<div class="kit-part-chips">${chip}</div>` : ''}
+            <div class="kit-part-actions">
+                <button type="button" class="kit-act kit-act-swap" data-part="${p.part_id}"
+                        ${p.swap_pending ? 'disabled' : ''}>
+                    🔁 ${p.swap_pending ? 'ส่งคำขอแล้ว' : 'ขอเปลี่ยน/สลับ'}
+                </button>
+                <button type="button" class="kit-act kit-act-issue" data-part="${p.part_id}"
+                        ${isLost || isRepair ? 'disabled' : ''}>
+                    🔧 ${isLost || isRepair ? 'แจ้งแล้ว' : 'แจ้งชำรุด/หาย'}
+                </button>
+            </div>
+        </div>`;
+    };
+
+    box.innerHTML = `
+        <div class="kit-card">
+            <div class="kit-card-head">
+                <div>
+                    <div class="kit-card-title">${kit.set_icon || '👔'} ชุด #${kit.kit_no}</div>
+                    <div class="kit-card-sub">${escapeHtml(kit.set_name || '')} · ${escapeHtml(kit.qr_code || '')}</div>
+                </div>
+            </div>
+            <div class="kit-part-list">${parts.map(partCard).join('')}</div>
+            <p class="kit-card-foot">
+                ใส่ไม่พอดีกด <strong>🔁 ขอเปลี่ยน/สลับ</strong> — เลือกไซส์ที่อยากได้
+                หรือระบุชิ้นของเพื่อนที่ตกลงกันไว้ได้เลย ครูเป็นคนอนุมัติ
             </p>
         </div>`;
 
-    // Event delegation — ตารางถูก render ใหม่ทุกครั้ง ผูก listener ที่กล่องแม่ทีเดียว
-    box.querySelectorAll('.kit-swap-btn').forEach(b =>
+    box.querySelectorAll('.kit-act-swap').forEach(b =>
         b.addEventListener('click', () => requestPartSwap(kit, Number(b.dataset.part))));
-    box.querySelectorAll('.kit-issue-btn').forEach(b =>
+    box.querySelectorAll('.kit-act-issue').forEach(b =>
         b.addEventListener('click', () => reportPartIssue(kit, Number(b.dataset.part))));
 }
 
@@ -6289,32 +6376,99 @@ async function requestPartSwap(kit, partId) {
 
     const { value, isConfirmed } = await Swal.fire({
         title: `🔁 ขอเปลี่ยน${part.type_name}`,
+        width: 520,
         html: `
-            <div style="text-align:left;font-size:.9rem;">
-                <p style="margin:0 0 .6rem;font-size:.82rem;opacity:.75;">
+            <div class="swap-form">
+                <p class="swap-current">
                     ชุด #${kit.kit_no} · ${escapeHtml(part.part_code)} ·
                     ไซส์ปัจจุบัน <strong>${escapeHtml(part.size || '-')}</strong>
                 </p>
-                <label style="font-size:.82rem;font-weight:bold;">ต้องการไซส์</label>
-                <select id="swap-size" class="swal2-select" style="width:100%;margin:.3rem 0 .8rem;">
+
+                <label class="swap-label">ต้องการไซส์</label>
+                <select id="swap-size" class="swap-input">
                     ${options.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('')}
                 </select>
-                <label style="font-size:.82rem;font-weight:bold;">เหตุผล</label>
-                <textarea id="swap-reason" class="swal2-textarea" style="width:100%;margin:.3rem 0 0;"
+
+                <label class="swap-label">สลับกับใคร</label>
+                <div class="swap-modes">
+                    <label class="swap-mode">
+                        <input type="radio" name="swap-mode" value="any" checked>
+                        <span><strong>ให้ครูหาให้</strong><br>
+                              <small>ครูจะเลือกชิ้นที่ว่างและไซส์ตรงให้เอง</small></span>
+                    </label>
+                    <label class="swap-mode">
+                        <input type="radio" name="swap-mode" value="pick">
+                        <span><strong>ตกลงกับเพื่อนไว้แล้ว</strong><br>
+                              <small>ระบุชิ้นที่จะสลับด้วยเอง แล้วให้ครูอนุมัติ</small></span>
+                    </label>
+                </div>
+
+                <div id="swap-target-wrap" class="hidden">
+                    <select id="swap-target" class="swap-input" size="6">
+                        <option value="">กำลังโหลด...</option>
+                    </select>
+                    <p class="swap-hint">แสดงเฉพาะชิ้นที่ว่างและสภาพดี</p>
+                </div>
+
+                <label class="swap-label">เหตุผล</label>
+                <textarea id="swap-reason" class="swap-input" rows="2"
                           placeholder="เช่น คับเกินไป ใส่แล้วเจ็บเท้า"></textarea>
             </div>`,
         showCancelButton: true, confirmButtonText: 'ส่งคำขอ', cancelButtonText: 'ยกเลิก',
-        preConfirm: () => ({
-            size: document.getElementById('swap-size').value,
-            reason: document.getElementById('swap-reason').value.trim()
-        })
+        didOpen: () => {
+            const wrap   = document.getElementById('swap-target-wrap');
+            const sizeEl = document.getElementById('swap-size');
+            const tgtEl  = document.getElementById('swap-target');
+
+            // โหลดชิ้นที่สลับได้ตามไซส์ที่เลือกอยู่
+            const loadTargets = async () => {
+                tgtEl.innerHTML = '<option value="">กำลังโหลด...</option>';
+                const { data, error } = await uniformApi.swapTargets(partId, sizeEl.value);
+                if (error) { tgtEl.innerHTML = `<option value="">โหลดไม่สำเร็จ</option>`; return; }
+                if (!data?.length) {
+                    tgtEl.innerHTML = `<option value="">— ไม่มีชิ้นไซส์ ${escapeHtml(sizeEl.value)} ที่ว่าง —</option>`;
+                    return;
+                }
+                tgtEl.innerHTML = data.map(t =>
+                    `<option value="${t.part_id}">${escapeHtml(t.part_code)} · ไซส์ ${escapeHtml(t.size || '-')}` +
+                    ` · ชุด #${t.kit_no}` +
+                    (t.owner_name ? ` — ${escapeHtml(t.owner_name)}` : ' (ไม่มีเจ้าของ)') +
+                    `</option>`).join('');
+            };
+
+            document.querySelectorAll('input[name="swap-mode"]').forEach(r =>
+                r.addEventListener('change', e => {
+                    const pick = e.target.value === 'pick';
+                    wrap.classList.toggle('hidden', !pick);
+                    if (pick) loadTargets();
+                }));
+            sizeEl.addEventListener('change', () => {
+                if (!wrap.classList.contains('hidden')) loadTargets();
+            });
+        },
+        preConfirm: () => {
+            const mode = document.querySelector('input[name="swap-mode"]:checked')?.value;
+            const target = document.getElementById('swap-target')?.value || '';
+            if (mode === 'pick' && !target) {
+                Swal.showValidationMessage('กรุณาเลือกชิ้นที่จะสลับด้วย');
+                return false;
+            }
+            return {
+                size: document.getElementById('swap-size').value,
+                reason: document.getElementById('swap-reason').value.trim(),
+                targetId: mode === 'pick' ? Number(target) : null
+            };
+        }
     });
     if (!isConfirmed) return;
 
     const { data, error } = await uniformApi.requestSwap(
-        kit.kit_id, partId, value.size, value.reason || null);
+        kit.kit_id, partId, value.size, value.reason || null, value.targetId);
     if (error) return Swal.fire('ส่งคำขอไม่สำเร็จ', error.message, 'error');
-    await Swal.fire('ส่งคำขอแล้ว 🙌', data?.message || 'ครูจะตรวจสอบให้', 'success');
+    await Swal.fire('ส่งคำขอแล้ว 🙌',
+        (data?.message || 'ครูจะตรวจสอบให้') +
+        (value.targetId ? '<br><small>ครูจะเห็นชิ้นที่คุณเลือกไว้</small>' : ''),
+        'success');
     renderMyKit();
 }
 

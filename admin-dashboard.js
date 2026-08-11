@@ -7826,7 +7826,11 @@ async function _renderSwapRequests() {
                     <div style="font-size:.72rem;opacity:.6;">${escapeHtml(r.part_code)}</div></td>
                 <td class="nowrap"><span style="opacity:.6;">${escapeHtml(r.current_size || '-')}</span>
                     → <strong>${escapeHtml(r.want_size || 'ไม่ระบุ')}</strong></td>
-                <td style="font-size:.85rem;">${escapeHtml(r.reason || '—')}</td>
+                <td style="font-size:.85rem;">${escapeHtml(r.reason || '—')}
+                    ${r.target_label
+                      ? `<div style="font-size:.72rem;margin-top:.25rem;color:#1d4ed8;">
+                           🤝 ตกลงกับเพื่อนไว้: ${escapeHtml(r.target_label)}</div>`
+                      : ''}</td>
                 <td class="nowrap" style="font-size:.78rem;">${fmtDate(r.created_at)}</td>
                 <td><div class="actions">
                     <button class="oad-btn oad-btn-approve" onclick="window.__oadDecideSwap(${r.id}, true)">✅ อนุมัติ</button>
@@ -7859,16 +7863,23 @@ window.__oadDecideSwap = async (id, approve) => {
             'ไม่พบชิ้นชนิดและไซส์ที่ขอ ซึ่งว่างและสภาพดีพอจะสลับให้ได้', 'info');
     }
 
+    const asked = cands.find(c => c.requested);
     const { value, isConfirmed } = await Swal.fire({
         title: '🔁 เลือกชิ้นที่จะสลับให้',
         html: `<div style="text-align:left;font-size:.9rem;">
-                 <p style="margin:0 0 .5rem;font-size:.8rem;opacity:.75;">
-                   ระบบจะสลับชิ้นนี้เข้าถุงของนักเรียน และย้ายชิ้นเดิมไปแทนที่
-                 </p>
+                 ${asked
+                   ? `<p style="margin:0 0 .5rem;padding:.5rem .6rem;border-radius:8px;
+                               background:rgba(37,99,235,.1);color:#1d4ed8;font-size:.82rem;">
+                        🤝 นักเรียนตกลงกับเพื่อนไว้แล้ว — เลือกไว้ให้ข้างล่างแล้ว
+                        เปลี่ยนเป็นชิ้นอื่นได้ถ้าไม่เหมาะ
+                      </p>`
+                   : `<p style="margin:0 0 .5rem;font-size:.8rem;opacity:.75;">
+                        ระบบจะสลับชิ้นนี้เข้าถุงของนักเรียน และย้ายชิ้นเดิมไปแทนที่
+                      </p>`}
                  <select id="swap-pick" class="swal2-select" size="8"
                          style="width:100%;height:auto;margin:0 0 .6rem;">
-                   ${cands.map(c => `<option value="${c.part_id}">
-                       ${escapeHtml(c.part_code)} · ไซส์ ${escapeHtml(c.size || '-')} · ชุด #${c.kit_no}
+                   ${cands.map(c => `<option value="${c.part_id}"${c.requested ? ' selected' : ''}>
+                       ${c.requested ? '🤝 ' : ''}${escapeHtml(c.part_code)} · ไซส์ ${escapeHtml(c.size || '-')} · ชุด #${c.kit_no}
                        ${c.owner_name ? '— ' + escapeHtml(c.owner_name) : '(ไม่มีเจ้าของ)'}
                      </option>`).join('')}
                  </select>

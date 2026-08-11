@@ -1715,9 +1715,16 @@ export const uniformApi = {
         }));
     },
     getOutstanding(eventId)  { return _wrap(() => supabase.rpc('get_uniform_outstanding', { p_event_id: eventId })); },
-    requestSwap(kitId, partId, wantSize, reason) {
+    requestSwap(kitId, partId, wantSize, reason, targetPartId = null) {
         return _wrap(() => supabase.rpc('uniform_request_swap', {
-            p_kit_id: kitId, p_part_id: partId, p_want_size: wantSize, p_reason: reason
+            p_kit_id: kitId, p_part_id: partId, p_want_size: wantSize,
+            p_reason: reason, p_target_part_id: targetPartId
+        }));
+    },
+    // ชิ้นของเพื่อนที่นักเรียนขอสลับด้วยได้ (ชนิดเดียวกัน ว่าง สภาพดี)
+    swapTargets(partId, wantSize = null) {
+        return _wrap(() => supabase.rpc('get_swap_targets', {
+            p_part_id: partId, p_want_size: wantSize
         }));
     },
     // นักเรียนแจ้งชำรุด / ของหาย ในชุดประจำตัวตัวเอง
