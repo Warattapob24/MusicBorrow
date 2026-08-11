@@ -6592,6 +6592,7 @@ async function _renderKitTable() {
                         <button class="oad-btn" onclick="window.__oadAssignKit(${k.kit_id})">${k.owner_id ? '🔁 ย้าย' : '👤 กำหนด'}</button>
                         ${k.owner_id ? `<button class="oad-btn oad-btn-red" onclick="window.__oadReleaseKit(${k.kit_id}, ${k.kit_no})">🚪 ปลด</button>` : ''}
                         <button class="oad-btn" onclick="window.__oadKitSizes(${k.kit_id})">📏 ไซส์</button>
+                        <button class="oad-btn" onclick="window.__oadKitCondition(${k.kit_id})">🔧 สภาพ</button>
                         <button class="oad-btn" onclick="window.__oadLockKit(${k.kit_id}, ${k.kit_no}, ${!locked})">${locked ? '🔓' : '🔒'}</button>
                         <button class="oad-btn" onclick="window.__oadKitHistory(${k.kit_id}, ${k.kit_no})">📜</button>
                     </div></td>
@@ -7239,6 +7240,53 @@ function _showUniTypeDetail(typeId) {
         </div>`;
     host.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
+// 🔧 แก้สภาพทีละชิ้นในถุงเดียว — รวมถึงแจ้งหาย
+//    เดิมแก้สภาพได้จากตาราง "ชิ้นที่ต้องจัดการ" เท่านั้น ซึ่งมีแต่ชิ้นที่ติดธงอยู่แล้ว
+//    ชิ้นที่ยังสภาพดีจึงไม่มีทางถูกแจ้งหายได้เลยถ้าถุงนั้นไม่มีเจ้าของมาแจ้งเอง
+window.__oadKitCondition = async (kitId) => {
+    const kit   = _uni.kits.find(k => k.kit_id === kitId);
+    const parts = kit?.parts || [];
+    if (!parts.length) return toast('ถุงนี้ยังไม่มีชิ้นส่วน', 'error');
+
+    const OPTS = [['A','A — สภาพดี'], ['B','B — มีร่องรอย'], ['C','C — ชำรุดเล็กน้อย'],
+                  ['repair','🔧 ต้องซ่อม'], ['lost','❌ สูญหาย']];
+
+    const { value, isConfirmed } = await Swal.fire({
+        title: `🔧 สภาพชุด #${kit.kit_no}`,
+        width: 480,
+        html: `<div style="text-align:left;font-size:.9rem;">
+                 <p style="margin:0 0 .7rem;font-size:.8rem;opacity:.7;">
+                   ชิ้นที่ตั้งเป็น <strong>สูญหาย</strong> จะไม่ถูกนับเป็นชิ้นบังคับตอนเบิก
+                   แต่ยังอยู่ในทะเบียนและเก็บไซส์ไว้
+                 </p>
+                 ${parts.map(p => `
+                   <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;">
+                     <span style="flex:1;min-width:0;">${p.icon || ''} ${escapeHtml(p.type_name)}
+                       <span style="opacity:.6;font-size:.78rem;">${escapeHtml(p.part_code)}</span></span>
+                     <select class="cond-in" data-part="${p.part_id}" data-was="${p.condition}"
+                             style="width:150px;margin:0;padding:.35rem;font-size:.85rem;">
+                       ${OPTS.map(([v, t]) =>
+                         `<option value="${v}"${p.condition === v ? ' selected' : ''}>${t}</option>`).join('')}
+                     </select>
+                   </div>`).join('')}
+               </div>`,
+        showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => [...document.querySelectorAll('.cond-in')]
+            .filter(i => i.value !== i.dataset.was)          // ส่งเฉพาะที่เปลี่ยนจริง
+            .map(i => ({ part_id: Number(i.dataset.part), condition: i.value }))
+    });
+    if (!isConfirmed) return;
+    if (!value.length) return toast('ไม่มีอะไรเปลี่ยน');
+
+    for (const c of value) {
+        const { error } = await uniformApi.setPartCondition(c.part_id, c.condition);
+        if (error) return toast(error.message, 'error');
+    }
+    toast(`บันทึกสภาพ ${value.length} ชิ้นแล้ว`);
+    _renderKitTable();
+    _renderUniformReport();
+};
 
 window.__oadFixPart = async (partId, code) => {
     const { value, isConfirmed } = await Swal.fire({
