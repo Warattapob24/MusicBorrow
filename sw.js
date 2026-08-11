@@ -8,7 +8,7 @@
 //   6. [NEW] Added 'push' event listener for background notifications
 //   7. [NEW] Enhanced 'notificationclick' to focus existing tabs instead of always opening new ones
 
-const CACHE_NAME = 'music-borrow-v6.1.0'; // events + staff roles + uniforms + return-reminder actions
+const CACHE_NAME = 'music-borrow-v6.2.0'; // instrument picklist + forced profile refresh
 
 const PRECACHE_URLS = [
     '/',

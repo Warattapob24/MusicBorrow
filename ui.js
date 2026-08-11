@@ -521,7 +521,10 @@ async function showForcedProfileUpdateModal(userData) {
                     </div>
                     <div>
                         <label style="font-size:0.85rem; font-weight:bold;">ระดับชั้น/ห้อง ปัจจุบัน</label>
-                        <input id="swal-classlevel" class="swal2-input" style="margin: 0.5rem 0 1rem 0;" value="${escapeHtml(userData.class_level || '')}" placeholder="เช่น ม.4/1">
+                        <input id="swal-classlevel" class="swal2-input" style="margin: 0.5rem 0 0.25rem 0;" value="" placeholder="เช่น ม.4/1" autocomplete="off">
+                        ${userData.class_level ? `<p style="margin:0 0 0.75rem 0; font-size:0.75rem; color:var(--pico-muted-color);">
+                            ปีที่แล้วคุณอยู่ <strong>${escapeHtml(userData.class_level)}</strong> — กรุณากรอกชั้นปัจจุบัน
+                        </p>` : ''}
                     </div>
                 </div>
 
@@ -554,6 +557,12 @@ async function showForcedProfileUpdateModal(userData) {
             const classLevel = document.getElementById('swal-classlevel').value.trim();
             
             const instrument = document.getElementById('swal-forced-instrument')?.value || '';
+
+            const needsClass = ['student', 'club'].includes(group);
+            if (needsClass && !/^ม\.[1-6]\/[1-9][0-9]*$/.test(classLevel)) {
+                Swal.showValidationMessage('กรุณากรอกชั้นเรียนให้ถูกรูปแบบ เช่น ม.4/1');
+                return false;
+            }
 
             if (group === 'club' && !instrument) {
                 Swal.showValidationMessage('กรุณาเลือกเครื่องดนตรีหลัก');
