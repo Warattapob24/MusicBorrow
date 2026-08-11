@@ -6,6 +6,82 @@
     <title>ระบบยืมคืนเครื่องดนตรี</title>
     <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@1.5.10/css/pico.min.css">
     <link rel="icon" type="image/png" href="assets/logo.png">
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         กู้ตัวเองเมื่อ Service Worker เก่าค้าง (ต้องมาก่อน main.js เสมอ)
+
+         อาการ: เครื่องนักเรียนที่ยังถือ SW รุ่นก่อน "network-first .js"
+         จะเสิร์ฟไฟล์ .js จากแคชแบบตายตัว พอโมดูลบางไฟล์เป็นรุ่นเก่าปนรุ่นใหม่
+         (เช่น utils.js เก่าที่ยังไม่มี fmtEventTimes ปนกับ ui.js ใหม่ที่ import มัน)
+         ES module graph จะ instantiate ไม่ผ่าน → main.js ไม่ได้รัน →
+         registerServiceWorker() ไม่ถูกเรียก → SW เก่าไม่มีวันถูกแทนที่
+         = ค้างถาวร เข้าไม่ได้ จนกว่าจะล้าง storage เอง
+
+         ไฟล์ HTML เป็น network-first ทุกรุ่นของ SW สคริปต์นี้จึงถึงมือทุกเครื่อง
+         และเป็นสคริปต์ธรรมดา (ไม่ใช่ module) จึงรันได้แม้ module graph พัง
+         ══════════════════════════════════════════════════════════════════ -->
+    <script>
+    (function () {
+        var EXPECTED = 'music-borrow-v6.4.1';   // ต้องตรงกับ CACHE_NAME ใน sw.js
+        var FLAG     = '__mb_recovered';
+        var done     = false;
+
+        // โหมดส่วนตัวบางเบราว์เซอร์ throw ตอนแตะ storage — ตัวกู้ระบบห้ามพังเอง
+        function mark(v) { try { return v === undefined ? sessionStorage.getItem(FLAG)
+                                 : (v === null ? sessionStorage.removeItem(FLAG)
+                                               : sessionStorage.setItem(FLAG, v)); }
+                           catch (e) { return null; } }
+
+        function hardReset(reason) {
+            if (done) return;
+            // รีเซ็ตได้ครั้งเดียวต่อแท็บ กัน reload วนไม่รู้จบถ้าสาเหตุจริงอยู่ที่อื่น
+            if (mark()) return;
+            done = true;
+            mark(reason || '1');
+            console.warn('[boot] stale cache detected (' + reason + ') — clearing and reloading');
+
+            var jobs = [];
+            if (window.caches) {
+                jobs.push(caches.keys().then(function (names) {
+                    return Promise.all(names.map(function (n) { return caches.delete(n); }));
+                }));
+            }
+            if (navigator.serviceWorker) {
+                jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    return Promise.all(regs.map(function (r) { return r.unregister(); }));
+                }));
+            }
+            Promise.all(jobs)['catch'](function () {})  // ล้างไม่สำเร็จก็ยังต้อง reload
+                .then(function () { location.reload(); });
+        }
+
+        // 1) แคชคนละรุ่นกับที่ deploy อยู่ → ล้างทิ้งก่อนที่โมดูลจะพัง
+        if (window.caches && caches.keys) {
+            caches.keys().then(function (names) {
+                var stale = names.filter(function (n) {
+                    return n.indexOf('music-borrow-') === 0 && n !== EXPECTED;
+                });
+                if (stale.length) hardReset('cache:' + stale[0]);
+                else mark(null);                        // ปกติแล้ว ปลดล็อกไว้ใช้รอบหน้า
+            })['catch'](function () {});
+        }
+
+        // 2) โมดูลโหลด/ผูกกันไม่ผ่าน — จับให้ครบทั้ง import ที่หายและไฟล์ที่โหลดไม่ได้
+        window.addEventListener('error', function (e) {
+            var msg = String((e && e.message) || '');
+            if (/does not provide an export|Failed to fetch dynamically imported|Importing a module script failed|error loading dynamically imported|Unexpected token/i.test(msg)) {
+                hardReset('module');
+            }
+        }, true);
+
+        // 3) กันเหนียว: บูตไม่เสร็จใน 20 วิ ถือว่าค้าง (main.js ติดธงนี้ทันทีที่รัน)
+        //    เผื่อเน็ตโรงเรียนช้าไว้พอสมควร — ถ้าพลาดก็แค่ reload รอบเดียว
+        setTimeout(function () {
+            if (!document.documentElement.hasAttribute('data-app-booted')) hardReset('timeout');
+        }, 20000);
+    })();
+    </script>
+
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>

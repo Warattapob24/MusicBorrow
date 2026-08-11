@@ -17,6 +17,11 @@ import { addSafeEventListener } from './utils.js';
 import { fillInstrumentSelect } from './api.js';
 import { scheduledNotificationsApi } from './api.js';
 
+// ⛑️ บอกตัวกู้ระบบใน index.html ว่าโมดูลทุกตัวผูกกันสำเร็จแล้ว
+// ต้องอยู่บนสุดหลัง import — ถ้า import ตัวใดพัง บรรทัดนี้จะไม่ถูกรัน
+// แล้ว watchdog 15 วิ จะล้างแคชกับ SW เก่าให้เอง
+document.documentElement.setAttribute('data-app-booted', '1');
+
 // ─────────────────────────────────────────────
 // Parse QR Scan URL parameter early
 // ─────────────────────────────────────────────
