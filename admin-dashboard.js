@@ -3653,11 +3653,14 @@ function renderBorrowsTable() {
                         special:     '<span class="oad-badge oad-badge-gray">📝 กรณีพิเศษ</span>'
                     };
 
-                    // 🕐 Live timer — นับถอยหลังจาก expected_return_at ได้ทุกประเภทแล้ว
-                    const timerCell = r.expected_return_at
+                    // 🕐 Live timer cell — countdown สำหรับ take-home, elapsed สำหรับ in-school
+                    // ⚠️ ห้ามเปลี่ยนทิศทางการนับ: ยืมในโรงเรียน/ออกงานต้อง "นับเดินหน้า"
+                    // เพราะเวลาที่เดินไปถูกใช้สะสมเป็นเวลาซ้อมของนักเรียน
+                    const countsDown = (type === 'take_home' || type === 'special');
+                    const timerCell = countsDown
                         ? `<div style="font-size:0.85rem;">
-                              <div style="font-size:0.7rem; color:var(--oad-muted);">📅 กำหนดคืน ${fmtDate(r.expected_return_at)}</div>
-                              <div class="oad-live-countdown" data-due="${escapeHtml(r.expected_return_at)}" style="font-weight:700; color:${isOverdue ? 'var(--oad-danger, #ef4444)' : 'var(--oad-accent)'};">…</div>
+                              <div style="font-size:0.7rem; color:var(--oad-muted);">📅 กำหนดคืน ${fmtDateShort(r.due_date)}</div>
+                              <div class="oad-live-countdown" data-due="${escapeHtml(r.due_date || '')}" style="font-weight:700; color:var(--oad-accent);">…</div>
                            </div>`
                         : `<div style="font-size:0.85rem;">
                               <div style="font-size:0.7rem; color:var(--oad-muted);">⏱️ ยืมเมื่อ ${fmtDate(r.borrow_timestamp)}</div>
