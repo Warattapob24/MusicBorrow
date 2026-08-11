@@ -903,10 +903,32 @@ function buildShell() {
                     <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-uni"> 👔 เบิกชุด</label>
                     <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-cal" checked> 📅 แสดงในปฏิทิน</label>
                 </div>
+
+                <div style="margin:.9rem 0;">
+                    <label style="font-size:.8rem; font-weight:700; display:block; margin-bottom:.35rem;">
+                        🔔 แจ้งเตือนล่วงหน้า
+                    </label>
+                    <div style="display:flex; gap:1rem; flex-wrap:wrap; font-size:.85rem;">
+                        <label><input type="checkbox" class="oad-ev-rem" value="20160"> 2 สัปดาห์</label>
+                        <label><input type="checkbox" class="oad-ev-rem" value="10080"> 1 สัปดาห์</label>
+                        <label><input type="checkbox" class="oad-ev-rem" value="4320"> 3 วัน</label>
+                        <label><input type="checkbox" class="oad-ev-rem" value="1440" checked> 1 วัน</label>
+                        <label><input type="checkbox" class="oad-ev-rem" value="120" checked> 2 ชม.</label>
+                        <label><input type="checkbox" class="oad-ev-rem" value="30"> 30 นาที</label>
+                    </div>
+                    <p style="font-size:.75rem;color:var(--oad-muted);margin:.35rem 0 0;">
+                        ตั้งงานล่วงหน้าเป็นเดือนได้ ระบบจะเตือนตามจังหวะที่ติ๊กไว้เอง
+                    </p>
+                </div>
+
                 <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
-                    <button class="oad-btn oad-btn-approve" id="oad-ev-create">📅 เพิ่มกิจกรรม</button>
+                    <button class="oad-btn oad-btn-approve" id="oad-ev-create">📢 ประกาศเลย</button>
+                    <button class="oad-btn" id="oad-ev-draft">📝 บันทึกเป็นร่าง</button>
                     <button class="oad-btn" id="oad-ev-quick">⚡ ซ้อมวันนี้ (13:00–16:00)</button>
                 </div>
+                <p style="font-size:.78rem;color:var(--oad-muted);margin:.6rem 0 0;">
+                    <strong>ร่าง</strong> = วางแผนไว้ก่อน นักเรียนยังไม่เห็น และยังไม่ขึ้นปฏิทิน · กด "ประกาศ" ในตารางเมื่อพร้อม
+                </p>
             </div>
 
             <div class="oad-panel">
@@ -5555,7 +5577,8 @@ function wireListeners() {
     });
 
     // 🎭 Events tab
-    document.getElementById('oad-ev-create')?.addEventListener('click', () => _createEvent(false));
+    document.getElementById('oad-ev-create')?.addEventListener('click', () => _createEvent(false, 'open'));
+    document.getElementById('oad-ev-draft')?.addEventListener('click', () => _createEvent(false, 'draft'));
     document.getElementById('oad-ev-quick')?.addEventListener('click', () => _createEvent(true));
     // เลือกวันที่ → เดากำหนดคืนเป็นเย็นวันเดียวกัน (งานส่วนใหญ่จบในวันเดียว)
     document.getElementById('oad-ev-date')?.addEventListener('change', e => {
@@ -6188,7 +6211,7 @@ const _ACT = {
 };
 
 const _EV_STATUS = {
-    draft:  '<span class="oad-badge oad-badge-gray">ร่าง</span>',
+    draft:  '<span class="oad-badge oad-badge-amber">📝 ร่าง — นักเรียนยังไม่เห็น</span>',
     open:   '<span class="oad-badge oad-badge-green">เปิดรับเบิก</span>',
     active: '<span class="oad-badge oad-badge-blue">กำลังดำเนินงาน</span>',
     closed: '<span class="oad-badge oad-badge-gray">ปิดแล้ว</span>'
@@ -6250,7 +6273,10 @@ async function renderEventsTab() {
                     <td class="nowrap">${cell(s.uniform_back, s.uniform_out, uPend)}</td>
                     <td>${_EV_STATUS[e.status] || escapeHtml(e.status)}</td>
                     <td><div class="actions">
-                        ${isClosed ? '' :
+                        ${e.status === 'draft'
+                          ? `<button class="oad-btn oad-btn-approve" onclick="window.__oadPublishEvent(${e.id}, '${escapeHtml(e.name).replace(/'/g, "\'")}')">📢 ประกาศ</button>`
+                          : ''}
+                        ${isClosed || e.status === 'draft' ? '' :
                           `<button class="oad-btn oad-btn-red" onclick="window.__oadCloseEvent(${e.id}, ${iPend + uPend})">🔴 ปิดงาน</button>`}
                         <button class="oad-btn" onclick="window.__oadEventDetail(${e.id})">🔍 ของค้าง</button>
                     </div></td>
@@ -6267,7 +6293,7 @@ function _updateEventsBadge(n) {
     else b.classList.add('hidden');
 }
 
-async function _createEvent(quick = false) {
+async function _createEvent(quick = false, status = 'open') {
     const pick = id => document.getElementById(id);
     let payload;
 
@@ -6287,7 +6313,8 @@ async function _createEvent(quick = false) {
             startAt: new Date(`${today}T13:00`).toISOString(),
             endAt:   new Date(`${today}T16:00`).toISOString(),
             activityType: 'practice', showInCalendar: true,
-            needsInstrument: false, needsUniform: false, openTo: 'club'
+            needsInstrument: false, needsUniform: false, openTo: 'club',
+            status: 'open', remindBefore: [120]
         };
     } else {
         const name = pick('oad-ev-name')?.value?.trim();
@@ -6316,7 +6343,10 @@ async function _createEvent(quick = false) {
             location: pick('oad-ev-loc')?.value?.trim() || null,
             needsInstrument: inst, needsUniform: uni,
             openTo: pick('oad-ev-open')?.value || 'club',
-            showInCalendar: pick('oad-ev-cal')?.checked ?? true
+            showInCalendar: pick('oad-ev-cal')?.checked ?? true,
+            status,
+            remindBefore: [...document.querySelectorAll('.oad-ev-rem:checked')]
+                .map(c => Number(c.value)).sort((a, b) => b - a)
         };
     }
 
@@ -7738,3 +7768,20 @@ async function _loadGcalStatus() {
             : 'ยังไม่เคยซิงก์ — ตั้งค่าตามขั้นตอนด้านล่างก่อน';
     }
 }
+
+// ── ประกาศกิจกรรมที่ร่างไว้ — นักเรียนเห็นและปฏิทินอัปเดตทันที
+window.__oadPublishEvent = async (eventId, name) => {
+    const { isConfirmed } = await Swal.fire({
+        title: `ประกาศ "${name}"?`,
+        text: 'นักเรียนจะเห็นทันที และกิจกรรมจะถูกส่งขึ้นปฏิทิน Google',
+        icon: 'question', showCancelButton: true,
+        confirmButtonText: '📢 ประกาศ', cancelButtonText: 'ยังก่อน'
+    });
+    if (!isConfirmed) return;
+
+    const { error } = await eventsApi.setStatus(eventId, 'open');
+    if (error) return toast(error.message, 'error');
+    toast('ประกาศแล้ว — นักเรียนเห็นและกำลังซิงก์เข้าปฏิทิน');
+    renderEventsTab();
+    _loadGcalStatus();
+};

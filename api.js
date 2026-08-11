@@ -1610,14 +1610,24 @@ export const eventsApi = {
     create({ name, eventDate, startAt = null, endAt = null, returnDueAt = null,
              activityType = 'performance', location = null,
              needsInstrument = false, needsUniform = false,
-             openTo = 'club', showInCalendar = true }) {
+             openTo = 'club', showInCalendar = true,
+             status = 'open', remindBefore = [1440, 120] }) {
         return _wrap(() => supabase.rpc('admin_create_event', {
             p_name: name, p_event_date: eventDate,
             p_start_at: startAt, p_end_at: endAt, p_return_due_at: returnDueAt,
             p_activity_type: activityType, p_location: location,
             p_needs_instrument: needsInstrument, p_needs_uniform: needsUniform,
-            p_open_to: openTo, p_show_in_calendar: showInCalendar
+            p_open_to: openTo, p_show_in_calendar: showInCalendar,
+            p_status: status, p_remind_before: remindBefore
         }));
+    },
+    setStatus(eventId, status) {
+        return _wrap(() => supabase.rpc('admin_set_event_status',
+            { p_event_id: eventId, p_status: status }));
+    },
+    setReminders(eventId, minutes) {
+        return _wrap(() => supabase.rpc('admin_set_event_reminders',
+            { p_event_id: eventId, p_minutes: minutes }));
     },
     // 📅 ตารางกิจกรรม (ซ้อม / ค่าย / ออกงาน / ประชุม)
     schedule(days = 60) {
