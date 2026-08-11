@@ -6632,29 +6632,23 @@ async function _renderPartTypeTable() {
 window.__oadAssignKit = async (kitId) => {
     const kit = _uni.kits.find(k => k.kit_id === kitId);
 
-    // ชุดประจำตัวเป็นของสมาชิกชุมนุมเท่านั้น
+    // ชุดประจำตัวเป็นของสมาชิกชุมนุมเท่านั้น (บังคับที่ฐานข้อมูลด้วย)
+    // จึงไม่มีตัวกรองกลุ่ม — มีกลุ่มเดียวให้เลือกอยู่แล้ว
     const { data: cands, error: cErr } = await staffApi.candidates();
     if (cErr) return toast(cErr.message, 'error');
 
-    const club = (cands || []).filter(c => c.student_group === 'club');
+    const club = (cands || []).filter(c => c.student_group === 'club')
+                              .sort((a, b) => a.full_name.localeCompare(b.full_name, 'th'));
     if (!club.length) return toast('ยังไม่มีสมาชิกชุมนุม', 'error');
 
     // ใครถือชุดอยู่แล้วบ้าง — กันเลือกซ้ำโดยไม่รู้ตัว
     const owned = new Map();
     (_uni.kits || []).forEach(k => { if (k.owner_id) owned.set(k.owner_id, k.kit_no); });
 
-    const groupOf = (c) => c.section_name || 'ยังไม่ระบุเครื่อง';
-    const groups = new Map();
-    for (const c of club) {
-        const key = groupOf(c);
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(c);
-    }
-
     const optionOf = (c) => {
         const has = owned.get(c.user_id);
         const tail = [c.main_instrument, c.class_level].filter(Boolean).join(' · ');
-        return '<option value="' + c.user_id + '" data-grp="' + escapeHtml(groupOf(c)) + '"' +
+        return '<option value="' + c.user_id + '"' +
                (kit?.owner_id === c.user_id ? ' selected' : '') + '>' +
                escapeHtml(c.full_name) +
                (tail ? ' · ' + escapeHtml(tail) : '') +
@@ -6662,52 +6656,32 @@ window.__oadAssignKit = async (kitId) => {
                '</option>';
     };
 
-    const groupHtml = [...groups.entries()].map(([name, list]) =>
-        '<optgroup label="' + escapeHtml(name) + ' (' + list.length + ')">' +
-        list.map(optionOf).join('') + '</optgroup>').join('');
-
-    const groupOptions = [...groups.entries()].map(([name, list]) =>
-        '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + ' (' + list.length + ')</option>'
-    ).join('');
-
     const { value, isConfirmed } = await Swal.fire({
         title: '👤 เจ้าของชุด #' + (kit?.kit_no ?? ''),
         width: 500,
         html: '<div style="text-align:left;font-size:.9rem;">' +
-              '<label style="font-weight:700;">กลุ่มเครื่อง</label>' +
-              '<select id="assign-group" class="swal2-input" style="width:100%;margin:.2rem 0 .6rem;">' +
-                '<option value="">— ทุกกลุ่ม (' + club.length + ' คน) —</option>' + groupOptions +
-              '</select>' +
+              '<p style="margin:0 0 .5rem;font-size:.8rem;opacity:.75;">' +
+                'กลุ่ม: <strong>สมาชิกชุมนุม</strong> (' + club.length + ' คน) — ' +
+                'ชุดประจำตัวมีเฉพาะกลุ่มนี้' +
+              '</p>' +
               '<input id="assign-search" class="swal2-input" style="width:100%;margin:0 0 .6rem;"' +
-                ' placeholder="🔍 พิมพ์ชื่อหรือเครื่องดนตรี">' +
-              '<label style="font-weight:700;">นักเรียน</label>' +
-              '<select id="assign-stu" class="swal2-input" size="10"' +
-                ' style="width:100%;margin:.2rem 0 0;height:auto;">' +
-                '<option value="">— ไม่มีเจ้าของ —</option>' + groupHtml +
+                ' placeholder="🔍 พิมพ์ชื่อ เครื่องดนตรี หรือชั้นเรียน">' +
+              '<select id="assign-stu" class="swal2-input" size="11"' +
+                ' style="width:100%;margin:0;height:auto;">' +
+                '<option value="">— ไม่มีเจ้าของ —</option>' +
+                club.map(optionOf).join('') +
               '</select></div>',
         showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก',
         didOpen: () => {
-            const grp = document.getElementById('assign-group');
             const q   = document.getElementById('assign-search');
             const sel = document.getElementById('assign-stu');
-
-            const apply = () => {
-                const want = grp.value;
+            q.addEventListener('input', () => {
                 const term = q.value.trim().toLowerCase();
-                sel.querySelectorAll('optgroup').forEach(g => {
-                    let shown = 0;
-                    [...g.children].forEach(o => {
-                        const hit = (!want || o.dataset.grp === want) &&
-                                    (!term || o.text.toLowerCase().includes(term));
-                        o.hidden = !hit;
-                        if (hit) shown++;
-                    });
-                    g.hidden = shown === 0;
+                [...sel.options].forEach((o, idx) => {
+                    if (idx === 0) return;   // "ไม่มีเจ้าของ" ต้องเลือกได้เสมอ
+                    o.hidden = term && !o.text.toLowerCase().includes(term);
                 });
-            };
-
-            grp.addEventListener('change', apply);
-            q.addEventListener('input', apply);
+            });
             q.focus();
         },
         preConfirm: () => document.getElementById('assign-stu').value || null

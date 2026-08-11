@@ -8,7 +8,7 @@
 //   6. [NEW] Added 'push' event listener for background notifications
 //   7. [NEW] Enhanced 'notificationclick' to focus existing tabs instead of always opening new ones
 
-const CACHE_NAME = 'music-borrow-v6.3.0'; // remove fast size grid
+const CACHE_NAME = 'music-borrow-v6.3.1'; // kit owner: drop invented section filter
 
 const PRECACHE_URLS = [
     '/',
