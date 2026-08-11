@@ -6337,17 +6337,26 @@ export async function renderSchedule() {
         }
         box.style.display = '';
 
-        const now = Date.now();
+        const now = new Date();
         box.innerHTML = data.map(e => {
             const a = _ACT_TH[e.activity_type] || _ACT_TH.other;
             const start = new Date(e.start_at);
             const t = d => new Date(d).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-            const diffDays = Math.ceil((start - now) / 86400000);
-            const when = diffDays < 0 ? 'กำลังดำเนินอยู่'
+            // ⚠️ ต้องเทียบ "วันบนปฏิทิน" ไม่ใช่จำนวนชั่วโมงที่ห่างกัน
+            // งานวันนี้บ่าย 2 ห่างจากตอนเช้าแค่ 6 ชม. = 0.25 วัน
+            // Math.ceil(0.25) ได้ 1 → เคยขึ้นว่า "พรุ่งนี้" ทั้งที่เป็นวันนี้
+            const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+            const diffDays = Math.round((startOfDay(start) - startOfDay(now)) / 86400000);
+            const ended = e.end_at && new Date(e.end_at) < now;
+            const running = start <= now && !ended;
+
+            const when = running  ? 'กำลังดำเนินอยู่'
+                       : ended    ? 'จบแล้ว'
                        : diffDays === 0 ? 'วันนี้'
                        : diffDays === 1 ? 'พรุ่งนี้'
+                       : diffDays < 0   ? `${Math.abs(diffDays)} วันก่อน`
                        : `อีก ${diffDays} วัน`;
-            const soon = diffDays >= 0 && diffDays <= 1;
+            const soon = running || (diffDays >= 0 && diffDays <= 1);
 
             return `<div class="sd-list-item" style="display:flex;gap:.8rem;align-items:flex-start;
                         border-left:4px solid ${a.color};padding-left:.8rem;">
