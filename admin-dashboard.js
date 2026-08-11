@@ -6913,8 +6913,12 @@ window.__oadPrintKitCards = async () => {
     try {
         const cards = await Promise.all(targets.map(k => new Promise(resolve => {
             const div = document.createElement('div');
+            // ⚠️ ต้องเป็น URL เหมือน QR เครื่องดนตรี (?scan=) ไม่ใช่ข้อความเปล่า
+            //    ข้อความเปล่า "KIT-052" แอปกล้องมือถืออ่านได้แต่กดอะไรไม่ได้
+            //    ต้องเปิดแอปเราแล้วกดสแกนเองเท่านั้น — URL สแกนด้วยแอปไหนก็เข้าได้เลย
+            const code = k.qr_code || `KIT-${String(k.kit_no).padStart(3, '0')}`;
             new QRCode(div, {
-                text: k.qr_code || `KIT-${String(k.kit_no).padStart(3, '0')}`,
+                text: `${window.location.origin}/?kit=${encodeURIComponent(code)}`,
                 width: 200, height: 200,
                 colorDark: '#000000', colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel.H

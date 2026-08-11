@@ -330,7 +330,23 @@ export function prepareUnifiedRegisterForm(authUser) {
     }
 }
 
+// 👔 QR ถุงชุดที่มากับ URL (?kit=KIT-052) — คืน true ถ้าจัดการให้แล้ว
+//    แยกเป็นฟังก์ชันเพราะมีจุดที่ต้องเช็คเหมือนกัน 3 ที่ ลืมที่ใดที่หนึ่งแล้วสแกนไม่ติด
+function consumePendingKit() {
+    const code = localStorage.getItem('pendingKitCode') || sessionStorage.getItem('pendingKitCode');
+    if (!code) return false;
+    localStorage.removeItem('pendingKitCode');
+    sessionStorage.removeItem('pendingKitCode');
+    // รองรับทั้ง ?kit=KIT-052 และ ?kit=52 (parseKitCode รับเฉพาะแบบเต็มกับ URL)
+    const kitCode = parseKitCode(code)
+        || (/^\d+$/.test(code) ? `KIT-${String(code).padStart(3, '0')}` : null);
+    if (!kitCode) return false;
+    setTimeout(() => processKitScan(kitCode), 500);
+    return true;
+}
+
 export function checkPendingScanOnLoad() {
+    if (consumePendingKit()) return;
     const pendingScanId = localStorage.getItem('pendingScanId');
     if (pendingScanId) {
         localStorage.removeItem('pendingScanId');
@@ -348,6 +364,7 @@ export async function showDashboardView(user) {
 
     const dashboardSection = document.getElementById('dashboard-section');
     if (currentUser && currentUser.id === user.id && !dashboardSection.classList.contains('hidden')) {
+        if (consumePendingKit()) return;
         const pendingScanId = localStorage.getItem('pendingScanId') || sessionStorage.getItem('pendingScanId');
         if (pendingScanId) {
             localStorage.removeItem('pendingScanId');
@@ -456,13 +473,15 @@ export async function showDashboardView(user) {
              requestPushPermission(user.id, VAPID_PUBLIC_KEY);
         }
 
-        const pendingScanId = localStorage.getItem('pendingScanId') || sessionStorage.getItem('pendingScanId');
-        if (pendingScanId) {
-            localStorage.removeItem('pendingScanId');
-            sessionStorage.removeItem('pendingScanId');
-            setTimeout(async () => {
-                await processQrScan(pendingScanId);
-            }, 500);
+        if (!consumePendingKit()) {
+            const pendingScanId = localStorage.getItem('pendingScanId') || sessionStorage.getItem('pendingScanId');
+            if (pendingScanId) {
+                localStorage.removeItem('pendingScanId');
+                sessionStorage.removeItem('pendingScanId');
+                setTimeout(async () => {
+                    await processQrScan(pendingScanId);
+                }, 500);
+            }
         }
 
     } catch (error) {

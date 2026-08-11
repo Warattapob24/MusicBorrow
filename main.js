@@ -38,6 +38,18 @@ try {
         console.log('[QR] Saved pendingScanId to localStorage:', scanId);
     }
 
+    // 👔 QR ถุงชุด — เก็บไว้แบบเดียวกับ ?scan ของเครื่องดนตรี
+    //    ทำให้สแกนด้วยแอปกล้อง/แอป QR อะไรก็ได้ ไม่ต้องเปิดแอปเราก่อน
+    const kitCode = urlParams.get('kit');
+    if (kitCode) {
+        localStorage.setItem('pendingKitCode', kitCode);
+        urlParams.delete('kit');
+        const s = urlParams.toString();
+        window.history.replaceState({}, document.title,
+            window.location.pathname + (s ? '?' + s : ''));
+        console.log('[QR] Saved pendingKitCode to localStorage:', kitCode);
+    }
+
     // ⏰ มาจากปุ่ม "คืนเลย" ในการแจ้งเตือน — ตั้งธงไว้ให้ dashboard เปิดหน้าคืนทันที
     if (urlParams.get('return') === 'my') {
         sessionStorage.setItem('pendingReturnAll', urlParams.get('auto') === '1' ? 'auto' : '1');
