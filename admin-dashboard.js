@@ -525,6 +525,14 @@ function buildShell() {
                 </div>
             </div>
 
+            <div class="oad-panel">
+                <div class="oad-panel-title">
+                    📋 ใบตรวจจากหัวหน้า
+                    <span class="oad-tab-badge hidden" id="oad-staffrep-badge" style="margin-left:.5rem;">0</span>
+                </div>
+                <div class="oad-table-wrap" id="oad-staffrep-wrap"></div>
+            </div>
+
             <hr style="border: 0; border-top: 1px dashed var(--oad-border); margin: 2rem 0; opacity: 0.5;">
 
             <div class="oad-panel-title" style="margin-top: 0.75rem; color: var(--oad-text);">🎯 สถิติและผลสัมฤทธิ์ระบบ (Analytics & KPIs)</div>
@@ -631,14 +639,6 @@ function buildShell() {
                     ไม่มีสิทธิ์คืนของ ปิดงาน หรือบล็อกใคร ทุกอย่างที่มีผลจริงยังอยู่ที่ครูคนเดียว
                 </p>
                 <div class="oad-table-wrap" id="oad-staff-wrap"></div>
-            </div>
-
-            <div class="oad-panel">
-                <div class="oad-panel-title">
-                    📋 ใบตรวจจากหัวหน้า
-                    <span class="oad-tab-badge hidden" id="oad-staffrep-badge" style="margin-left:.5rem;">0</span>
-                </div>
-                <div class="oad-table-wrap" id="oad-staffrep-wrap"></div>
             </div>
 
             <div class="oad-panel">
@@ -1041,10 +1041,15 @@ function buildShell() {
                     ปิดสวิตช์นี้เมื่อจัดชุดเสร็จแล้ว เพื่อกันนักเรียนลงเบอร์มั่ว<br>
                     <strong>ชุดที่ยังกรอกไซส์ไม่ครบ ระบบไม่ให้เลือกอยู่แล้ว</strong> — และล็อกรายชุดได้ด้วยปุ่ม 🔓/🔒 ในตารางด้านบน
                 </p>
-                <label style="display:flex; align-items:center; gap:.6rem; font-size:.95rem;">
+                <label style="display:flex; align-items:center; gap:.6rem; font-size:.95rem; margin-bottom:.6rem;">
                     <input type="checkbox" id="oad-uni-selfselect" style="width:20px;height:20px;">
                     <span>เปิดให้นักเรียนเลือกชุดเองได้</span>
                 </label>
+                <label style="display:flex; align-items:center; gap:.6rem; font-size:.95rem;">
+                    <input type="checkbox" id="oad-uni-reqsize" style="width:20px;height:20px;">
+                    <span>ต้องกรอกไซส์ครบก่อน ถึงจะเลือกชุดนั้นได้</span>
+                </label>
+                <div id="oad-uni-avail" style="font-size:.85rem; margin-top:.7rem;"></div>
             </div>
 
             <div class="oad-panel">
@@ -5545,12 +5550,12 @@ function switchTab(tabName) {
 
 function renderActiveTab() {
     switch (state.activeTab) {
-        case 'overview':     renderStats(); renderOverviewPanels(); break;
+        case 'overview':     renderStats(); renderOverviewPanels(); _renderStaffReports(); break;
         case 'borrows':      renderBorrowsTable(); break;
         case 'events':       renderEventsTab(); _loadCalendarUrl(); _loadGcalStatus(); break;
         case 'uniforms':     renderUniformsTab(); break;
         case 'repairs':      renderRepairsTable(); break;
-        case 'users':        loadUserKitMap().then(renderUsersTable); renderStaffPanels(); break;
+        case 'users':        loadUserKitMap().then(renderUsersTable); _renderStaffRoles(); break;
         case 'recovery':     renderRecoveryTable(); break;
         case 'config':       renderConfigTab(); break;
         case 'rankings':     renderRankingsTable(); break;
@@ -6461,6 +6466,19 @@ async function renderUniformsTab() {
         if (sel && _uni.setTypeId) sel.value = String(_uni.setTypeId);
     }
 
+    const rq = document.getElementById('oad-uni-reqsize');
+    if (rq && !rq.dataset.wired) {
+        const { data: on } = await uniformApi.getRequireSize();
+        rq.checked = on !== false;
+        rq.dataset.wired = '1';
+        rq.addEventListener('change', async e => {
+            const { error } = await uniformApi.setRequireSize(e.target.checked);
+            if (error) { e.target.checked = !e.target.checked; return toast(error.message, 'error'); }
+            toast(e.target.checked ? 'บังคับกรอกไซส์ก่อนเลือก' : 'เลือกได้แม้ยังไม่กรอกไซส์');
+            _renderKitAvailability();
+        });
+    }
+
     const ss = document.getElementById('oad-uni-selfselect');
     if (ss && !ss.dataset.wired) {
         const { data: on } = await uniformApi.getSelfSelect();
@@ -6476,6 +6494,7 @@ async function renderUniformsTab() {
     // ต้องรอทั้ง _renderKitTable (ให้ _uni.kits มีข้อมูล) และ _renderUniformReport
     // (ให้ _uni.stock มีข้อมูล) ก่อน ตารางกรอกไซส์ถึงจะแสดง "เหลือกี่ตัว" ได้
     await Promise.all([_renderKitTable(), _renderPartTypeTable(), _renderUniformReport()]);
+    _renderKitAvailability();
     renderSizeGrid();
 }
 
@@ -7211,10 +7230,6 @@ const _SCOPE_LABEL = {
     uniform: { icon: '👔', name: 'ฝ่ายเสื้อผ้า',      hint: 'ดูแลชุด' }
 };
 
-async function renderStaffPanels() {
-    await Promise.all([_renderStaffRoles(), _renderStaffReports()]);
-}
-
 async function _renderStaffRoles() {
     const wrap = document.getElementById('oad-staff-wrap');
     if (!wrap) return;
@@ -7231,17 +7246,19 @@ async function _renderStaffRoles() {
 
     wrap.innerHTML = `
         <table class="oad-table">
-            <thead><tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>ขอบเขต</th><th>จัดการ</th></tr></thead>
+            <thead><tr><th>ชื่อ</th><th>ชั้น</th><th>เครื่องดนตรี</th>
+                       <th>ตำแหน่ง</th><th>ขอบเขต</th><th>จัดการ</th></tr></thead>
             <tbody>
             ${rows.map(r => {
-                const s = _SCOPE_LABEL[r.scope_type] || { icon: '•', name: r.scope_type, hint: '' };
-                const u = r.users || {};
-                const name = `${u.prefix || ''}${u.first_name || ''} ${u.last_name || ''}`.trim() || '—';
+                const sc = _SCOPE_LABEL[r.scope_type] || { icon: '•', name: r.scope_type };
                 return `<tr>
-                    <td><strong>${escapeHtml(name)}</strong></td>
-                    <td>${s.icon} ${escapeHtml(s.name)}</td>
-                    <td style="font-size:.85rem;opacity:.8;">${escapeHtml(r.scope_value || s.hint)}</td>
-                    <td><button class="oad-btn oad-btn-red" onclick="window.__oadRevokeStaff(${r.id})">ถอดถอน</button></td>
+                    <td><strong>${escapeHtml(r.full_name || '—')}</strong>
+                        ${r.nickname ? `<span style="opacity:.6;"> (${escapeHtml(r.nickname)})</span>` : ''}</td>
+                    <td class="nowrap">${escapeHtml(r.class_level || '—')}</td>
+                    <td class="nowrap">${escapeHtml(r.main_instrument || '—')}</td>
+                    <td class="nowrap">${sc.icon} ${escapeHtml(sc.name)}</td>
+                    <td style="font-size:.85rem;opacity:.8;">${escapeHtml(r.scope_label || '')}</td>
+                    <td><button class="oad-btn oad-btn-red" onclick="window.__oadRevokeStaff(${r.role_id})">ถอดถอน</button></td>
                 </tr>`;
             }).join('')}
             </tbody>
@@ -7301,26 +7318,51 @@ window.__oadRevokeStaff = async (roleId) => {
 };
 
 window.__oadAddStaff = async () => {
-    const [{ data: sections }, { data: events }] = await Promise.all([
-        sectionsApi.list(), eventsApi.list()
+    const [{ data: sections }, { data: events }, { data: cands, error: cErr }] = await Promise.all([
+        sectionsApi.list(), eventsApi.list(), staffApi.candidates()
     ]);
+    if (cErr) return toast(cErr.message, 'error');
+    if (!cands?.length) return toast('ยังไม่มีสมาชิกชุมนุมให้แต่งตั้ง', 'error');
 
-    const candidates = (state.users || [])
-        .filter(u => u.student_group !== 'deactivated')
-        .map(u => `<option value="${u.id}">${escapeHtml((u.prefix||'') + u.first_name + ' ' + u.last_name)}${u.class_level ? ' · ' + escapeHtml(u.class_level) : ''}</option>`)
-        .join('');
+    // แต่งตั้งได้เฉพาะสมาชิกชุมนุม — รายชื่อมาจาก RPC ที่กรองมาแล้ว
+    // และติดป้ายบอกว่าใครถือตำแหน่งอะไรอยู่ จะได้ไม่แต่งตั้งซ้ำโดยไม่รู้ตัว
+    const classes = [...new Set(cands.map(c => c.class_level).filter(Boolean))].sort();
+
+    const optionOf = c => {
+        const held = c.current_roles ? ` — ${c.current_roles}` : '';
+        return `<option value="${c.user_id}" data-class="${escapeHtml(c.class_level || '')}"
+                        data-held="${c.current_roles ? '1' : '0'}">
+                  ${escapeHtml(c.full_name)}${c.class_level ? ' · ' + escapeHtml(c.class_level) : ''}${escapeHtml(held)}
+                </option>`;
+    };
 
     const result = await Swal.fire({
         title: '🎖 แต่งตั้งหัวหน้า',
-        width: 480,
+        width: 520,
         html: `<div style="text-align:left;font-size:.9rem;">
+                 <p style="margin:0 0 .7rem;font-size:.8rem;opacity:.75;">
+                   แต่งตั้งได้เฉพาะ<strong>สมาชิกชุมนุม</strong> (${cands.length} คน) ·
+                   ชื่อที่มีตำแหน่งอยู่แล้วจะแสดงต่อท้าย
+                 </p>
+
+                 <label style="font-weight:700;">กรองชั้นเรียน</label>
+                 <select id="st-class" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">
+                   <option value="">— ทุกชั้น —</option>
+                   ${classes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+                 </select>
+
                  <label style="font-weight:700;">นักเรียน</label>
-                 <select id="st-user" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">${candidates}</select>
+                 <select id="st-user" class="swal2-input" size="8"
+                         style="width:100%;margin:.2rem 0 .7rem;height:auto;">
+                   ${cands.map(optionOf).join('')}
+                 </select>
+
                  <label style="font-weight:700;">ตำแหน่ง</label>
                  <select id="st-scope" class="swal2-input" style="width:100%;margin:.2rem 0 .7rem;">
                    ${Object.entries(_SCOPE_LABEL).map(([k, v]) =>
                       `<option value="${k}">${v.icon} ${v.name} — ${v.hint}</option>`).join('')}
                  </select>
+
                  <div id="st-value-wrap" style="display:none;">
                    <label style="font-weight:700;">ขอบเขต</label>
                    <select id="st-value" class="swal2-input" style="width:100%;margin:.2rem 0 0;"></select>
@@ -7328,16 +7370,30 @@ window.__oadAddStaff = async () => {
                </div>`,
         showCancelButton: true, confirmButtonText: 'แต่งตั้ง', cancelButtonText: 'ยกเลิก',
         didOpen: () => {
+            const cls   = document.getElementById('st-class');
+            const user  = document.getElementById('st-user');
             const scope = document.getElementById('st-scope');
             const wrap  = document.getElementById('st-value-wrap');
             const val   = document.getElementById('st-value');
+
+            cls.addEventListener('change', () => {
+                const want = cls.value;
+                let firstVisible = null;
+                [...user.options].forEach(o => {
+                    const show = !want || o.dataset.class === want;
+                    o.hidden = !show;
+                    if (show && !firstVisible) firstVisible = o;
+                });
+                if (firstVisible) user.value = firstVisible.value;
+            });
+
             const sync = () => {
-                const s = scope.value;
-                if (s === 'section') {
+                const sv = scope.value;
+                if (sv === 'section') {
                     wrap.style.display = 'block';
                     val.innerHTML = (sections || []).map(x =>
                         `<option value="${escapeHtml(x.code)}">${x.icon || ''} ${escapeHtml(x.name_th)}</option>`).join('');
-                } else if (s === 'event') {
+                } else if (sv === 'event') {
                     wrap.style.display = 'block';
                     const open = (events || []).filter(e => e.status === 'open' || e.status === 'active');
                     val.innerHTML = open.length
@@ -7351,18 +7407,21 @@ window.__oadAddStaff = async () => {
             sync();
         },
         preConfirm: () => {
+            const userId = document.getElementById('st-user').value;
+            if (!userId) { Swal.showValidationMessage('เลือกนักเรียนก่อน'); return false; }
             const scope = document.getElementById('st-scope').value;
             const needsValue = scope === 'section' || scope === 'event';
             const value = needsValue ? document.getElementById('st-value').value : null;
             if (needsValue && !value) { Swal.showValidationMessage('ต้องเลือกขอบเขต'); return false; }
-            return { userId: document.getElementById('st-user').value, scope, value };
+            return { userId, scope, value };
         }
     });
 
     if (!result.isConfirmed) return;
-    const { error } = await staffApi.grant(result.value.userId, result.value.scope, result.value.value);
+    const { data, error } = await staffApi.grantChecked(
+        result.value.userId, result.value.scope, result.value.value);
     if (error) return toast(error.message, 'error');
-    toast('แต่งตั้งเรียบร้อย');
+    toast(data?.message || 'แต่งตั้งเรียบร้อย');
     _renderStaffRoles();
 };
 
@@ -7788,3 +7847,22 @@ window.__oadPublishEvent = async (eventId, name) => {
     renderEventsTab();
     _loadGcalStatus();
 };
+
+// ── บอกครูว่าตอนนี้นักเรียนเลือกชุดได้กี่ชุด และถ้าเลือกไม่ได้เพราะอะไร
+async function _renderKitAvailability() {
+    const el = document.getElementById('oad-uni-avail');
+    if (!el) return;
+    const { data: a, error } = await uniformApi.availability();
+    if (error || !a) { el.textContent = ''; return; }
+
+    if (a.selectable > 0) {
+        el.innerHTML = `<span style="color:#10b981;">✅ นักเรียนเลือกได้ตอนนี้ <strong>${a.selectable}</strong> ชุด</span>`;
+        return;
+    }
+    const why = !a.self_select_on ? 'ปิดการเลือกชุดเองอยู่'
+              : a.no_size > 0     ? `ยังไม่ได้กรอกไซส์ ${a.no_size} ชุด — กรอกที่ตาราง "กรอกไซส์เร็ว" ด้านล่าง`
+              : a.locked > 0      ? `ชุดที่ว่างถูกล็อกไว้ ${a.locked} ชุด`
+              : a.free === 0      ? 'ชุดถูกเลือกไปหมดแล้ว'
+              : 'ยังไม่พร้อม';
+    el.innerHTML = `<span style="color:#f59e0b;">⚠️ นักเรียนยังเลือกไม่ได้ — ${escapeHtml(why)}</span>`;
+}

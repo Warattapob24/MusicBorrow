@@ -6254,6 +6254,25 @@ async function pickMyKit() {
     Swal.fire({ title: 'กำลังโหลดชุดที่ว่าง...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     const { data: kits, error } = await uniformApi.availableKits();
+
+    // ไม่มีชุดให้เลือก มีได้หลายสาเหตุ — บอกให้ตรงเรื่อง อย่าเหมาว่า "ถูกเลือกไปหมด"
+    if (!error && !kits?.length) {
+        const { data: why } = await uniformApi.availability();
+        if (why && !why.self_select_on) {
+            return Swal.fire('ยังเลือกชุดเองไม่ได้',
+                'ครูปิดการเลือกชุดด้วยตัวเองอยู่ — กรุณาติดต่อครู', 'info');
+        }
+        if (why && why.no_size > 0) {
+            return Swal.fire('ชุดยังไม่พร้อมให้เลือก',
+                `มีชุดว่าง ${why.free} ชุด แต่ยังไม่ได้ระบุไซส์ครบ
+` +
+                'ครูต้องกรอกไซส์ก่อน ถึงจะเลือกได้', 'info');
+        }
+        if (why && why.locked > 0 && why.free > 0) {
+            return Swal.fire('ชุดถูกล็อกไว้',
+                `ชุดที่ว่างอยู่ ${why.locked} ชุดถูกครูล็อกไว้ — กรุณาติดต่อครู`, 'info');
+        }
+    }
     if (error) return Swal.fire('ผิดพลาด', error.message, 'error');
     if (!kits?.length) {
         return Swal.fire('ไม่มีชุดว่าง', 'ชุดถูกเลือกไปหมดแล้ว — กรุณาแจ้งครู', 'info');

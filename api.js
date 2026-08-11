@@ -1686,7 +1686,15 @@ export const staffApi = {
                     { onConflict: 'user_id,scope_type,scope_value' }));
     },
     revoke(roleId)          { return _wrap(() => supabase.from('staff_roles').update({ is_active: false }).eq('id', roleId)); },
-    listAll()               { return _wrap(() => supabase.from('staff_roles').select('*, users(prefix, first_name, last_name)').eq('is_active', true)); }
+    // staff_roles มี FK ไป users 2 เส้น (user_id + granted_by) → PostgREST embed ไม่ได้
+    // ต้องใช้ RPC แทน ไม่งั้นได้ error "Could not embed"
+    listAll()               { return _wrap(() => supabase.rpc('admin_staff_list')); },
+    candidates()            { return _wrap(() => supabase.rpc('admin_staff_candidates')); },
+    grantChecked(userId, scopeType, scopeValue = null) {
+        return _wrap(() => supabase.rpc('admin_grant_staff', {
+            p_user_id: userId, p_scope_type: scopeType, p_scope_value: scopeValue
+        }));
+    }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1764,6 +1772,9 @@ export const uniformApi = {
         return _wrap(() => supabase.rpc('admin_set_part_condition', { p_part_id: partId, p_condition: condition }));
     },
     getSelfSelect()         { return _wrap(() => supabase.rpc('get_uniform_self_select')); },
+    availability()          { return _wrap(() => supabase.rpc('get_kit_availability')); },
+    getRequireSize()        { return _wrap(() => supabase.rpc('get_uniform_require_size')); },
+    setRequireSize(on)      { return _wrap(() => supabase.rpc('admin_set_uniform_require_size', { p_on: on })); },
     setSelfSelect(on)       { return _wrap(() => supabase.rpc('admin_set_uniform_self_select', { p_on: on })); },
     lockKit(kitId, selectable) {
         return _wrap(() => supabase.rpc('admin_lock_kit', { p_kit_id: kitId, p_selectable: selectable }));
