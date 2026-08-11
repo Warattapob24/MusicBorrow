@@ -910,7 +910,40 @@ function buildShell() {
             </div>
 
             <div class="oad-panel">
-                <div class="oad-panel-title">📆 ปฏิทิน Google (ให้นักเรียน subscribe)</div>
+                <div class="oad-panel-title">
+                    📆 ซิงก์เข้าปฏิทินเดิมของโรงเรียน
+                    <span id="oad-gcal-status" style="margin-left:auto;font-size:.8rem;font-weight:400;color:var(--oad-muted);"></span>
+                </div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:.8rem;">
+                    เขียนกิจกรรมเข้า<strong>ปฏิทินเดิม</strong>ที่นักเรียนใช้อยู่โดยตรง — ไม่ต้องสร้างปฏิทินใหม่<br>
+                    แก้ในแอปแล้วปฏิทินตามทันที · ลบในแอปแล้วปฏิทินก็ลบตาม
+                </p>
+                <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1.2rem;">
+                    <button class="oad-btn oad-btn-approve" id="oad-gcal-sync">🔄 ซิงก์เดี๋ยวนี้</button>
+                    <span id="oad-gcal-hint" style="font-size:.8rem;color:var(--oad-muted);"></span>
+                </div>
+
+                <details style="margin-bottom:1.2rem;">
+                    <summary style="cursor:pointer;font-size:.87rem;font-weight:700;">⚙️ วิธีตั้งค่าครั้งแรก (ทำครั้งเดียว)</summary>
+                    <ol style="font-size:.83rem;color:var(--oad-muted);line-height:1.9;margin:.6rem 0 0;padding-left:1.2rem;">
+                        <li>ไป <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener">Google Cloud Console → Service Accounts</a> → สร้าง project (ถ้ายังไม่มี) → <strong>Create service account</strong></li>
+                        <li>เข้า service account ที่สร้าง → แท็บ <strong>Keys</strong> → Add key → <strong>JSON</strong> → ได้ไฟล์มา</li>
+                        <li>เปิด <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener">Google Calendar API</a> → กด <strong>Enable</strong></li>
+                        <li>เปิดปฏิทินเดิมใน Google Calendar → ตั้งค่า → <strong>แชร์กับบุคคลที่ต้องการ</strong> → เพิ่มอีเมลของ service account (ลงท้าย <code>@…iam.gserviceaccount.com</code>) → สิทธิ์ <strong>"แก้ไขกิจกรรม"</strong></li>
+                        <li>ไป <a href="https://supabase.com/dashboard/project/qsbvitqxwgtmopjjuxin/settings/functions" target="_blank" rel="noopener">Supabase → Edge Functions → Secrets</a> เพิ่ม 2 ตัว:
+                            <ul style="margin:.3rem 0;">
+                                <li><code>GCAL_SERVICE_ACCOUNT</code> = เนื้อหาไฟล์ JSON ทั้งก้อน</li>
+                                <li><code>GCAL_CALENDAR_ID</code> = อีเมลปฏิทิน (ลงท้าย <code>@group.calendar.google.com</code>)</li>
+                            </ul>
+                        </li>
+                        <li>กลับมากด <strong>ซิงก์เดี๋ยวนี้</strong></li>
+                    </ol>
+                    <p style="font-size:.8rem;color:#f59e0b;margin:.6rem 0 0;">
+                        🔐 ไฟล์ JSON มีกุญแจลับ — วางใน Supabase Secrets เท่านั้น อย่าส่งให้ใครหรือ commit ลง git
+                    </p>
+                </details>
+
+                <div class="oad-panel-title" style="font-size:.95rem;">📥 หรือใช้ลิงก์ subscribe (สร้างปฏิทินใหม่แยก)</div>
                 <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:.8rem;">
                     subscribe ครั้งเดียว แล้วกิจกรรมที่เพิ่มในแอปจะขึ้นปฏิทินเอง <strong>ไม่ต้องกรอกซ้ำ</strong><br>
                     Google รีเฟรชช้า (บางครั้งหลายชั่วโมง) — เรื่องด่วนให้พึ่งการแจ้งเตือนของแอปซึ่งถึงใน 10 วินาที
@@ -5489,7 +5522,7 @@ function renderActiveTab() {
     switch (state.activeTab) {
         case 'overview':     renderStats(); renderOverviewPanels(); break;
         case 'borrows':      renderBorrowsTable(); break;
-        case 'events':       renderEventsTab(); _loadCalendarUrl(); break;
+        case 'events':       renderEventsTab(); _loadCalendarUrl(); _loadGcalStatus(); break;
         case 'uniforms':     renderUniformsTab(); break;
         case 'repairs':      renderRepairsTable(); break;
         case 'users':        loadUserKitMap().then(renderUsersTable); renderStaffPanels(); break;
@@ -5558,6 +5591,22 @@ function wireListeners() {
     });
     document.getElementById('oad-ev-start')?.addEventListener('input', e => { e.target.dataset.touched = '1'; });
     syncDueVisibility();
+
+    // 📆 ซิงก์เข้าปฏิทินเดิม
+    document.getElementById('oad-gcal-sync')?.addEventListener('click', async (e) => {
+        const btn = e.target;
+        btn.disabled = true; btn.textContent = '⏳ กำลังซิงก์...';
+        const { data, error } = await eventsApi.gcalSync();
+        btn.disabled = false; btn.textContent = '🔄 ซิงก์เดี๋ยวนี้';
+
+        const res = data?.data ?? data;   // functions.invoke ห่อ payload ไว้ใน .data
+        if (error || res?.ok === false) {
+            const msg = res?.error || error?.message || 'ซิงก์ไม่สำเร็จ';
+            return Swal.fire('ซิงก์ไม่สำเร็จ', msg, 'error');
+        }
+        toast(`ซิงก์แล้ว — เพิ่ม ${res?.created ?? 0} · แก้ ${res?.updated ?? 0} · ลบ ${res?.removed ?? 0}`);
+        _loadGcalStatus();
+    });
 
     // 📆 ปฏิทิน Google
     document.getElementById('oad-cal-copy')?.addEventListener('click', async () => {
@@ -7668,4 +7717,24 @@ async function _loadCalendarUrl() {
     const { data: token, error } = await eventsApi.calendarToken();
     if (error || !token) { el.value = ''; el.placeholder = 'โหลดลิงก์ไม่สำเร็จ'; return; }
     el.value = `${SUPABASE_URL}/functions/v1/calendar-ics?token=${token}`;
+}
+
+// ── สถานะการซิงก์เข้าปฏิทินเดิม
+async function _loadGcalStatus() {
+    const el = document.getElementById('oad-gcal-status');
+    const hint = document.getElementById('oad-gcal-hint');
+    if (!el) return;
+
+    const { data, error } = await eventsApi.gcalStatus();
+    if (error || !data) { el.textContent = ''; return; }
+
+    const pending = Number(data.pending || 0);
+    el.innerHTML = pending
+        ? `<span style="color:#f59e0b;">รอซิงก์ ${pending} รายการ</span>`
+        : `<span style="color:#10b981;">ซิงก์ครบแล้ว</span>`;
+    if (hint) {
+        hint.textContent = data.last_sync
+            ? `ซิงก์ล่าสุด ${new Date(data.last_sync).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}`
+            : 'ยังไม่เคยซิงก์ — ตั้งค่าตามขั้นตอนด้านล่างก่อน';
+    }
 }

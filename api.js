@@ -1624,6 +1624,9 @@ export const eventsApi = {
         return _wrap(() => supabase.rpc('get_activity_schedule', { p_from: null, p_days: days }));
     },
     calendarToken()      { return _wrap(() => supabase.rpc('admin_get_calendar_token')); },
+    // ซิงก์เข้าปฏิทิน Google เดิมของโรงเรียน (ผ่าน Calendar API ไม่ใช่ ICS)
+    gcalStatus()         { return _wrap(() => supabase.rpc('admin_gcal_status')); },
+    gcalSync()           { return _wrap(() => supabase.functions.invoke('gcal-sync')); },
     resetCalendarToken() { return _wrap(() => supabase.rpc('admin_reset_calendar_token')); },
     close(eventId, note = null) {
         return _wrap(() => supabase.rpc('admin_close_event', { p_event_id: eventId, p_note: note }));
