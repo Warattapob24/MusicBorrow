@@ -11,7 +11,7 @@
 import { authApi, notificationsExt, borrowExt, usersExt, repair,
          instrumentsExt, realtimeApi, gamesExt, knowledgeExt, statsApi,
          badgesExt, rankingsExt, bossesApi, raidApi, studentLoopsApi,
-         uniformApi } from './api.js';
+         uniformApi, eventsApi } from './api.js';
 import { currentUser, setCurrentUser, getCurrentUser } from './auth.js';
 import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
 import { buildPlayerCardHTML, triggerLevelUp, sharePlayerCard  } from './player-card.js';
@@ -902,6 +902,11 @@ const VIEWS = {
             return `
                 ${renderUnifiedCard({ emoji: '🎸', title: 'ยืม และ คืนเครื่องดนตรี', subtitle: 'จัดการเครื่องดนตรีของคุณในหน้าเดียว' })}
 
+                <div id="schedule-section" style="margin-bottom: 2.5rem;">
+                    <h3 class="sd-section-title">📅 ตารางกิจกรรม</h3>
+                    <div id="schedule-list" aria-busy="true" class="sd-list-container"></div>
+                </div>
+
                 <div id="borrowed-section" style="margin-bottom: 2.5rem; display: none;">
                     <h3 class="sd-section-title" style="color: var(--pico-color-green-500);">🎸 เครื่องดนตรีที่กำลังยืม</h3>
                     <div id="borrowed-list" aria-busy="true" class="sd-list-container"></div>
@@ -921,6 +926,7 @@ const VIEWS = {
                 <div class="sd-bottom-spacer"></div>`;
         },
         async afterRender(user) {
+            renderSchedule();   // ไม่ต้อง await — โหลดคู่ขนานกับส่วนอื่น
             await loadAndRenderMyBorrowedItems(user.id);
             await renderMyKit();
             await renderBorrowForm(user);
@@ -6291,4 +6297,91 @@ async function pickMyKit() {
     }
     await Swal.fire('เรียบร้อย', `ชุด #${data.kit_no} เป็นชุดประจำตัวของคุณแล้ว`, 'success');
     renderMyKit();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 📅 ตารางกิจกรรม — นัดซ้อม / เข้าค่าย / ออกงาน / ประชุม
+//    ข้อมูลชุดเดียวกับที่ส่งออกไปปฏิทิน Google จึงตรงกันเสมอ
+// ─────────────────────────────────────────────────────────────────────────────
+const _ACT_TH = {
+    practice:    { icon: '🎵', name: 'ซ้อม',     color: '#3b82f6' },
+    camp:        { icon: '⛺', name: 'เข้าค่าย', color: '#8b5cf6' },
+    performance: { icon: '🎭', name: 'ออกงาน',   color: '#f59e0b' },
+    meeting:     { icon: '📋', name: 'ประชุม',   color: '#64748b' },
+    other:       { icon: '📌', name: 'กิจกรรม',  color: '#64748b' }
+};
+
+/** ลิงก์ "เพิ่มลงปฏิทิน" ของ Google — ใช้ตอนอยากเพิ่มงานเดียวทันที ไม่ต้องรอ feed */
+function _gcalLink(e) {
+    const z = d => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    const a = _ACT_TH[e.activity_type] || _ACT_TH.other;
+    const p = new URLSearchParams({
+        action: 'TEMPLATE',
+        text: `${a.icon} ${a.name} ${e.name}`,
+        dates: `${z(e.start_at)}/${z(e.end_at || e.return_due_at || e.start_at)}`,
+        ctz: 'Asia/Bangkok'
+    });
+    if (e.location) p.set('location', e.location);
+    return `https://calendar.google.com/calendar/render?${p}`;
+}
+
+export async function renderSchedule() {
+    const box = document.getElementById('schedule-list');
+    if (!box) return;
+    box.setAttribute('aria-busy', 'true');
+
+    try {
+        const { data, error } = await eventsApi.schedule(60);
+        if (error) throw error;
+
+        if (!data?.length) {
+            box.innerHTML = `<p style="text-align:center;color:var(--pico-muted-color);padding:1.5rem;">
+                ยังไม่มีกิจกรรมที่นัดไว้</p>`;
+            return;
+        }
+
+        const now = Date.now();
+        box.innerHTML = data.map(e => {
+            const a = _ACT_TH[e.activity_type] || _ACT_TH.other;
+            const start = new Date(e.start_at);
+            const t = d => new Date(d).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+            const diffDays = Math.ceil((start - now) / 86400000);
+            const when = diffDays < 0 ? 'กำลังดำเนินอยู่'
+                       : diffDays === 0 ? 'วันนี้'
+                       : diffDays === 1 ? 'พรุ่งนี้'
+                       : `อีก ${diffDays} วัน`;
+            const soon = diffDays >= 0 && diffDays <= 1;
+
+            return `<div class="sd-list-item" style="display:flex;gap:.8rem;align-items:flex-start;
+                        border-left:4px solid ${a.color};padding-left:.8rem;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;">
+                        ${a.icon} ${escapeHtml(e.name)}
+                        ${soon ? `<span style="font-size:.72rem;background:${a.color};color:#fff;
+                                  padding:.1rem .4rem;border-radius:6px;margin-left:.3rem;">${when}</span>` : ''}
+                    </div>
+                    <div style="font-size:.83rem;color:var(--pico-muted-color);margin-top:.15rem;">
+                        ${start.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        · ${t(e.start_at)}${e.end_at ? `–${t(e.end_at)}` : ''} น.
+                        ${e.location ? ` · 📍 ${escapeHtml(e.location)}` : ''}
+                        ${!soon ? ` · ${when}` : ''}
+                    </div>
+                    ${(e.needs_instrument || e.needs_uniform) ? `
+                        <div style="font-size:.78rem;margin-top:.25rem;">
+                            ${e.needs_instrument ? '🎺 เบิกเครื่อง ' : ''}${e.needs_uniform ? '👔 เบิกชุด' : ''}
+                            ${e.joined ? '<span style="color:#10b981;"> · ✅ เบิกแล้ว</span>'
+                                       : '<span style="color:#f59e0b;"> · ยังไม่ได้เบิก</span>'}
+                        </div>` : ''}
+                </div>
+                <a href="${_gcalLink(e)}" target="_blank" rel="noopener"
+                   title="เพิ่มลงปฏิทิน Google"
+                   style="flex-shrink:0;text-decoration:none;font-size:1.1rem;opacity:.6;">📅</a>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        box.innerHTML = `<p style="text-align:center;color:var(--pico-del-color);padding:1.5rem;">
+            โหลดตารางไม่สำเร็จ: ${escapeHtml(err?.message || '')}</p>`;
+    } finally {
+        box.removeAttribute('aria-busy');
+    }
 }

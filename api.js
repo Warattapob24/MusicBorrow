@@ -1607,14 +1607,24 @@ const _wrap = async (fn) => {
 export const eventsApi = {
     getOpen()               { return _wrap(() => supabase.rpc('get_open_events')); },
     getSummary(eventId)     { return _wrap(() => supabase.rpc('get_event_summary', { p_event_id: eventId })); },
-    create({ name, eventDate, returnDueAt, startAt = null,
-             needsInstrument = true, needsUniform = true, openTo = 'club' }) {
+    create({ name, eventDate, startAt = null, endAt = null, returnDueAt = null,
+             activityType = 'performance', location = null,
+             needsInstrument = false, needsUniform = false,
+             openTo = 'club', showInCalendar = true }) {
         return _wrap(() => supabase.rpc('admin_create_event', {
-            p_name: name, p_event_date: eventDate, p_return_due_at: returnDueAt,
-            p_start_at: startAt,
-            p_needs_instrument: needsInstrument, p_needs_uniform: needsUniform, p_open_to: openTo
+            p_name: name, p_event_date: eventDate,
+            p_start_at: startAt, p_end_at: endAt, p_return_due_at: returnDueAt,
+            p_activity_type: activityType, p_location: location,
+            p_needs_instrument: needsInstrument, p_needs_uniform: needsUniform,
+            p_open_to: openTo, p_show_in_calendar: showInCalendar
         }));
     },
+    // 📅 ตารางกิจกรรม (ซ้อม / ค่าย / ออกงาน / ประชุม)
+    schedule(days = 60) {
+        return _wrap(() => supabase.rpc('get_activity_schedule', { p_from: null, p_days: days }));
+    },
+    calendarToken()      { return _wrap(() => supabase.rpc('admin_get_calendar_token')); },
+    resetCalendarToken() { return _wrap(() => supabase.rpc('admin_reset_calendar_token')); },
     close(eventId, note = null) {
         return _wrap(() => supabase.rpc('admin_close_event', { p_event_id: eventId, p_note: note }));
     },

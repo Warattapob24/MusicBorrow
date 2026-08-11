@@ -6,6 +6,7 @@
 
 import { adminDashboard as api, adminExt, authApi, bossesApi, raidApi, instrumentsExt, notifications, adminKnowledgeApi, scheduledNotificationsApi, adminNotifications, recoveryApi, studentLoopsApi, eventsApi, uniformApi, staffApi, sectionsApi } from './api.js';
 import { escapeHtml, translateGroup } from './utils.js';
+import { SUPABASE_URL } from './config.js';
 import { getCurrentUser } from './auth.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -849,25 +850,44 @@ function buildShell() {
 
         <div class="oad-tab-panel" id="oad-panel-events">
             <div class="oad-panel">
-                <div class="oad-panel-title">🎭 เปิดงานใหม่</div>
+                <div class="oad-panel-title">📅 เพิ่มกิจกรรม</div>
                 <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
-                    เปิดงานแล้วนักเรียนจะเลือกงานนี้ได้ตอนสแกน QR ยืมเครื่อง — กำหนดคืนจะยึดตามงานอัตโนมัติ
+                    กรอกที่นี่ที่เดียว — ขึ้นทั้งตารางในแอปและปฏิทิน Google ที่นักเรียน subscribe ไว้<br>
+                    ติ๊ก "เบิกของ" เฉพาะงานที่ต้องเบิกจริง (ซ้อมปกติไม่ต้องติ๊ก จะได้ไม่ไปโผล่ตอนเด็กสแกนยืมเครื่อง)
                 </p>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.75rem; align-items:end;">
                     <div>
-                        <label style="font-size:.8rem; font-weight:700;">ชื่องาน*</label>
+                        <label style="font-size:.8rem; font-weight:700;">ประเภท*</label>
+                        <select id="oad-ev-type" class="oad-input">
+                            <option value="practice">🎵 นัดซ้อม</option>
+                            <option value="performance" selected>🎭 ออกงาน</option>
+                            <option value="camp">⛺ เข้าค่าย</option>
+                            <option value="meeting">📋 ประชุม</option>
+                            <option value="other">📌 อื่นๆ</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:.8rem; font-weight:700;">ชื่อกิจกรรม*</label>
                         <input id="oad-ev-name" class="oad-input" placeholder="เช่น แห่เทียนพรรษา">
+                    </div>
+                    <div>
+                        <label style="font-size:.8rem; font-weight:700;">📍 สถานที่</label>
+                        <input id="oad-ev-loc" class="oad-input" placeholder="เช่น วัดกลาง">
                     </div>
                     <div>
                         <label style="font-size:.8rem; font-weight:700;">วันที่จัดงาน*</label>
                         <input id="oad-ev-date" type="date" class="oad-input">
                     </div>
                     <div>
-                        <label style="font-size:.8rem; font-weight:700;">⏰ เวลานัด (เริ่มงาน)</label>
+                        <label style="font-size:.8rem; font-weight:700;">⏰ เริ่ม</label>
                         <input id="oad-ev-start" type="time" class="oad-input" value="08:00">
                     </div>
                     <div>
-                        <label style="font-size:.8rem; font-weight:700;">กำหนดคืน*</label>
+                        <label style="font-size:.8rem; font-weight:700;">⏱️ เลิก</label>
+                        <input id="oad-ev-end" type="time" class="oad-input" value="12:00">
+                    </div>
+                    <div id="oad-ev-due-wrap">
+                        <label style="font-size:.8rem; font-weight:700;">กำหนดคืนของ</label>
                         <input id="oad-ev-due" type="datetime-local" class="oad-input">
                     </div>
                     <div>
@@ -879,13 +899,32 @@ function buildShell() {
                     </div>
                 </div>
                 <div style="display:flex; gap:1.25rem; flex-wrap:wrap; margin:.9rem 0;">
-                    <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-inst" checked> เบิกเครื่องดนตรี</label>
-                    <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-uni" checked> เบิกชุด</label>
+                    <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-inst"> 🎺 เบิกเครื่องดนตรี</label>
+                    <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-uni"> 👔 เบิกชุด</label>
+                    <label style="font-size:.85rem;"><input type="checkbox" id="oad-ev-cal" checked> 📅 แสดงในปฏิทิน</label>
                 </div>
                 <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
-                    <button class="oad-btn oad-btn-approve" id="oad-ev-create">🎭 เปิดงาน</button>
-                    <button class="oad-btn" id="oad-ev-quick">⚡ งานวันนี้ (คืนพรุ่งนี้เที่ยง)</button>
+                    <button class="oad-btn oad-btn-approve" id="oad-ev-create">📅 เพิ่มกิจกรรม</button>
+                    <button class="oad-btn" id="oad-ev-quick">⚡ ซ้อมวันนี้ (13:00–16:00)</button>
                 </div>
+            </div>
+
+            <div class="oad-panel">
+                <div class="oad-panel-title">📆 ปฏิทิน Google (ให้นักเรียน subscribe)</div>
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:.8rem;">
+                    subscribe ครั้งเดียว แล้วกิจกรรมที่เพิ่มในแอปจะขึ้นปฏิทินเอง <strong>ไม่ต้องกรอกซ้ำ</strong><br>
+                    Google รีเฟรชช้า (บางครั้งหลายชั่วโมง) — เรื่องด่วนให้พึ่งการแจ้งเตือนของแอปซึ่งถึงใน 10 วินาที
+                </p>
+                <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center;">
+                    <input id="oad-cal-url" class="oad-input" readonly style="flex:1; min-width:260px; font-size:.78rem;">
+                    <button class="oad-btn oad-btn-approve" id="oad-cal-copy">📋 คัดลอกลิงก์</button>
+                    <button class="oad-btn" id="oad-cal-open">➕ เปิด Google Calendar</button>
+                    <button class="oad-btn oad-btn-red" id="oad-cal-reset">🔑 เปลี่ยนลิงก์</button>
+                </div>
+                <p style="font-size:.78rem; color:var(--oad-muted); margin:.7rem 0 0;">
+                    วิธี: Google Calendar → "ปฏิทินอื่นๆ" + → <strong>จากURL</strong> → วางลิงก์ → เพิ่มปฏิทิน<br>
+                    ⚠️ ใครมีลิงก์นี้เห็นตารางทั้งหมด — ถ้าหลุด กด "เปลี่ยนลิงก์" แล้วให้ทุกคน subscribe ใหม่
+                </p>
             </div>
 
             <div class="oad-panel">
@@ -5450,7 +5489,7 @@ function renderActiveTab() {
     switch (state.activeTab) {
         case 'overview':     renderStats(); renderOverviewPanels(); break;
         case 'borrows':      renderBorrowsTable(); break;
-        case 'events':       renderEventsTab(); break;
+        case 'events':       renderEventsTab(); _loadCalendarUrl(); break;
         case 'uniforms':     renderUniformsTab(); break;
         case 'repairs':      renderRepairsTable(); break;
         case 'users':        loadUserKitMap().then(renderUsersTable); renderStaffPanels(); break;
@@ -5485,12 +5524,65 @@ function wireListeners() {
     // 🎭 Events tab
     document.getElementById('oad-ev-create')?.addEventListener('click', () => _createEvent(false));
     document.getElementById('oad-ev-quick')?.addEventListener('click', () => _createEvent(true));
-    // เลือกวันที่จัดงาน → เดากำหนดคืนเป็น "เย็นวันเดียวกัน"
-    // งานส่วนใหญ่จบในวันเดียว ไม่ควรบังคับให้ค้างข้ามคืน (ครูแก้ได้อิสระ)
+    // เลือกวันที่ → เดากำหนดคืนเป็นเย็นวันเดียวกัน (งานส่วนใหญ่จบในวันเดียว)
     document.getElementById('oad-ev-date')?.addEventListener('change', e => {
         const dueEl = document.getElementById('oad-ev-due');
         if (!dueEl || dueEl.value || !e.target.value) return;
         dueEl.value = `${e.target.value}T18:00`;
+    });
+
+    // กำหนดคืนมีความหมายเฉพาะงานที่มีการเบิก — ไม่งั้นซ่อนไปเลยจะได้ไม่สับสน
+    const syncDueVisibility = () => {
+        const wrap = document.getElementById('oad-ev-due-wrap');
+        const on = document.getElementById('oad-ev-inst')?.checked
+                || document.getElementById('oad-ev-uni')?.checked;
+        if (wrap) wrap.style.display = on ? '' : 'none';
+    };
+    ['oad-ev-inst', 'oad-ev-uni'].forEach(id =>
+        document.getElementById(id)?.addEventListener('change', syncDueVisibility));
+
+    // เลือกประเภทกิจกรรม → ตั้งค่าเริ่มต้นที่สมเหตุสมผลให้เลย
+    document.getElementById('oad-ev-type')?.addEventListener('change', e => {
+        const isShow = e.target.value === 'performance' || e.target.value === 'camp';
+        const inst = document.getElementById('oad-ev-inst');
+        const uni  = document.getElementById('oad-ev-uni');
+        if (inst) inst.checked = isShow;
+        if (uni)  uni.checked  = isShow;
+        const st = document.getElementById('oad-ev-start');
+        const en = document.getElementById('oad-ev-end');
+        if (st && en && !st.dataset.touched) {
+            if (e.target.value === 'practice') { st.value = '13:00'; en.value = '16:00'; }
+            else { st.value = '08:00'; en.value = '12:00'; }
+        }
+        syncDueVisibility();
+    });
+    document.getElementById('oad-ev-start')?.addEventListener('input', e => { e.target.dataset.touched = '1'; });
+    syncDueVisibility();
+
+    // 📆 ปฏิทิน Google
+    document.getElementById('oad-cal-copy')?.addEventListener('click', async () => {
+        const el = document.getElementById('oad-cal-url');
+        if (!el?.value) return toast('ยังไม่มีลิงก์', 'error');
+        try { await navigator.clipboard.writeText(el.value); toast('คัดลอกลิงก์แล้ว'); }
+        catch { el.select(); toast('กด Ctrl+C เพื่อคัดลอก'); }
+    });
+    document.getElementById('oad-cal-open')?.addEventListener('click', () => {
+        const el = document.getElementById('oad-cal-url');
+        if (!el?.value) return toast('ยังไม่มีลิงก์', 'error');
+        window.open('https://calendar.google.com/calendar/u/0/r/settings/addbyurl', '_blank');
+    });
+    document.getElementById('oad-cal-reset')?.addEventListener('click', async () => {
+        const { isConfirmed } = await Swal.fire({
+            title: 'เปลี่ยนลิงก์ปฏิทิน?',
+            text: 'ลิงก์เดิมจะใช้ไม่ได้ทันที — ทุกคนที่ subscribe ไว้ต้อง subscribe ใหม่',
+            icon: 'warning', showCancelButton: true,
+            confirmButtonText: 'เปลี่ยน', cancelButtonText: 'ยกเลิก'
+        });
+        if (!isConfirmed) return;
+        const { error } = await eventsApi.resetCalendarToken();
+        if (error) return toast(error.message, 'error');
+        toast('เปลี่ยนลิงก์แล้ว — แจ้งให้ทุกคน subscribe ใหม่');
+        _loadCalendarUrl();
     });
 
     // 🎖 Staff roles
@@ -6038,6 +6130,14 @@ export function destroyAdminDashboard() {
 //    → ปิดงานไม่ได้ถ้ายังมีของค้าง (เว้นแต่ระบุเหตุผล)
 // ═══════════════════════════════════════════════════════════════════════════
 
+const _ACT = {
+    practice:    { icon: '🎵', name: 'ซ้อม',      cls: 'oad-badge-blue' },
+    camp:        { icon: '⛺', name: 'เข้าค่าย',  cls: 'oad-badge-purple' },
+    performance: { icon: '🎭', name: 'ออกงาน',    cls: 'oad-badge-amber' },
+    meeting:     { icon: '📋', name: 'ประชุม',    cls: 'oad-badge-gray' },
+    other:       { icon: '📌', name: 'อื่นๆ',     cls: 'oad-badge-gray' }
+};
+
 const _EV_STATUS = {
     draft:  '<span class="oad-badge oad-badge-gray">ร่าง</span>',
     open:   '<span class="oad-badge oad-badge-green">เปิดรับเบิก</span>',
@@ -6071,7 +6171,7 @@ async function renderEventsTab() {
     wrap.innerHTML = `
         <table class="oad-table">
             <thead><tr>
-                <th>งาน</th><th>วันที่</th><th>⏰ เวลานัด</th><th>กำหนดคืน</th>
+                <th>ประเภท</th><th>กิจกรรม</th><th>วันที่</th><th>⏰ เวลา</th><th>กำหนดคืน</th>
                 <th>เครื่องดนตรี</th><th>ชุด</th><th>สถานะ</th><th>จัดการ</th>
             </tr></thead>
             <tbody>
@@ -6084,12 +6184,19 @@ async function renderEventsTab() {
                     : '—';
                 const isClosed = e.status === 'closed';
                 return `<tr>
-                    <td><strong>${escapeHtml(e.name)}</strong></td>
+                    <td class="nowrap">${(() => { const a = _ACT[e.activity_type] || _ACT.other;
+                        return `<span class="oad-badge ${a.cls}">${a.icon} ${a.name}</span>`; })()}</td>
+                    <td><strong>${escapeHtml(e.name)}</strong>
+                        ${e.location ? `<div style="font-size:.72rem;opacity:.65;">📍 ${escapeHtml(e.location)}</div>` : ''}
+                        ${e.show_in_calendar ? '' : '<div style="font-size:.72rem;opacity:.55;">ไม่แสดงในปฏิทิน</div>'}</td>
                     <td class="nowrap">${fmtDateShort(e.event_date)}</td>
-                    <td class="nowrap">${e.start_at
-                        ? new Date(e.start_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
-                        : '<span style="opacity:.4;">—</span>'}</td>
-                    <td class="nowrap">${fmtDate(e.return_due_at)}</td>
+                    <td class="nowrap" style="font-size:.82rem;">${(() => {
+                        const t = d => new Date(d).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                        if (!e.start_at) return '<span style="opacity:.4;">—</span>';
+                        return e.end_at ? `${t(e.start_at)}–${t(e.end_at)}` : `${t(e.start_at)} น.`;
+                    })()}</td>
+                    <td class="nowrap">${(e.needs_instrument || e.needs_uniform)
+                        ? fmtDate(e.return_due_at) : '<span style="opacity:.4;">ไม่มีการเบิก</span>'}</td>
                     <td class="nowrap">${cell(s.instrument_back, s.instrument_out, iPend)}</td>
                     <td class="nowrap">${cell(s.uniform_back, s.uniform_out, uPend)}</td>
                     <td>${_EV_STATUS[e.status] || escapeHtml(e.status)}</td>
@@ -6112,58 +6219,64 @@ function _updateEventsBadge(n) {
 }
 
 async function _createEvent(quick = false) {
-    let name, date, start, due, openTo, needsInst, needsUni;
+    const pick = id => document.getElementById(id);
+    let payload;
 
     if (quick) {
-        // ⚡ ปุ่มลัด — เปิดงานให้เสร็จใน 15 วิ กันครูลืมเปิดจนเด็กเบิกออกงานไม่ได้
+        // ⚡ ซ้อมวันนี้ — กรณีที่ใช้บ่อยที่สุด ไม่ต้องกรอกอะไรนอกจากชื่อ
         const { value: qName } = await Swal.fire({
-            title: '⚡ เปิดงานด่วน',
-            input: 'text', inputPlaceholder: 'ชื่องาน',
-            text: 'จัดวันนี้ — กำหนดคืนพรุ่งนี้ 12:00',
-            showCancelButton: true, confirmButtonText: 'เปิดงาน', cancelButtonText: 'ยกเลิก',
-            inputValidator: v => (!v || !v.trim()) ? 'กรุณาใส่ชื่องาน' : undefined
+            title: '⚡ นัดซ้อมวันนี้',
+            input: 'text', inputPlaceholder: 'ชื่อ (เว้นว่าง = "ซ้อมประจำ")',
+            text: '13:00 – 16:00 วันนี้ · ไม่ต้องเบิกของ',
+            showCancelButton: true, confirmButtonText: 'เพิ่ม', cancelButtonText: 'ยกเลิก'
         });
-        if (!qName) return;
-        // งานวันเดียวจบ — คืนเย็นวันนี้ ไม่ต้องค้างข้ามคืน
+        if (qName === undefined) return;
         const today = new Date().toISOString().slice(0, 10);
-        name = qName.trim();
-        date = today;
-        start = new Date(`${today}T08:00`).toISOString();
-        due   = new Date(`${today}T18:00`).toISOString();
-        openTo = 'club'; needsInst = true; needsUni = true;
+        payload = {
+            name: (qName || '').trim() || 'ซ้อมประจำ',
+            eventDate: today,
+            startAt: new Date(`${today}T13:00`).toISOString(),
+            endAt:   new Date(`${today}T16:00`).toISOString(),
+            activityType: 'practice', showInCalendar: true,
+            needsInstrument: false, needsUniform: false, openTo: 'club'
+        };
     } else {
-        name      = document.getElementById('oad-ev-name')?.value?.trim();
-        date      = document.getElementById('oad-ev-date')?.value;
-        const startLocal = document.getElementById('oad-ev-start')?.value;
-        const dueLocal = document.getElementById('oad-ev-due')?.value;
-        openTo    = document.getElementById('oad-ev-open')?.value || 'club';
-        needsInst = document.getElementById('oad-ev-inst')?.checked ?? true;
-        needsUni  = document.getElementById('oad-ev-uni')?.checked ?? true;
+        const name = pick('oad-ev-name')?.value?.trim();
+        const date = pick('oad-ev-date')?.value;
+        const st   = pick('oad-ev-start')?.value;
+        const en   = pick('oad-ev-end')?.value;
+        const due  = pick('oad-ev-due')?.value;
+        const inst = pick('oad-ev-inst')?.checked ?? false;
+        const uni  = pick('oad-ev-uni')?.checked ?? false;
 
-        if (!name || !date || !dueLocal) {
-            return toast('กรอกชื่องาน วันที่ และกำหนดคืนให้ครบ', 'error');
+        if (!name || !date || !st || !en) {
+            return toast('กรอกชื่อ วันที่ เวลาเริ่ม-เลิก ให้ครบ', 'error');
         }
-        // datetime-local / time ให้เวลาท้องถิ่นแบบไม่มี timezone — แปลงเป็น ISO ก่อนส่ง
-        start = startLocal ? new Date(`${date}T${startLocal}`).toISOString() : null;
-        due = new Date(dueLocal).toISOString();
-        if (start && new Date(due) <= new Date(start)) {
-            return toast('กำหนดคืนต้องอยู่หลังเวลานัด', 'error');
-        }
-        if (new Date(due) <= new Date()) {
-            return toast('กำหนดคืนต้องเป็นเวลาในอนาคต', 'error');
-        }
+        const startAt = new Date(`${date}T${st}`);
+        const endAt   = new Date(`${date}T${en}`);
+        if (endAt <= startAt) return toast('เวลาเลิกต้องอยู่หลังเวลาเริ่ม', 'error');
+
+        if ((inst || uni) && !due) return toast('งานที่มีการเบิกต้องระบุกำหนดคืน', 'error');
+        if (due && new Date(due) <= startAt) return toast('กำหนดคืนต้องอยู่หลังเวลาเริ่ม', 'error');
+
+        payload = {
+            name, eventDate: date,
+            startAt: startAt.toISOString(), endAt: endAt.toISOString(),
+            returnDueAt: due ? new Date(due).toISOString() : null,
+            activityType: pick('oad-ev-type')?.value || 'performance',
+            location: pick('oad-ev-loc')?.value?.trim() || null,
+            needsInstrument: inst, needsUniform: uni,
+            openTo: pick('oad-ev-open')?.value || 'club',
+            showInCalendar: pick('oad-ev-cal')?.checked ?? true
+        };
     }
 
-    const { data, error } = await eventsApi.create({
-        name, eventDate: date, returnDueAt: due, startAt: start,
-        needsInstrument: needsInst, needsUniform: needsUni, openTo
-    });
+    const { data, error } = await eventsApi.create(payload);
+    if (error) return toast(error.message || 'เพิ่มกิจกรรมไม่สำเร็จ', 'error');
 
-    if (error) return toast(error.message || 'เปิดงานไม่สำเร็จ', 'error');
-
-    toast(data?.message || `เปิดงาน "${name}" แล้ว`);
-    ['oad-ev-name', 'oad-ev-date', 'oad-ev-due'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
+    toast(data?.message || `เพิ่ม "${payload.name}" แล้ว`);
+    ['oad-ev-name', 'oad-ev-date', 'oad-ev-due', 'oad-ev-loc'].forEach(id => {
+        const el = pick(id); if (el) el.value = '';
     });
     renderEventsTab();
 }
@@ -7546,4 +7659,13 @@ function _sgStockNote(typeId, size, isCurrent = false) {
     const left = st.remaining;
     if (left > 0) return ` (เหลือ ${left})`;
     return isCurrent ? '' : ' (หมด)';
+}
+
+// ── ลิงก์ ICS สำหรับ subscribe เข้า Google Calendar
+async function _loadCalendarUrl() {
+    const el = document.getElementById('oad-cal-url');
+    if (!el) return;
+    const { data: token, error } = await eventsApi.calendarToken();
+    if (error || !token) { el.value = ''; el.placeholder = 'โหลดลิงก์ไม่สำเร็จ'; return; }
+    el.value = `${SUPABASE_URL}/functions/v1/calendar-ics?token=${token}`;
 }
