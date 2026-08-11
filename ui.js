@@ -484,12 +484,18 @@ export async function showDashboardView(user) {
 }
 
 async function showForcedProfileUpdateModal(userData) {
+    // ขาดแค่เครื่องดนตรี (ข้อมูลอื่นครบ) → อย่าขึ้นข้อความรีเซ็ตปีการศึกษา ซึ่งไม่ตรงเรื่อง
+    const onlyInstrumentMissing =
+        userData.student_group === 'club' && !userData.main_instrument && !!userData.class_level;
+
     const { value: formValues } = await Swal.fire({
-        title: '🎓 เริ่มต้นปีการศึกษาใหม่!',
+        title: onlyInstrumentMissing ? '🎵 เลือกเครื่องดนตรีของคุณ' : '🎓 เริ่มต้นปีการศึกษาใหม่!',
         html: `
             <div style="text-align:left; margin-top:1rem;">
                 <p style="font-size:0.9rem; color:var(--pico-muted-color);">
-                    ระบบได้ทำการรีเซ็ตสถิติเวลาซ้อมทั้งหมด กรุณาตรวจสอบและ <strong>อัปเดตระดับชั้นเรียนของคุณ</strong> สำหรับปีการศึกษาใหม่เพื่อเริ่มใช้งาน
+                    ${onlyInstrumentMissing
+                        ? 'ยังไม่มีข้อมูลเครื่องดนตรีของคุณในระบบ กรุณา<strong>เลือกเครื่องเอก</strong>เพื่อเริ่มใช้งาน'
+                        : 'ระบบได้ทำการรีเซ็ตสถิติเวลาซ้อมทั้งหมด กรุณาตรวจสอบและ <strong>อัปเดตระดับชั้นเรียนของคุณ</strong> สำหรับปีการศึกษาใหม่เพื่อเริ่มใช้งาน'}
                 </p>
                 
                 <div class="grid">
@@ -518,8 +524,23 @@ async function showForcedProfileUpdateModal(userData) {
                         <input id="swal-classlevel" class="swal2-input" style="margin: 0.5rem 0 1rem 0;" value="${escapeHtml(userData.class_level || '')}" placeholder="เช่น ม.4/1">
                     </div>
                 </div>
+
+                <div id="forced-instrument-wrap" class="${userData.student_group === 'club' ? '' : 'hidden'}">
+                    <label style="font-size:0.85rem; font-weight:bold;">เครื่องดนตรีหลัก (สำหรับสมาชิกชุมนุม)</label>
+                    <select id="swal-forced-instrument" class="swal2-select" style="margin: 0.5rem 0; width: 100%;">
+                        <option value="">— เลือกเครื่องดนตรี —</option>
+                    </select>
+                </div>
             </div>
         `,
+        didOpen: () => {
+            fillInstrumentSelect(document.getElementById('swal-forced-instrument'),
+                                 userData.main_instrument || null);
+            document.getElementById('swal-group')?.addEventListener('change', (e) => {
+                document.getElementById('forced-instrument-wrap')
+                        ?.classList.toggle('hidden', e.target.value !== 'club');
+            });
+        },
         width: '600px',
         focusConfirm: false,
         allowOutsideClick: false,
@@ -532,11 +553,19 @@ async function showForcedProfileUpdateModal(userData) {
             const group = document.getElementById('swal-group').value;
             const classLevel = document.getElementById('swal-classlevel').value.trim();
             
+            const instrument = document.getElementById('swal-forced-instrument')?.value || '';
+
+            if (group === 'club' && !instrument) {
+                Swal.showValidationMessage('กรุณาเลือกเครื่องดนตรีหลัก');
+                return false;
+            }
+
             if (!fname || !lname || !group) {
                 Swal.showValidationMessage('⚠️ กรุณากรอกชื่อ นามสกุล และกลุ่มผู้ใช้ให้ครบถ้วน');
                 return false;
             }
-            return { 
+            return {
+                main_instrument: instrument || null,
                 first_name: fname, 
                 last_name: lname, 
                 student_group: group,
@@ -552,6 +581,7 @@ async function showForcedProfileUpdateModal(userData) {
             last_name: formValues.last_name,
             student_group: formValues.student_group,
             class_level: formValues.class_level,
+            main_instrument: formValues.main_instrument,
             needs_profile_update: false
         });
 
