@@ -3608,6 +3608,8 @@ body { margin: 0; padding: 0; background-color: var(--main-bg, var(--pico-backgr
     font-style: normal; font-size: .73rem; opacity: .68;
     overflow-wrap: anywhere; word-break: break-word;
 }
+/* กลุ่มเครื่องอยู่บรรทัดเดียวกับชื่อเครื่อง แต่เบากว่า ชื่อเครื่องจะได้เด่นก่อน */
+.duty-sec { font-weight: 400; opacity: .6; font-size: .78rem; }
 .duty-side {
     flex: 0 0 auto; text-align: right; font-size: .68rem;
     line-height: 1.25; opacity: .7; max-width: 34%;
@@ -6886,9 +6888,9 @@ async function renderDutyView() {
                 <span class="duty-ic" style="background:${r.is_overdue ? '#ef4444' : '#3b82f6'};">
                     ${r.is_overdue ? '🔥' : '🎺'}</span>
                 <span class="duty-main">
-                    <b>${escapeHtml(r.instrument_name || r.instrument_kind || '-')}</b>
-                    <i>${escapeHtml(nameWithNick(r.student_name, r.student_nickname))}${
-                        r.section_name ? ' · ' + escapeHtml(r.section_name) : ''}</i>
+                    <b>${escapeHtml(r.instrument_name || r.instrument_kind || '-')}${
+                        r.section_name ? ' <span class="duty-sec">· ' + escapeHtml(r.section_name) + '</span>' : ''}</b>
+                    <i>${escapeHtml(nameWithNick(r.student_name, r.student_nickname))}</i>
                 </span>
                 <span class="duty-side${r.is_overdue ? ' duty-side-late' : ''}">${
                     r.expected_return_at
