@@ -19,6 +19,7 @@ import { BadgeSystem } from './badge-system.js';
 import { renderBadgeGallery, setupBadgeGalleryEvents } from './badge-gallery.js';
 // uniform-kit.js นำเข้าแค่ api/utils/auth จึงไม่เกิด import cycle กับไฟล์นี้
 import { parseKitCode, processKitScan } from './uniform-kit.js';
+import { staffApi } from './api.js';
 
 // เปลี่ยนจากการเรียก setView โดยตรง เป็นการเปลี่ยน Hash แทน
 window.__sdSetView = (viewName) => {
@@ -1252,6 +1253,22 @@ const VIEWS = {
                     window.location.reload(); 
                 }
             });
+        }
+    },
+
+    duty: {
+        label: 'งานที่ได้รับมอบหมาย',
+        icon: '👑',
+        render() {
+            return `
+                ${renderUnifiedCard({ title: '👑 งานที่ได้รับมอบหมาย',
+                                      subtitle: 'ติดตามของที่ยังไม่คืน แล้วส่งใบตรวจให้ครู' })}
+                <div id="duty-scopes" style="margin-bottom:1rem;"></div>
+                <div id="duty-body" aria-busy="true" style="min-height:200px;"></div>
+                <div class="sd-bottom-spacer"></div>`;
+        },
+        async afterRender() {
+            await renderDutyView();
         }
     },
 
@@ -3744,11 +3761,13 @@ function buildShell() {
         { id: 'favorites', icon: '📚', label: 'เรียนรู้' },
         { id: 'bosses', icon: '🐉', label: 'ล่าบอส' },
         { id: 'games', icon: '🎮', label: 'มินิเกม' },
+        { id: 'duty', icon: '👑', label: 'งานที่ได้รับมอบหมาย', staffOnly: true },
         { id: 'profile', icon: '👤', label: 'โปรไฟล์' }
     ];
     
+    // แท็บหัวหน้าซ่อนไว้ก่อน แล้วค่อยเปิดเมื่อรู้ว่าคนนี้ถูกแต่งตั้งจริง
     const navHtml = tabs.map(t => `
-        <button class="sd-tab" data-view="${t.id}">
+        <button class="sd-tab${t.staffOnly ? ' hidden' : ''}" data-view="${t.id}">
             ${t.icon} ${t.label}
         </button>
     `).join('');
@@ -4010,6 +4029,17 @@ export async function initStudentDashboard(mountEl, user) {
 
     await setView('home', user);
     setupRealtime(user);
+    revealStaffTab();
+}
+
+// 👑 เปิดแท็บ "งานที่ได้รับมอบหมาย" เฉพาะคนที่ครูแต่งตั้งไว้จริง
+let _myScopes = null;
+async function revealStaffTab() {
+    const { data, error } = await staffApi.myScopes();
+    if (error) return;
+    _myScopes = data || [];
+    if (!_myScopes.length) return;
+    document.querySelector('#sd-top-nav .sd-tab[data-view="duty"]')?.classList.remove('hidden');
 }
 
 export function destroyStudentDashboard() {
@@ -6718,4 +6748,202 @@ export async function renderSchedule() {
     } finally {
         box.removeAttribute('aria-busy');
     }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 👑 งานที่ได้รับมอบหมาย (หัวหน้าวง / หัวหน้ากลุ่มเครื่อง / หัวหน้างาน / ฝ่ายเสื้อผ้า)
+//    ดูอย่างเดียว + ส่งใบตรวจ — ไม่มีสิทธิ์กดคืนหรือบล็อกใคร
+// ═══════════════════════════════════════════════════════════════════════════
+const _DUTY_SCOPE = {
+    band:       { icon: '🎖', name: 'หัวหน้าวง',          hint: 'ดูแลทั้งวง' },
+    section:    { icon: '🎺', name: 'หัวหน้ากลุ่มเครื่อง', hint: 'ดูแลกลุ่มเครื่องของตน' },
+    instrument: { icon: '🎵', name: 'หัวหน้าเครื่อง',      hint: 'ดูแลเครื่องของตน' },
+    event:      { icon: '🎭', name: 'หัวหน้างาน',         hint: 'ดูแลเฉพาะงานที่รับผิดชอบ' },
+    uniform:    { icon: '👔', name: 'ฝ่ายเสื้อผ้า',        hint: 'ดูแลชุดวงโยธวาทิต' }
+};
+
+async function renderDutyView() {
+    const scopeBox = document.getElementById('duty-scopes');
+    const body     = document.getElementById('duty-body');
+    if (!body) return;
+
+    const { data: scopes, error: sErr } = await staffApi.myScopes();
+    if (sErr) {
+        body.removeAttribute('aria-busy');
+        body.innerHTML = `<p style="color:var(--pico-del-color);">โหลดข้อมูลหน้าที่ไม่สำเร็จ</p>`;
+        return;
+    }
+    const list = scopes || [];
+    if (!list.length) {
+        scopeBox.innerHTML = '';
+        body.removeAttribute('aria-busy');
+        body.innerHTML = `<p style="text-align:center;padding:2rem;color:var(--pico-muted-color);">
+            คุณยังไม่ได้รับมอบหมายหน้าที่</p>`;
+        return;
+    }
+
+    scopeBox.innerHTML = `
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        ${list.map(sc => {
+            const d = _DUTY_SCOPE[sc.t] || { icon: '•', name: sc.t, hint: '' };
+            return `<div style="flex:1 1 150px;border:1px solid var(--pico-muted-border-color);
+                                border-radius:10px;padding:.6rem .7rem;
+                                background:var(--pico-card-background-color);">
+                <div style="font-weight:700;">${d.icon} ${escapeHtml(d.name)}</div>
+                <div style="font-size:.75rem;opacity:.65;">
+                    ${escapeHtml(sc.v ? String(sc.v) : d.hint)}</div>
+            </div>`; }).join('')}
+        </div>`;
+
+    // ฝ่ายเสื้อผ้า/หัวหน้าวง/หัวหน้างาน เห็นส่วนชุดด้วย
+    const kinds = list.map(x => x.t);
+    const seesUniform = kinds.some(k => ['band', 'uniform', 'event'].includes(k));
+
+    const [instRes, uniRes, repRes] = await Promise.all([
+        staffApi.getOutstanding(null),
+        seesUniform ? staffApi.uniformOutstanding(null) : Promise.resolve({ data: [] }),
+        staffApi.myReports(20)
+    ]);
+
+    const inst = instRes.data || [];
+    const uni  = uniRes.data  || [];
+    const reps = repRes.data  || [];
+    const lateN = inst.filter(r => r.is_overdue).length;
+
+    body.removeAttribute('aria-busy');
+    body.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));
+                    gap:.5rem;margin-bottom:1rem;">
+            ${[['🎺', inst.length, 'เครื่องยังไม่คืน', '#3b82f6'],
+               ['🔥', lateN, 'เกินกำหนด', '#ef4444'],
+               ...(seesUniform ? [['👔', uni.length, 'ชิ้นชุดยังไม่คืน', '#8b5cf6']] : [])]
+              .map(([ic, n, lb, c]) => `
+                <div style="border:1px solid var(--pico-muted-border-color);border-radius:10px;
+                            padding:.6rem;text-align:center;background:var(--pico-card-background-color);">
+                    <div style="font-size:1.1rem;">${ic}</div>
+                    <div style="font-size:1.4rem;font-weight:800;color:${c};">${n}</div>
+                    <div style="font-size:.7rem;opacity:.65;">${lb}</div>
+                </div>`).join('')}
+        </div>
+
+        <button type="button" id="duty-report-btn" class="sd-btn-primary"
+                style="width:100%;margin-bottom:1rem;">📋 ส่งใบตรวจให้ครู</button>
+
+        <h4 style="font-size:.95rem;margin:.5rem 0;">🎺 เครื่องดนตรีที่ยังไม่คืน</h4>
+        ${inst.length ? `<div class="sd-list-container">
+            ${inst.map(r => `
+            <div class="sd-list-item">
+                <div class="sd-list-icon" style="background:${r.is_overdue ? '#ef4444' : '#3b82f6'};color:#fff;">
+                    ${r.is_overdue ? '🔥' : '🎺'}</div>
+                <div class="sd-list-content">
+                    <div class="sd-list-title">${escapeHtml(r.instrument_name || r.instrument_kind || '-')}</div>
+                    <div class="sd-list-desc">${escapeHtml(r.student_name || '-')}</div>
+                    <div class="sd-list-subtitle">
+                        ${r.section_name ? escapeHtml(r.section_name) + ' · ' : ''}
+                        ${r.expected_return_at
+                            ? (r.is_overdue ? 'เลยกำหนด ' : 'กำหนดคืน ') + fmtWhen(r.expected_return_at)
+                            : 'ไม่ระบุกำหนด'}</div>
+                </div>
+            </div>`).join('')}
+        </div>` : '<p style="opacity:.6;font-size:.85rem;">✅ คืนครบแล้ว</p>'}
+
+        ${seesUniform ? `
+        <h4 style="font-size:.95rem;margin:1.2rem 0 .5rem;">👔 ชุดที่ยังไม่คืน</h4>
+        ${uni.length ? `<div class="sd-list-container">
+            ${uni.map(r => `
+            <div class="sd-list-item">
+                <div class="sd-list-icon" style="background:#8b5cf6;color:#fff;">${r.icon || '👔'}</div>
+                <div class="sd-list-content">
+                    <div class="sd-list-title">ชุด #${r.kit_no} · ${escapeHtml(r.part_type || '')}</div>
+                    <div class="sd-list-desc">${escapeHtml(r.student_name || '-')}</div>
+                    <div class="sd-list-subtitle">
+                        ${escapeHtml(r.part_code || '')}${r.size ? ' · ไซส์ ' + escapeHtml(r.size) : ''}
+                        ${r.event_name ? ' · ' + escapeHtml(r.event_name) : ''}</div>
+                </div>
+            </div>`).join('')}
+        </div>` : '<p style="opacity:.6;font-size:.85rem;">✅ คืนครบแล้ว</p>'}` : ''}
+
+        <h4 style="font-size:.95rem;margin:1.2rem 0 .5rem;">📋 ใบตรวจที่ส่งไปแล้ว</h4>
+        ${reps.length ? `<div class="sd-list-container">
+            ${reps.map(r => `
+            <div class="sd-list-item">
+                <div class="sd-list-icon" style="background:${r.acknowledged ? '#10b981' : '#f59e0b'};color:#fff;">
+                    ${r.acknowledged ? '✅' : '⏳'}</div>
+                <div class="sd-list-content">
+                    <div class="sd-list-title">${escapeHtml(r.target_label || r.target_kind || '-')}</div>
+                    <div class="sd-list-desc">${escapeHtml(r.finding || '')}${
+                        r.note ? ' — ' + escapeHtml(r.note) : ''}</div>
+                    <div class="sd-list-subtitle">
+                        ${timeAgo(r.created_at)} · ${r.acknowledged ? 'ครูรับเรื่องแล้ว' : 'รอครูตรวจ'}</div>
+                </div>
+            </div>`).join('')}
+        </div>` : '<p style="opacity:.6;font-size:.85rem;">ยังไม่เคยส่งใบตรวจ</p>'}`;
+
+    document.getElementById('duty-report-btn')?.addEventListener('click', submitStaffReport);
+}
+
+function fmtWhen(ts) {
+    try {
+        return new Date(ts).toLocaleString('th-TH',
+            { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    } catch { return ''; }
+}
+
+// 📋 ส่งใบตรวจ — หัวหน้าไม่มีสิทธิ์แก้ข้อมูล ทำได้แค่รายงานให้ครูตัดสิน
+async function submitStaffReport() {
+    const { value, isConfirmed } = await Swal.fire({
+        title: '📋 ส่งใบตรวจให้ครู',
+        width: 500,
+        html: `
+            <div style="text-align:left;font-size:.9rem;">
+                <!-- ⚠️ ค่าต้องตรงกับ CHECK constraint ของ staff_reports เป๊ะ ๆ
+                     target_kind: instrument | uniform_part | uniform_kit | other
+                     finding:     ครบ | ขาด | ชำรุด | สูญหาย | อื่นๆ -->
+                <label class="swap-label">ตรวจเรื่องอะไร</label>
+                <select id="rep-kind" class="swap-input">
+                    <option value="instrument">🎺 เครื่องดนตรี</option>
+                    <option value="uniform_kit">👔 ชุด (ทั้งถุง)</option>
+                    <option value="uniform_part">🧤 ชิ้นส่วนชุด</option>
+                    <option value="other">📝 อื่น ๆ</option>
+                </select>
+
+                <label class="swap-label">ระบุสิ่งที่ตรวจ</label>
+                <input id="rep-label" class="swap-input"
+                       placeholder="เช่น ทรัมเป็ต 3 / ชุด #12 / ปลอกแขน A-052">
+
+                <label class="swap-label">ผลการตรวจ</label>
+                <select id="rep-finding" class="swap-input">
+                    <option value="ครบ">✅ ครบ สภาพดี</option>
+                    <option value="ขาด">⚠️ ขาด / ไม่ครบ</option>
+                    <option value="ชำรุด">🔧 ชำรุด</option>
+                    <option value="สูญหาย">❌ สูญหาย</option>
+                    <option value="อื่นๆ">📝 อื่นๆ</option>
+                </select>
+
+                <label class="swap-label">รายละเอียดเพิ่มเติม</label>
+                <textarea id="rep-note" class="swap-input" rows="3"
+                          placeholder="เช่น ขาดปลอกแขน 1 ข้าง / นวมรั่ว"></textarea>
+            </div>`,
+        showCancelButton: true, confirmButtonText: 'ส่งให้ครู', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+            const label = document.getElementById('rep-label').value.trim();
+            if (!label) { Swal.showValidationMessage('กรุณาระบุสิ่งที่ตรวจ'); return false; }
+            return {
+                kind:    document.getElementById('rep-kind').value,
+                label,
+                finding: document.getElementById('rep-finding').value,
+                note:    document.getElementById('rep-note').value.trim()
+            };
+        }
+    });
+    if (!isConfirmed) return;
+
+    const { data, error } = await staffApi.submitReport({
+        targetKind: value.kind, targetLabel: value.label,
+        finding: value.finding, note: value.note || null
+    });
+    if (error) return Swal.fire('ส่งไม่สำเร็จ', error.message, 'error');
+    await Swal.fire('ส่งแล้ว 🙌', data?.message || 'ครูได้รับใบตรวจแล้ว', 'success');
+    renderDutyView();
 }

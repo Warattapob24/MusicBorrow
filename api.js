@@ -1674,6 +1674,14 @@ export const staffApi = {
             p_note: note, p_photo_url: photoUrl
         }));
     },
+    // ชุดที่ยังไม่คืน — กรองตามขอบเขตของหัวหน้าคนนั้น
+    // (get_uniform_outstanding ตัวเดิมไม่ตรวจสิทธิ์เลย จึงใช้กับนักเรียนไม่ได้)
+    uniformOutstanding(eventId = null) {
+        return _wrap(() => supabase.rpc('staff_get_uniform_outstanding', { p_event_id: eventId }));
+    },
+    myReports(limit = 30) {
+        return _wrap(() => supabase.rpc('staff_my_reports', { p_limit: limit }));
+    },
     listReports(onlyOpen = true) {
         let q = supabase.from('staff_reports').select('*').order('created_at', { ascending: false });
         if (onlyOpen) q = q.is('teacher_ack_at', null);
