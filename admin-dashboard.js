@@ -6176,8 +6176,12 @@ export async function initAdminDashboard(containerEl) {
 
     await loadAll();
 
-    renderStats();
-    renderOverviewPanels();
+    // ⚠️ ต้องเรนเดอร์ผ่านทางเดียวกับตอนกดสลับแท็บ
+    //    เดิมเรียก renderStats() + renderOverviewPanels() ตรง ๆ ซึ่งครอบไม่ถึง
+    //    แผงอื่นใน case 'overview' (ใบตรวจจากหัวหน้า, คำขอใช้ชุด, คำขอเปลี่ยนไซส์,
+    //    สรุปชุด) แผงพวกนี้จึงว่างตอนเปิดแอป ต้องสลับแท็บไปกลับถึงจะขึ้น
+    //    เรียก renderActiveTab() ทางเดียวจบ เพิ่มแผงใหม่ทีหลังก็ไม่หลุดอีก
+    renderActiveTab();
     updateBadges();
     renderCharts();
 
