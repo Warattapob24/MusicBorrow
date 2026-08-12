@@ -957,21 +957,39 @@ function buildShell() {
 
             <div class="oad-panel">
                 <div class="oad-panel-title">📆 ให้นักเรียนเห็นตารางในปฏิทิน</div>
-                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:.8rem;">
-                    subscribe ครั้งเดียว แล้วกิจกรรมที่เพิ่มในแอปจะขึ้นปฏิทินเอง <strong>ไม่ต้องกรอกซ้ำ</strong>
-                    — ไม่ต้องตั้งค่าอะไรเพิ่ม<br>
-                    Google รีเฟรชช้า (บางครั้งหลายชั่วโมง) — เรื่องด่วนพึ่งการแจ้งเตือนของแอปซึ่งถึงใน 10 วินาที
+                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    ทำครั้งเดียว แล้วกิจกรรมที่เพิ่มในแอปจะขึ้นปฏิทินเอง <strong>ไม่ต้องกรอกซ้ำ</strong>
                 </p>
-                <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center;">
-                    <input id="oad-cal-url" class="oad-input" readonly style="flex:1; min-width:260px; font-size:.78rem;">
-                    <button class="oad-btn oad-btn-approve" id="oad-cal-copy">📋 คัดลอกลิงก์</button>
-                    <button class="oad-btn" id="oad-cal-open">➕ เปิด Google Calendar</button>
-                    <button class="oad-btn oad-btn-red" id="oad-cal-reset">🔑 เปลี่ยนลิงก์</button>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.6rem;">
+                    <button class="oad-btn oad-btn-approve" id="oad-cal-add"
+                            style="padding:.85rem; font-size:.95rem; font-weight:700;">
+                        ➕ เพิ่มเข้าปฏิทินของฉัน
+                    </button>
+                    <button class="oad-btn" id="oad-cal-copy"
+                            style="padding:.85rem; font-size:.95rem; font-weight:700;">
+                        📋 คัดลอกลิงก์ส่งให้นักเรียน
+                    </button>
                 </div>
                 <p style="font-size:.78rem; color:var(--oad-muted); margin:.7rem 0 0;">
-                    วิธี: Google Calendar → "ปฏิทินอื่นๆ" + → <strong>จากURL</strong> → วางลิงก์ → เพิ่มปฏิทิน<br>
-                    ⚠️ ใครมีลิงก์นี้เห็นตารางทั้งหมด — ถ้าหลุด กด "เปลี่ยนลิงก์" แล้วให้ทุกคน subscribe ใหม่
+                    กด "เพิ่มเข้าปฏิทินของฉัน" → Google ถามยืนยัน → กด <strong>เพิ่ม</strong> จบ<br>
+                    นักเรียนใช้ลิงก์ที่คัดลอก เปิดแล้วกดเพิ่มเหมือนกัน
                 </p>
+
+                <details style="margin-top:1rem;">
+                    <summary style="cursor:pointer;font-size:.83rem;color:var(--oad-muted);">
+                        ตัวเลือกอื่น (ลิงก์เต็ม · เพิ่มด้วยมือ · เปลี่ยนลิงก์)
+                    </summary>
+                    <div style="margin-top:.7rem;">
+                        <input id="oad-cal-url" class="oad-input" readonly
+                               style="width:100%; font-size:.78rem; margin-bottom:.6rem;">
+                        <button class="oad-btn oad-btn-red" id="oad-cal-reset">🔑 เปลี่ยนลิงก์</button>
+                        <p style="font-size:.78rem; color:var(--oad-muted); margin:.7rem 0 0;">
+                            เพิ่มด้วยมือ: Google Calendar → "ปฏิทินอื่นๆ" + → <strong>จากURL</strong> → วางลิงก์ → เพิ่มปฏิทิน<br>
+                            Google รีเฟรชช้า (บางครั้งหลายชั่วโมง) — เรื่องด่วนพึ่งการแจ้งเตือนของแอปซึ่งถึงใน 10 วินาที<br>
+                            ⚠️ ใครมีลิงก์นี้เห็นตารางทั้งหมด — ถ้าหลุด กด "เปลี่ยนลิงก์" แล้วให้ทุกคน subscribe ใหม่
+                        </p>
+                    </div>
+                </details>
 
                 <!-- ทางเลือกขั้นสูง: พับเก็บไว้ เพราะต้องตั้งค่า Google Cloud 5 ขั้น
                      คนส่วนใหญ่ใช้ลิงก์ subscribe ข้างบนก็พอแล้ว -->
@@ -5676,10 +5694,12 @@ function wireListeners() {
         try { await navigator.clipboard.writeText(el.value); toast('คัดลอกลิงก์แล้ว'); }
         catch { el.select(); toast('กด Ctrl+C เพื่อคัดลอก'); }
     });
-    document.getElementById('oad-cal-open')?.addEventListener('click', () => {
+    // ⚠️ ของเดิมเปิดหน้า addbyurl เปล่า ๆ ครูต้องไปวางลิงก์เองอีกที
+    //    ส่ง cid ไปเลย Google จะเด้งกล่อง "เพิ่มปฏิทินนี้ไหม" ให้กดยืนยันทีเดียวจบ
+    document.getElementById('oad-cal-add')?.addEventListener('click', () => {
         const el = document.getElementById('oad-cal-url');
         if (!el?.value) return toast('ยังไม่มีลิงก์', 'error');
-        window.open('https://calendar.google.com/calendar/u/0/r/settings/addbyurl', '_blank');
+        window.open('https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(el.value), '_blank');
     });
     document.getElementById('oad-cal-reset')?.addEventListener('click', async () => {
         const { isConfirmed } = await Swal.fire({
