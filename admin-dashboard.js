@@ -6937,10 +6937,19 @@ window.__oadPrintKitCards = async () => {
 
         const cardHtml = c => {
             const parts = c.parts || [];
+            // รูปเจ้าของใต้ QR — ถ้าไม่มีรูป (ครึ่งหนึ่งยังไม่ได้อัปโหลด) ใช้วงกลม
+            // อักษรแรกของชื่อแทน จะได้ไม่เหลือช่องว่างและไม่พึ่งไฟล์ภายนอกตอนพิมพ์
+            const initial = (c.owner_name || '').replace(/^(เด็กชาย|เด็กหญิง|นางสาว|นาย|นาง)/, '').trim().charAt(0);
+            const photo = c.owner_avatar
+                ? `<img class="face" src="${escapeHtml(c.owner_avatar)}" alt=""
+                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                   <div class="face facefb" style="display:none;">${escapeHtml(initial || '👔')}</div>`
+                : `<div class="face facefb">${escapeHtml(c.owner_id ? (initial || '🙂') : '👔')}</div>`;
             return `<div class="card">
               <div class="left">
-                <img src="${c.base64}" alt="">
+                <img class="qr" src="${c.base64}" alt="">
                 <div class="code">${escapeHtml(c.qr_code || '')}</div>
+                ${photo}
               </div>
               <div class="right">
                 <div class="kitno">ชุด #${c.kit_no}</div>
@@ -6978,9 +6987,23 @@ body { font-family:'Sarabun',sans-serif; background:#f4f4f5; margin:0; padding:1
   display:flex; gap:3mm; overflow:hidden;
   break-inside:avoid; page-break-inside:avoid;
 }
-.left { width:26mm; flex-shrink:0; text-align:center; }
-.left img { width:26mm; height:26mm; display:block; }
-.code { font-size:7pt; letter-spacing:.3pt; margin-top:1mm; color:#333; }
+/* คอลัมน์ซ้ายสูง 48mm (บัตร 54 - padding 3 บนล่าง)
+   QR 26 + รหัส ~3.2 + รูป 17 + ระยะห่าง ~1.4 = 47.6mm พอดีไม่ล้น */
+.left { width:26mm; flex-shrink:0; text-align:center;
+        display:flex; flex-direction:column; align-items:center; }
+.left .qr { width:26mm; height:26mm; display:block; }
+.code { font-size:7pt; letter-spacing:.3pt; margin-top:.6mm; color:#333; line-height:1.1; }
+/* รูปเจ้าของชุด — ตัดเป็นวงกลม กรอบบางให้ตัดขอบตอนพิมพ์ได้ชัด */
+.face {
+  width:17mm; height:17mm; margin-top:.8mm;
+  border-radius:50%; border:0.25mm solid #888;
+  object-fit:cover; display:block; background:#f0f0f0;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+.facefb {
+  display:flex; align-items:center; justify-content:center;
+  font-size:11pt; font-weight:700; color:#666;
+}
 .right { flex:1; min-width:0; display:flex; flex-direction:column; }
 .kitno { font-size:15pt; font-weight:700; line-height:1.05; }
 .name  { font-size:10pt; font-weight:600; line-height:1.15; margin-top:.6mm;
