@@ -225,6 +225,24 @@ function injectStyles() {
     gap: 1rem;
     margin-bottom: 1.25rem;
 }
+/* ปุ่มไอคอนมุมแผง — ของที่ตั้งครั้งเดียวแล้วแทบไม่กลับมา ไม่ต้องกินที่หน้าหลัก */
+.oad-icon-btn {
+    width: 34px; height: 34px; padding: 0; margin: 0;
+    border-radius: 9px; border: 1px solid var(--oad-border);
+    background: var(--oad-surface2); color: var(--oad-text);
+    font-size: 1rem; line-height: 1; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto;
+}
+.oad-icon-btn:hover { border-color: #6366f1; }
+.oad-icon-btn:active { transform: scale(.93); }
+/* กล่องตั้งค่าปฏิทินอยู่ใน Swal จึงต้องคุมความกว้างเองไม่ให้ล้น */
+.oad-cal-modal { max-width: 100%; }
+.oad-cal-modal .oad-input { width: 100%; box-sizing: border-box; }
+/* .oad-btn ปกติเป็น nowrap — ในกล่องนี้ป้ายยาวกว่าปุ่ม ตัวอักษรเลยโดนตัด
+   ยอมให้ตกบรรทัดแทน (วัดแล้ว "คัดลอกลิงก์ส่งให้นักเรียน" เกินไป 9px) */
+.oad-cal-modal .oad-btn { white-space: normal; line-height: 1.3; }
+
 .oad-stat-card {
     background: var(--oad-surface);
     border: 1px solid var(--oad-border);
@@ -874,7 +892,10 @@ function buildShell() {
 
         <div class="oad-tab-panel" id="oad-panel-events">
             <div class="oad-panel">
-                <div class="oad-panel-title">📅 เพิ่มกิจกรรม</div>
+                <div class="oad-panel-title">📅 เพิ่มกิจกรรม
+                    <button class="oad-icon-btn" id="oad-cal-settings" title="ตั้งค่าปฏิทิน"
+                            style="margin-left:auto;">📆</button>
+                </div>
                 <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
                     กรอกที่นี่ที่เดียว — ขึ้นทั้งตารางในแอปและปฏิทิน Google ที่นักเรียน subscribe ไว้<br>
                     ติ๊ก "เบิกของ" เฉพาะงานที่ต้องเบิกจริง (ซ้อมปกติไม่ต้องติ๊ก จะได้ไม่ไปโผล่ตอนเด็กสแกนยืมเครื่อง)
@@ -953,82 +974,6 @@ function buildShell() {
                 <p style="font-size:.78rem;color:var(--oad-muted);margin:.6rem 0 0;">
                     <strong>ร่าง</strong> = วางแผนไว้ก่อน นักเรียนยังไม่เห็น และยังไม่ขึ้นปฏิทิน · กด "ประกาศ" ในตารางเมื่อพร้อม
                 </p>
-            </div>
-
-            <div class="oad-panel">
-                <div class="oad-panel-title">📆 ให้นักเรียนเห็นตารางในปฏิทิน</div>
-                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
-                    ทำครั้งเดียว แล้วกิจกรรมที่เพิ่มในแอปจะขึ้นปฏิทินเอง <strong>ไม่ต้องกรอกซ้ำ</strong>
-                </p>
-                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.6rem;">
-                    <button class="oad-btn oad-btn-approve" id="oad-cal-add"
-                            style="padding:.85rem; font-size:.95rem; font-weight:700;">
-                        ➕ เพิ่มเข้าปฏิทินของฉัน
-                    </button>
-                    <button class="oad-btn" id="oad-cal-copy"
-                            style="padding:.85rem; font-size:.95rem; font-weight:700;">
-                        📋 คัดลอกลิงก์ส่งให้นักเรียน
-                    </button>
-                </div>
-                <p style="font-size:.78rem; color:var(--oad-muted); margin:.7rem 0 0;">
-                    กด "เพิ่มเข้าปฏิทินของฉัน" → Google ถามยืนยัน → กด <strong>เพิ่ม</strong> จบ<br>
-                    นักเรียนใช้ลิงก์ที่คัดลอก เปิดแล้วกดเพิ่มเหมือนกัน
-                </p>
-
-                <details style="margin-top:1rem;">
-                    <summary style="cursor:pointer;font-size:.83rem;color:var(--oad-muted);">
-                        ตัวเลือกอื่น (ลิงก์เต็ม · เพิ่มด้วยมือ · เปลี่ยนลิงก์)
-                    </summary>
-                    <div style="margin-top:.7rem;">
-                        <input id="oad-cal-url" class="oad-input" readonly
-                               style="width:100%; font-size:.78rem; margin-bottom:.6rem;">
-                        <button class="oad-btn oad-btn-red" id="oad-cal-reset">🔑 เปลี่ยนลิงก์</button>
-                        <p style="font-size:.78rem; color:var(--oad-muted); margin:.7rem 0 0;">
-                            เพิ่มด้วยมือ: Google Calendar → "ปฏิทินอื่นๆ" + → <strong>จากURL</strong> → วางลิงก์ → เพิ่มปฏิทิน<br>
-                            Google รีเฟรชช้า (บางครั้งหลายชั่วโมง) — เรื่องด่วนพึ่งการแจ้งเตือนของแอปซึ่งถึงใน 10 วินาที<br>
-                            ⚠️ ใครมีลิงก์นี้เห็นตารางทั้งหมด — ถ้าหลุด กด "เปลี่ยนลิงก์" แล้วให้ทุกคน subscribe ใหม่
-                        </p>
-                    </div>
-                </details>
-
-                <!-- ทางเลือกขั้นสูง: พับเก็บไว้ เพราะต้องตั้งค่า Google Cloud 5 ขั้น
-                     คนส่วนใหญ่ใช้ลิงก์ subscribe ข้างบนก็พอแล้ว -->
-                <details id="oad-gcal-box" style="margin-top:1.4rem; border-top:1px solid var(--oad-border); padding-top:1rem;">
-                    <summary style="cursor:pointer; font-size:.9rem; font-weight:700;">
-                        ⚙️ ซิงก์เข้าปฏิทินเดิมของโรงเรียน (ไม่บังคับ — ต้องตั้งค่า Google)
-                        <span id="oad-gcal-status" style="margin-left:.5rem;font-size:.8rem;font-weight:400;color:var(--oad-muted);"></span>
-                    </summary>
-
-                    <p style="font-size:0.85rem; color:var(--oad-muted); margin:.8rem 0;">
-                        เขียนกิจกรรมเข้า<strong>ปฏิทินเดิม</strong>ที่นักเรียนใช้อยู่โดยตรง แทนที่จะสร้างปฏิทินใหม่<br>
-                        ได้เพิ่มคือ <strong>ขึ้นทันที</strong> และอยู่ในปฏิทินเดิม · แลกกับการตั้งค่า 5 ขั้นข้างล่าง<br>
-                        แก้ในแอปแล้วปฏิทินตามทันที · ลบในแอปแล้วปฏิทินก็ลบตาม
-                    </p>
-                    <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1.2rem;">
-                        <button class="oad-btn oad-btn-approve" id="oad-gcal-sync">🔄 ซิงก์เดี๋ยวนี้</button>
-                        <span id="oad-gcal-hint" style="font-size:.8rem;color:var(--oad-muted);"></span>
-                    </div>
-
-                    <details>
-                        <summary style="cursor:pointer;font-size:.87rem;font-weight:700;">📖 วิธีตั้งค่าครั้งแรก (ทำครั้งเดียว)</summary>
-                        <ol style="font-size:.83rem;color:var(--oad-muted);line-height:1.9;margin:.6rem 0 0;padding-left:1.2rem;">
-                            <li>ไป <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener">Google Cloud Console → Service Accounts</a> → สร้าง project (ถ้ายังไม่มี) → <strong>Create service account</strong></li>
-                            <li>เข้า service account ที่สร้าง → แท็บ <strong>Keys</strong> → Add key → <strong>JSON</strong> → ได้ไฟล์มา</li>
-                            <li>เปิด <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener">Google Calendar API</a> → กด <strong>Enable</strong></li>
-                            <li>เปิดปฏิทินเดิมใน Google Calendar → ตั้งค่า → <strong>แชร์กับบุคคลที่ต้องการ</strong> → เพิ่มอีเมลของ service account (ลงท้าย <code>@…iam.gserviceaccount.com</code>) → สิทธิ์ <strong>"แก้ไขกิจกรรม"</strong></li>
-                            <li>ไป <a href="https://supabase.com/dashboard/project/qsbvitqxwgtmopjjuxin/settings/functions" target="_blank" rel="noopener">Supabase → Edge Functions → Secrets</a> เพิ่ม 2 ตัว:
-                                <ul style="margin:.3rem 0;">
-                                    <li><code>GCAL_SERVICE_ACCOUNT</code> = เนื้อหาไฟล์ JSON ทั้งก้อน</li>
-                                    <li><code>GCAL_CALENDAR_ID</code> = อีเมลปฏิทิน (ลงท้าย <code>@group.calendar.google.com</code>)</li>
-                                </ul>
-                            </li>
-                            <li>กลับมากด <strong>ซิงก์เดี๋ยวนี้</strong></li>
-                        </ol>
-                        <p style="font-size:.8rem;color:#f59e0b;margin:.6rem 0 0;">
-                            🔐 ไฟล์ JSON มีกุญแจลับ — วางใน Supabase Secrets เท่านั้น อย่าส่งให้ใครหรือ commit ลง git
-                        </p>
-                    </details>
-                </details>
             </div>
 
             <div class="oad-panel">
@@ -5671,49 +5616,10 @@ function wireListeners() {
     document.getElementById('oad-ev-start')?.addEventListener('input', e => { e.target.dataset.touched = '1'; });
     syncDueVisibility();
 
-    // 📆 ซิงก์เข้าปฏิทินเดิม
-    document.getElementById('oad-gcal-sync')?.addEventListener('click', async (e) => {
-        const btn = e.target;
-        btn.disabled = true; btn.textContent = '⏳ กำลังซิงก์...';
-        const { data, error } = await eventsApi.gcalSync();
-        btn.disabled = false; btn.textContent = '🔄 ซิงก์เดี๋ยวนี้';
+    // ปุ่มปฏิทินอยู่ในกล่องที่เปิดทีหลัง จึงผูก event ตอนกล่องเปิด (_wireCalendarButtons)
 
-        const res = data?.data ?? data;   // functions.invoke ห่อ payload ไว้ใน .data
-        if (error || res?.ok === false) {
-            const msg = res?.error || error?.message || 'ซิงก์ไม่สำเร็จ';
-            return Swal.fire('ซิงก์ไม่สำเร็จ', msg, 'error');
-        }
-        toast(`ซิงก์แล้ว — เพิ่ม ${res?.created ?? 0} · แก้ ${res?.updated ?? 0} · ลบ ${res?.removed ?? 0}`);
-        _loadGcalStatus();
-    });
-
-    // 📆 ปฏิทิน Google
-    document.getElementById('oad-cal-copy')?.addEventListener('click', async () => {
-        const el = document.getElementById('oad-cal-url');
-        if (!el?.value) return toast('ยังไม่มีลิงก์', 'error');
-        try { await navigator.clipboard.writeText(el.value); toast('คัดลอกลิงก์แล้ว'); }
-        catch { el.select(); toast('กด Ctrl+C เพื่อคัดลอก'); }
-    });
-    // ⚠️ ของเดิมเปิดหน้า addbyurl เปล่า ๆ ครูต้องไปวางลิงก์เองอีกที
-    //    ส่ง cid ไปเลย Google จะเด้งกล่อง "เพิ่มปฏิทินนี้ไหม" ให้กดยืนยันทีเดียวจบ
-    document.getElementById('oad-cal-add')?.addEventListener('click', () => {
-        const el = document.getElementById('oad-cal-url');
-        if (!el?.value) return toast('ยังไม่มีลิงก์', 'error');
-        window.open('https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(el.value), '_blank');
-    });
-    document.getElementById('oad-cal-reset')?.addEventListener('click', async () => {
-        const { isConfirmed } = await Swal.fire({
-            title: 'เปลี่ยนลิงก์ปฏิทิน?',
-            text: 'ลิงก์เดิมจะใช้ไม่ได้ทันที — ทุกคนที่ subscribe ไว้ต้อง subscribe ใหม่',
-            icon: 'warning', showCancelButton: true,
-            confirmButtonText: 'เปลี่ยน', cancelButtonText: 'ยกเลิก'
-        });
-        if (!isConfirmed) return;
-        const { error } = await eventsApi.resetCalendarToken();
-        if (error) return toast(error.message, 'error');
-        toast('เปลี่ยนลิงก์แล้ว — แจ้งให้ทุกคน subscribe ใหม่');
-        _loadCalendarUrl();
-    });
+    document.getElementById('oad-cal-settings')?.addEventListener('click',
+        () => window.__oadCalSettings());
 
     // 🎖 Staff roles
     document.getElementById('oad-staff-add')?.addEventListener('click', () => window.__oadAddStaff());
@@ -7078,6 +6984,152 @@ body { font-family:'Sarabun',sans-serif; background:#f4f4f5; margin:0; padding:1
         Swal.close();
         toast('สร้างบัตรไม่สำเร็จ: ' + (e?.message || e), 'error');
     }
+};
+
+// ผูกปุ่มในกล่องตั้งค่าปฏิทิน — เรียกทุกครั้งที่เปิดกล่อง
+// ใช้ dataset.wired กันผูกซ้ำ เปิด-ปิดกล่องหลายรอบจะได้ไม่ยิงซ้ำหลายครั้ง
+function _wireCalendarButtons() {
+    const once = (id, ev, fn) => {
+        const el = document.getElementById(id);
+        if (!el || el.dataset.wired) return;
+        el.dataset.wired = '1';
+        el.addEventListener(ev, fn);
+    };
+    // 📆 ซิงก์เข้าปฏิทินเดิม
+    once('oad-gcal-sync', 'click', async (e) => {
+        const btn = e.target;
+        btn.disabled = true; btn.textContent = '⏳ กำลังซิงก์...';
+        const { data, error } = await eventsApi.gcalSync();
+        btn.disabled = false; btn.textContent = '🔄 ซิงก์เดี๋ยวนี้';
+
+        const res = data?.data ?? data;   // functions.invoke ห่อ payload ไว้ใน .data
+        if (error || res?.ok === false) {
+            const msg = res?.error || error?.message || 'ซิงก์ไม่สำเร็จ';
+            return Swal.fire('ซิงก์ไม่สำเร็จ', msg, 'error');
+        }
+        toast(`ซิงก์แล้ว — เพิ่ม ${res?.created ?? 0} · แก้ ${res?.updated ?? 0} · ลบ ${res?.removed ?? 0}`);
+        _loadGcalStatus();
+    });
+
+    // 📆 ปฏิทิน Google
+    once('oad-cal-copy', 'click', async () => {
+        const el = document.getElementById('oad-cal-url');
+        if (!el?.value) return toast('ยังไม่มีลิงก์', 'error');
+        try { await navigator.clipboard.writeText(el.value); toast('คัดลอกลิงก์แล้ว'); }
+        catch { el.select(); toast('กด Ctrl+C เพื่อคัดลอก'); }
+    });
+    // ⚠️ ของเดิมเปิดหน้า addbyurl เปล่า ๆ ครูต้องไปวางลิงก์เองอีกที
+    //    ส่ง cid ไปเลย Google จะเด้งกล่อง "เพิ่มปฏิทินนี้ไหม" ให้กดยืนยันทีเดียวจบ
+    once('oad-cal-add', 'click', () => {
+        const el = document.getElementById('oad-cal-url');
+        if (!el?.value) return toast('ยังไม่มีลิงก์', 'error');
+        window.open('https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(el.value), '_blank');
+    });
+    once('oad-cal-reset', 'click', async () => {
+        const { isConfirmed } = await Swal.fire({
+            title: 'เปลี่ยนลิงก์ปฏิทิน?',
+            text: 'ลิงก์เดิมจะใช้ไม่ได้ทันที — ทุกคนที่ subscribe ไว้ต้อง subscribe ใหม่',
+            icon: 'warning', showCancelButton: true,
+            confirmButtonText: 'เปลี่ยน', cancelButtonText: 'ยกเลิก'
+        });
+        if (!isConfirmed) return;
+        const { error } = await eventsApi.resetCalendarToken();
+        if (error) return toast(error.message, 'error');
+        toast('เปลี่ยนลิงก์แล้ว — แจ้งให้ทุกคน subscribe ใหม่');
+        _loadCalendarUrl();
+    });
+
+}
+
+// 📆 เนื้อหากล่องตั้งค่าปฏิทิน — ย้ายออกจากหน้าแท็บมาไว้หลังไอคอนมุมขวาบน
+//    ครูตั้งครั้งเดียวแล้วแทบไม่กลับมาอีก ไม่ควรกินที่หน้าหลักถาวร
+const _CAL_SETTINGS_HTML = `                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:1rem;">
+                    ทำครั้งเดียว แล้วกิจกรรมที่เพิ่มในแอปจะขึ้นปฏิทินเอง <strong>ไม่ต้องกรอกซ้ำ</strong>
+                </p>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.6rem;">
+                    <button class="oad-btn oad-btn-approve" id="oad-cal-add"
+                            style="padding:.85rem; font-size:.95rem; font-weight:700;">
+                        ➕ เพิ่มเข้าปฏิทินของฉัน
+                    </button>
+                    <button class="oad-btn" id="oad-cal-copy"
+                            style="padding:.85rem; font-size:.95rem; font-weight:700;">
+                        📋 คัดลอกลิงก์
+                    </button>
+                </div>
+                <p style="font-size:.78rem; color:var(--oad-muted); margin:.7rem 0 0;">
+                    กด "เพิ่มเข้าปฏิทินของฉัน" → Google ถามยืนยัน → กด <strong>เพิ่ม</strong> จบ<br>
+                    นักเรียนใช้ลิงก์ที่คัดลอก เปิดแล้วกดเพิ่มเหมือนกัน
+                </p>
+
+                <details style="margin-top:1rem;">
+                    <summary style="cursor:pointer;font-size:.83rem;color:var(--oad-muted);">
+                        ตัวเลือกอื่น (ลิงก์เต็ม · เพิ่มด้วยมือ · เปลี่ยนลิงก์)
+                    </summary>
+                    <div style="margin-top:.7rem;">
+                        <input id="oad-cal-url" class="oad-input" readonly
+                               style="width:100%; font-size:.78rem; margin-bottom:.6rem;">
+                        <button class="oad-btn oad-btn-red" id="oad-cal-reset">🔑 เปลี่ยนลิงก์</button>
+                        <p style="font-size:.78rem; color:var(--oad-muted); margin:.7rem 0 0;">
+                            เพิ่มด้วยมือ: Google Calendar → "ปฏิทินอื่นๆ" + → <strong>จากURL</strong> → วางลิงก์ → เพิ่มปฏิทิน<br>
+                            Google รีเฟรชช้า (บางครั้งหลายชั่วโมง) — เรื่องด่วนพึ่งการแจ้งเตือนของแอปซึ่งถึงใน 10 วินาที<br>
+                            ⚠️ ใครมีลิงก์นี้เห็นตารางทั้งหมด — ถ้าหลุด กด "เปลี่ยนลิงก์" แล้วให้ทุกคน subscribe ใหม่
+                        </p>
+                    </div>
+                </details>
+
+                <!-- ทางเลือกขั้นสูง: พับเก็บไว้ เพราะต้องตั้งค่า Google Cloud 5 ขั้น
+                     คนส่วนใหญ่ใช้ลิงก์ subscribe ข้างบนก็พอแล้ว -->
+                <details id="oad-gcal-box" style="margin-top:1.4rem; border-top:1px solid var(--oad-border); padding-top:1rem;">
+                    <summary style="cursor:pointer; font-size:.9rem; font-weight:700;">
+                        ⚙️ ซิงก์เข้าปฏิทินเดิมของโรงเรียน (ไม่บังคับ — ต้องตั้งค่า Google)
+                        <span id="oad-gcal-status" style="margin-left:.5rem;font-size:.8rem;font-weight:400;color:var(--oad-muted);"></span>
+                    </summary>
+
+                    <p style="font-size:0.85rem; color:var(--oad-muted); margin:.8rem 0;">
+                        เขียนกิจกรรมเข้า<strong>ปฏิทินเดิม</strong>ที่นักเรียนใช้อยู่โดยตรง แทนที่จะสร้างปฏิทินใหม่<br>
+                        ได้เพิ่มคือ <strong>ขึ้นทันที</strong> และอยู่ในปฏิทินเดิม · แลกกับการตั้งค่า 5 ขั้นข้างล่าง<br>
+                        แก้ในแอปแล้วปฏิทินตามทันที · ลบในแอปแล้วปฏิทินก็ลบตาม
+                    </p>
+                    <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1.2rem;">
+                        <button class="oad-btn oad-btn-approve" id="oad-gcal-sync">🔄 ซิงก์เดี๋ยวนี้</button>
+                        <span id="oad-gcal-hint" style="font-size:.8rem;color:var(--oad-muted);"></span>
+                    </div>
+
+                    <details>
+                        <summary style="cursor:pointer;font-size:.87rem;font-weight:700;">📖 วิธีตั้งค่าครั้งแรก (ทำครั้งเดียว)</summary>
+                        <ol style="font-size:.83rem;color:var(--oad-muted);line-height:1.9;margin:.6rem 0 0;padding-left:1.2rem;">
+                            <li>ไป <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener">Google Cloud Console → Service Accounts</a> → สร้าง project (ถ้ายังไม่มี) → <strong>Create service account</strong></li>
+                            <li>เข้า service account ที่สร้าง → แท็บ <strong>Keys</strong> → Add key → <strong>JSON</strong> → ได้ไฟล์มา</li>
+                            <li>เปิด <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener">Google Calendar API</a> → กด <strong>Enable</strong></li>
+                            <li>เปิดปฏิทินเดิมใน Google Calendar → ตั้งค่า → <strong>แชร์กับบุคคลที่ต้องการ</strong> → เพิ่มอีเมลของ service account (ลงท้าย <code>@…iam.gserviceaccount.com</code>) → สิทธิ์ <strong>"แก้ไขกิจกรรม"</strong></li>
+                            <li>ไป <a href="https://supabase.com/dashboard/project/qsbvitqxwgtmopjjuxin/settings/functions" target="_blank" rel="noopener">Supabase → Edge Functions → Secrets</a> เพิ่ม 2 ตัว:
+                                <ul style="margin:.3rem 0;">
+                                    <li><code>GCAL_SERVICE_ACCOUNT</code> = เนื้อหาไฟล์ JSON ทั้งก้อน</li>
+                                    <li><code>GCAL_CALENDAR_ID</code> = อีเมลปฏิทิน (ลงท้าย <code>@group.calendar.google.com</code>)</li>
+                                </ul>
+                            </li>
+                            <li>กลับมากด <strong>ซิงก์เดี๋ยวนี้</strong></li>
+                        </ol>
+                        <p style="font-size:.8rem;color:#f59e0b;margin:.6rem 0 0;">
+                            🔐 ไฟล์ JSON มีกุญแจลับ — วางใน Supabase Secrets เท่านั้น อย่าส่งให้ใครหรือ commit ลง git
+                        </p>
+                    </details>
+                </details>`;
+
+window.__oadCalSettings = async () => {
+    await Swal.fire({
+        title: '📆 ปฏิทินกิจกรรม',
+        html: `<div class="oad-cal-modal" style="text-align:left;">${_CAL_SETTINGS_HTML}</div>`,
+        width: 620,
+        showConfirmButton: false,
+        showCloseButton: true,
+        didOpen: () => {
+            // ปุ่มถูกสร้างหลัง wireListeners จึงต้องผูก event ที่นี่
+            _wireCalendarButtons();
+            _loadCalendarUrl();
+            _loadGcalStatus();
+        }
+    });
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
