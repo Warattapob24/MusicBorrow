@@ -1002,7 +1002,10 @@ export async function renderBorrowForm(user) {
             </div>
             <button class="sd-btn-primary borrow-btn" type="button" style="width:100%;" disabled>ยืนยันการยืม</button>`;
 
-        const types = [...new Set(availableInstruments.map(i => i.type).filter(Boolean))];
+                // หมวดหมู่ต้องมาจากตาราง sections ที่เดียวกับแท็บหัวหน้า/การแต่งตั้ง
+        // เดิมดึงจาก instruments.type ซึ่งเป็นข้อความอิสระ ทำให้เครื่องเดียวกัน
+        // ถูกเรียกคนละชื่อ ("เครื่องเป่าทองเหลือง" กับ "ทองเหลือง")
+const types = [...new Set(availableInstruments.map(i => i.section_name).filter(Boolean))];
         const typeFilter = container.querySelector('#type-filter');
         types.forEach(t => typeFilter.innerHTML += `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`);
 
@@ -1166,7 +1169,7 @@ function _populateInstrumentSelect() {
     // 🟢 FIX: ถอด state. ออก ใช้ availableInstruments โดยตรง
     const filtered = selectedType === 'all' 
         ? availableInstruments 
-        : availableInstruments.filter(i => i.type === selectedType);
+        : availableInstruments.filter(i => i.section_name === selectedType);
 
     instrumentSelect.innerHTML = '<option value="">-- กรุณาเลือก --</option>';
     if (filtered.length > 0) {
