@@ -956,43 +956,11 @@ function buildShell() {
             </div>
 
             <div class="oad-panel">
-                <div class="oad-panel-title">
-                    📆 ซิงก์เข้าปฏิทินเดิมของโรงเรียน
-                    <span id="oad-gcal-status" style="margin-left:auto;font-size:.8rem;font-weight:400;color:var(--oad-muted);"></span>
-                </div>
+                <div class="oad-panel-title">📆 ให้นักเรียนเห็นตารางในปฏิทิน</div>
                 <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:.8rem;">
-                    เขียนกิจกรรมเข้า<strong>ปฏิทินเดิม</strong>ที่นักเรียนใช้อยู่โดยตรง — ไม่ต้องสร้างปฏิทินใหม่<br>
-                    แก้ในแอปแล้วปฏิทินตามทันที · ลบในแอปแล้วปฏิทินก็ลบตาม
-                </p>
-                <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1.2rem;">
-                    <button class="oad-btn oad-btn-approve" id="oad-gcal-sync">🔄 ซิงก์เดี๋ยวนี้</button>
-                    <span id="oad-gcal-hint" style="font-size:.8rem;color:var(--oad-muted);"></span>
-                </div>
-
-                <details style="margin-bottom:1.2rem;">
-                    <summary style="cursor:pointer;font-size:.87rem;font-weight:700;">⚙️ วิธีตั้งค่าครั้งแรก (ทำครั้งเดียว)</summary>
-                    <ol style="font-size:.83rem;color:var(--oad-muted);line-height:1.9;margin:.6rem 0 0;padding-left:1.2rem;">
-                        <li>ไป <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener">Google Cloud Console → Service Accounts</a> → สร้าง project (ถ้ายังไม่มี) → <strong>Create service account</strong></li>
-                        <li>เข้า service account ที่สร้าง → แท็บ <strong>Keys</strong> → Add key → <strong>JSON</strong> → ได้ไฟล์มา</li>
-                        <li>เปิด <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener">Google Calendar API</a> → กด <strong>Enable</strong></li>
-                        <li>เปิดปฏิทินเดิมใน Google Calendar → ตั้งค่า → <strong>แชร์กับบุคคลที่ต้องการ</strong> → เพิ่มอีเมลของ service account (ลงท้าย <code>@…iam.gserviceaccount.com</code>) → สิทธิ์ <strong>"แก้ไขกิจกรรม"</strong></li>
-                        <li>ไป <a href="https://supabase.com/dashboard/project/qsbvitqxwgtmopjjuxin/settings/functions" target="_blank" rel="noopener">Supabase → Edge Functions → Secrets</a> เพิ่ม 2 ตัว:
-                            <ul style="margin:.3rem 0;">
-                                <li><code>GCAL_SERVICE_ACCOUNT</code> = เนื้อหาไฟล์ JSON ทั้งก้อน</li>
-                                <li><code>GCAL_CALENDAR_ID</code> = อีเมลปฏิทิน (ลงท้าย <code>@group.calendar.google.com</code>)</li>
-                            </ul>
-                        </li>
-                        <li>กลับมากด <strong>ซิงก์เดี๋ยวนี้</strong></li>
-                    </ol>
-                    <p style="font-size:.8rem;color:#f59e0b;margin:.6rem 0 0;">
-                        🔐 ไฟล์ JSON มีกุญแจลับ — วางใน Supabase Secrets เท่านั้น อย่าส่งให้ใครหรือ commit ลง git
-                    </p>
-                </details>
-
-                <div class="oad-panel-title" style="font-size:.95rem;">📥 หรือใช้ลิงก์ subscribe (สร้างปฏิทินใหม่แยก)</div>
-                <p style="font-size:0.85rem; color:var(--oad-muted); margin-bottom:.8rem;">
-                    subscribe ครั้งเดียว แล้วกิจกรรมที่เพิ่มในแอปจะขึ้นปฏิทินเอง <strong>ไม่ต้องกรอกซ้ำ</strong><br>
-                    Google รีเฟรชช้า (บางครั้งหลายชั่วโมง) — เรื่องด่วนให้พึ่งการแจ้งเตือนของแอปซึ่งถึงใน 10 วินาที
+                    subscribe ครั้งเดียว แล้วกิจกรรมที่เพิ่มในแอปจะขึ้นปฏิทินเอง <strong>ไม่ต้องกรอกซ้ำ</strong>
+                    — ไม่ต้องตั้งค่าอะไรเพิ่ม<br>
+                    Google รีเฟรชช้า (บางครั้งหลายชั่วโมง) — เรื่องด่วนพึ่งการแจ้งเตือนของแอปซึ่งถึงใน 10 วินาที
                 </p>
                 <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center;">
                     <input id="oad-cal-url" class="oad-input" readonly style="flex:1; min-width:260px; font-size:.78rem;">
@@ -1004,6 +972,45 @@ function buildShell() {
                     วิธี: Google Calendar → "ปฏิทินอื่นๆ" + → <strong>จากURL</strong> → วางลิงก์ → เพิ่มปฏิทิน<br>
                     ⚠️ ใครมีลิงก์นี้เห็นตารางทั้งหมด — ถ้าหลุด กด "เปลี่ยนลิงก์" แล้วให้ทุกคน subscribe ใหม่
                 </p>
+
+                <!-- ทางเลือกขั้นสูง: พับเก็บไว้ เพราะต้องตั้งค่า Google Cloud 5 ขั้น
+                     คนส่วนใหญ่ใช้ลิงก์ subscribe ข้างบนก็พอแล้ว -->
+                <details id="oad-gcal-box" style="margin-top:1.4rem; border-top:1px solid var(--oad-border); padding-top:1rem;">
+                    <summary style="cursor:pointer; font-size:.9rem; font-weight:700;">
+                        ⚙️ ซิงก์เข้าปฏิทินเดิมของโรงเรียน (ไม่บังคับ — ต้องตั้งค่า Google)
+                        <span id="oad-gcal-status" style="margin-left:.5rem;font-size:.8rem;font-weight:400;color:var(--oad-muted);"></span>
+                    </summary>
+
+                    <p style="font-size:0.85rem; color:var(--oad-muted); margin:.8rem 0;">
+                        เขียนกิจกรรมเข้า<strong>ปฏิทินเดิม</strong>ที่นักเรียนใช้อยู่โดยตรง แทนที่จะสร้างปฏิทินใหม่<br>
+                        ได้เพิ่มคือ <strong>ขึ้นทันที</strong> และอยู่ในปฏิทินเดิม · แลกกับการตั้งค่า 5 ขั้นข้างล่าง<br>
+                        แก้ในแอปแล้วปฏิทินตามทันที · ลบในแอปแล้วปฏิทินก็ลบตาม
+                    </p>
+                    <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1.2rem;">
+                        <button class="oad-btn oad-btn-approve" id="oad-gcal-sync">🔄 ซิงก์เดี๋ยวนี้</button>
+                        <span id="oad-gcal-hint" style="font-size:.8rem;color:var(--oad-muted);"></span>
+                    </div>
+
+                    <details>
+                        <summary style="cursor:pointer;font-size:.87rem;font-weight:700;">📖 วิธีตั้งค่าครั้งแรก (ทำครั้งเดียว)</summary>
+                        <ol style="font-size:.83rem;color:var(--oad-muted);line-height:1.9;margin:.6rem 0 0;padding-left:1.2rem;">
+                            <li>ไป <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener">Google Cloud Console → Service Accounts</a> → สร้าง project (ถ้ายังไม่มี) → <strong>Create service account</strong></li>
+                            <li>เข้า service account ที่สร้าง → แท็บ <strong>Keys</strong> → Add key → <strong>JSON</strong> → ได้ไฟล์มา</li>
+                            <li>เปิด <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener">Google Calendar API</a> → กด <strong>Enable</strong></li>
+                            <li>เปิดปฏิทินเดิมใน Google Calendar → ตั้งค่า → <strong>แชร์กับบุคคลที่ต้องการ</strong> → เพิ่มอีเมลของ service account (ลงท้าย <code>@…iam.gserviceaccount.com</code>) → สิทธิ์ <strong>"แก้ไขกิจกรรม"</strong></li>
+                            <li>ไป <a href="https://supabase.com/dashboard/project/qsbvitqxwgtmopjjuxin/settings/functions" target="_blank" rel="noopener">Supabase → Edge Functions → Secrets</a> เพิ่ม 2 ตัว:
+                                <ul style="margin:.3rem 0;">
+                                    <li><code>GCAL_SERVICE_ACCOUNT</code> = เนื้อหาไฟล์ JSON ทั้งก้อน</li>
+                                    <li><code>GCAL_CALENDAR_ID</code> = อีเมลปฏิทิน (ลงท้าย <code>@group.calendar.google.com</code>)</li>
+                                </ul>
+                            </li>
+                            <li>กลับมากด <strong>ซิงก์เดี๋ยวนี้</strong></li>
+                        </ol>
+                        <p style="font-size:.8rem;color:#f59e0b;margin:.6rem 0 0;">
+                            🔐 ไฟล์ JSON มีกุญแจลับ — วางใน Supabase Secrets เท่านั้น อย่าส่งให้ใครหรือ commit ลง git
+                        </p>
+                    </details>
+                </details>
             </div>
 
             <div class="oad-panel">
@@ -7883,6 +7890,11 @@ async function _loadGcalStatus() {
             ? `ซิงก์ล่าสุด ${new Date(data.last_sync).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}`
             : 'ยังไม่เคยซิงก์ — ตั้งค่าตามขั้นตอนด้านล่างก่อน';
     }
+
+    // ตั้งค่าซิงก์ไว้แล้ว = กางให้เห็นเลย ไม่ต้องไปกดหา
+    // ยังไม่เคยตั้ง = พับไว้ คนที่ใช้แค่ลิงก์ subscribe จะได้ไม่เจอกำแพง 5 ขั้น
+    const boxEl = document.getElementById('oad-gcal-box');
+    if (boxEl && data.last_sync) boxEl.open = true;
 }
 
 // ── ประกาศกิจกรรมที่ร่างไว้ — นักเรียนเห็นและปฏิทินอัปเดตทันที
