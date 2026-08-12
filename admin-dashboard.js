@@ -527,16 +527,6 @@ function buildShell() {
 
             <div class="oad-panel">
                 <div class="oad-panel-title">
-                    👔 ชุดวงโยธวาทิต
-                    <span style="font-size:0.7rem; color:var(--oad-muted); font-weight:normal; margin-left:auto;">
-                        กดการ์ดเพื่อไปหน้าจัดการ
-                    </span>
-                </div>
-                <div id="oad-uni-summary"></div>
-            </div>
-
-            <div class="oad-panel">
-                <div class="oad-panel-title">
                     📋 ใบตรวจจากหัวหน้า
                     <span class="oad-tab-badge hidden" id="oad-staffrep-badge" style="margin-left:.5rem;">0</span>
                 </div>
@@ -3479,6 +3469,23 @@ function renderStats() {
         { icon: '🎸', value: s.available_now || 0,       label: 'พร้อมให้ยืม',    sub: `/${s.total_instruments || 0} ชิ้น`,    color: '#10b981', tab: 'instruments', filter: 'พร้อมใช้งาน' },
         { icon: '🚫', value: s.blocked_users || 0,       label: 'ถูกบล็อก',       sub: '',                                     color: '#7c849c', tab: 'users', filter: 'blocked' },
     ];
+
+    // 👔 ชุดวงโยธวาทิตต่อท้ายแถวเดียวกัน ไม่แยกแผง
+    // (_renderUniformSummary เติม state.uniStats ให้แล้วเรียก renderStats ซ้ำ)
+    const us = state.uniStats;
+    if (us) {
+        cards.push(
+            { icon: '👔', value: us.free,  label: 'ชุดที่ยังว่าง',
+              sub: `เลือกได้ ${us.selectable} ชุด`, color: '#10b981', tab: 'uniforms', filter: 'all' },
+            { icon: '🧾', value: us.total, label: 'ชิ้นส่วนชุด',
+              sub: `${us.sizeRows} ไซส์ที่ใช้จริง`, color: '#8b5cf6', tab: 'uniforms', filter: 'all' });
+        if (us.damaged) cards.push({ icon: '🔧', value: us.damaged, label: 'ชุดชำรุด/ต้องซ่อม',
+              sub: 'รอครูจัดการ', color: '#f59e0b', tab: 'uniforms', filter: 'all' });
+        if (us.lost)    cards.push({ icon: '❌', value: us.lost, label: 'ชิ้นชุดสูญหาย',
+              sub: 'ต้องตามคืน', color: '#ef4444', tab: 'uniforms', filter: 'all' });
+        if (us.unsized) cards.push({ icon: '📏', value: us.unsized, label: 'ชุดยังไม่ระบุไซส์',
+              sub: 'กรอกก่อนให้เด็กเลือก', color: '#0ea5e9', tab: 'uniforms', filter: 'all' });
+    }
 
     el.innerHTML = cards.map(c => `
         <div class="oad-stat-card" style="border-left:4px solid ${c.color}; cursor:pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;"
@@ -7171,53 +7178,30 @@ async function _renderUniformReport() {
 }
 
 // 👔 สรุปชุดวงโยธวาทิตบนหน้าภาพรวม — แบบเดียวกับสรุปการยืมเครื่อง
+// ดึงตัวเลขชุดมาเก็บไว้ แล้วให้ renderStats วาดรวมในแถวการ์ดเดียวกับสถิติอื่น
+// (เก็บใน state เพื่อให้ renderStats ที่ถูกเรียกซ้ำภายหลังยังวาดครบ)
 async function _renderUniformSummary() {
-    const box = document.getElementById('oad-uni-summary');
-    if (!box) return;
-    box.innerHTML = skeleton(1, 4);
-
     const [repRes, availRes] = await Promise.all([
         uniformApi.sizeReport(null),
         uniformApi.availability()
     ]);
-    if (repRes.error) {
-        box.innerHTML = `<div class="oad-empty">${escapeHtml(repRes.error.message)}</div>`;
-        return;
-    }
+    if (repRes.error) return;
 
-    const rows  = repRes.data || [];
-    const av    = availRes.data || {};
-    const sum   = (f) => rows.reduce((s, r) => s + Number(r[f]), 0);
-    const total = sum('n');
-    const dmg   = sum('damaged_n');
-    const lost  = sum('lost_n');
-    const uns   = rows.filter(r => r.size === '(ยังไม่ระบุ)').reduce((s, r) => s + Number(r.n), 0);
+    const rows = repRes.data || [];
+    const av   = availRes.data || {};
+    const sum  = (f) => rows.reduce((s, r) => s + Number(r[f]), 0);
 
-    const cards = [
-        { icon: '👔', value: av.free ?? '—',  label: 'ชุดที่ยังว่าง',
-          sub: `เลือกได้ ${av.selectable ?? 0} ชุด`, color: '#10b981' },
-        { icon: '🧾', value: total,           label: 'ชิ้นส่วนทั้งหมด',
-          sub: `${rows.length} ไซส์ที่ใช้จริง`,      color: '#6366f1' },
-        { icon: '🔧', value: dmg,             label: 'ชำรุด/ต้องซ่อม',
-          sub: dmg ? 'รอครูจัดการ' : 'ไม่มีค้าง',     color: '#f59e0b' },
-        { icon: '❌', value: lost,            label: 'สูญหาย',
-          sub: lost ? 'ต้องตามคืน' : 'ครบทุกชิ้น',    color: '#ef4444' },
-    ];
-    if (uns) cards.push({ icon: '📏', value: uns, label: 'ยังไม่ระบุไซส์',
-                          sub: 'กรอกก่อนให้เด็กเลือกชุด', color: '#0ea5e9' });
-    if (av.no_size)  cards.push({ icon: '⏳', value: av.no_size, label: 'ชุดที่ยังเลือกไม่ได้',
-                                  sub: 'รอกรอกไซส์ให้ครบ', color: '#f59e0b' });
-
-    box.innerHTML = `
-        <div class="oad-stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr));margin:0;">
-        ${cards.map(c => `
-            <div class="oad-stat-card" style="border-left:4px solid ${c.color}; cursor:pointer;"
-                 onclick="window.__oadQuickNav('uniforms','all')">
-                <span class="oad-stat-label">${c.icon} ${c.label}</span>
-                <span class="oad-stat-value" style="color:${c.color}">${c.value}</span>
-                <span class="oad-stat-sub">${escapeHtml(c.sub)}</span>
-            </div>`).join('')}
-        </div>`;
+    state.uniStats = {
+        free:       av.free ?? 0,
+        selectable: av.selectable ?? 0,
+        total:      sum('n'),
+        sizeRows:   rows.length,
+        damaged:    sum('damaged_n'),
+        lost:       sum('lost_n'),
+        unsized:    rows.filter(r => r.size === '(ยังไม่ระบุ)')
+                        .reduce((s, r) => s + Number(r.n), 0)
+    };
+    renderStats();
 }
 
 // รายละเอียดรายไซส์ของประเภทเดียว — กินความกว้างเต็มแผง ตัวเลขจึงไม่ถูกตัด
