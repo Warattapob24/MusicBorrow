@@ -3565,6 +3565,55 @@ body { margin: 0; padding: 0; background-color: var(--main-bg, var(--pico-backgr
 .sd-btn-outline { background-color: transparent !important; color: #2563eb !important; border: 2px solid #2563eb !important; padding: 0.6rem 1.2rem; }
 /* ปุ่มสีแดง หยุดซ้อม/แจ้งซ่อม/ออกจากระบบ */
 .sd-btn-danger { background-color: #ef4444 !important; color: #ffffff !important; padding: 0.75rem 1.5rem; box-shadow: 0 4px 10px rgba(239,68,68,0.2); }
+/* ═══ 👑 งานที่ได้รับมอบหมาย — แถวกะทัดรัด ข้อมูลครบเท่าเดิม ═══
+   ของเดิมใช้ .sd-list-item (padding 1rem + ไอคอน 40px + 3 บรรทัด ≈ 84px/แถว)
+   ยืมกัน 40 ชิ้นก็ยาว 3,000px+ เลื่อนหาไม่เจอ
+   แบบใหม่บีบเหลือ ~44px/แถว โดยยุบเป็น 2 บรรทัดและดันกำหนดคืนไปชิดขวา */
+.duty-h {
+    font-size: .88rem; margin: 1.1rem 0 .4rem; display: flex;
+    align-items: center; gap: .4rem;
+}
+.duty-n {
+    font-size: .72rem; font-weight: 700; padding: .05rem .45rem;
+    border-radius: 999px; background: var(--pico-muted-border-color);
+    color: var(--pico-color);
+}
+.duty-ok { opacity: .6; font-size: .82rem; margin: .2rem 0; }
+.duty-list {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 10px; overflow: hidden;
+    background: var(--pico-card-background-color);
+}
+.duty-row {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .4rem .55rem;
+    border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.duty-row:last-child { border-bottom: none; }
+.duty-late { background: rgba(239, 68, 68, .07); }
+.duty-ic {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .82rem; color: #fff;
+}
+.duty-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+/* ⚠️ ห้ามใช้ ellipsis ตัดบรรทัด — วัดแล้วชื่อยาว ๆ อย่าง
+   "เด็กหญิงพลอยณิตา บุญคุณเรืองเปี่ยม (พลอย) · เครื่องลมไม้" ถูกตัดหายบนจอ ≤430px
+   ยอมให้ตกบรรทัดแทน สูงขึ้นนิดเดียวแต่ข้อมูลอยู่ครบตามที่สั่ง */
+.duty-main b {
+    font-size: .84rem; font-weight: 600;
+    overflow-wrap: anywhere; word-break: break-word;
+}
+.duty-main i {
+    font-style: normal; font-size: .73rem; opacity: .68;
+    overflow-wrap: anywhere; word-break: break-word;
+}
+.duty-side {
+    flex: 0 0 auto; text-align: right; font-size: .68rem;
+    line-height: 1.25; opacity: .7; max-width: 34%;
+}
+.duty-side-late { color: var(--pico-del-color); opacity: 1; font-weight: 700; }
+
 /* ═══ 👔 ชุดประจำตัว — การ์ดต่อชิ้น ปุ่มใหญ่พอให้กดด้วยนิ้วโป้ง ═══ */
 .kit-card {
     background: var(--pico-card-background-color);
@@ -6830,57 +6879,65 @@ async function renderDutyView() {
         <button type="button" id="duty-report-btn" class="sd-btn-primary"
                 style="width:100%;margin-bottom:1rem;">📋 ส่งใบตรวจให้ครู</button>
 
-        <h4 style="font-size:.95rem;margin:.5rem 0;">🎺 เครื่องดนตรีที่ยังไม่คืน</h4>
-        ${inst.length ? `<div class="sd-list-container">
+        <h4 class="duty-h">🎺 เครื่องดนตรีที่ยังไม่คืน <span class="duty-n">${inst.length}</span></h4>
+        ${inst.length ? `<div class="duty-list">
             ${inst.map(r => `
-            <div class="sd-list-item">
-                <div class="sd-list-icon" style="background:${r.is_overdue ? '#ef4444' : '#3b82f6'};color:#fff;">
-                    ${r.is_overdue ? '🔥' : '🎺'}</div>
-                <div class="sd-list-content">
-                    <div class="sd-list-title">${escapeHtml(r.instrument_name || r.instrument_kind || '-')}</div>
-                    <div class="sd-list-desc">${escapeHtml(r.student_name || '-')}</div>
-                    <div class="sd-list-subtitle">
-                        ${r.section_name ? escapeHtml(r.section_name) + ' · ' : ''}
-                        ${r.expected_return_at
-                            ? (r.is_overdue ? 'เลยกำหนด ' : 'กำหนดคืน ') + fmtWhen(r.expected_return_at)
-                            : 'ไม่ระบุกำหนด'}</div>
-                </div>
+            <div class="duty-row${r.is_overdue ? ' duty-late' : ''}">
+                <span class="duty-ic" style="background:${r.is_overdue ? '#ef4444' : '#3b82f6'};">
+                    ${r.is_overdue ? '🔥' : '🎺'}</span>
+                <span class="duty-main">
+                    <b>${escapeHtml(r.instrument_name || r.instrument_kind || '-')}</b>
+                    <i>${escapeHtml(nameWithNick(r.student_name, r.student_nickname))}${
+                        r.section_name ? ' · ' + escapeHtml(r.section_name) : ''}</i>
+                </span>
+                <span class="duty-side${r.is_overdue ? ' duty-side-late' : ''}">${
+                    r.expected_return_at
+                        ? (r.is_overdue ? 'เลยกำหนด<br>' : 'คืน<br>') + fmtWhen(r.expected_return_at)
+                        : 'ไม่ระบุ<br>กำหนด'}</span>
             </div>`).join('')}
-        </div>` : '<p style="opacity:.6;font-size:.85rem;">✅ คืนครบแล้ว</p>'}
+        </div>` : '<p class="duty-ok">✅ คืนครบแล้ว</p>'}
 
         ${seesUniform ? `
-        <h4 style="font-size:.95rem;margin:1.2rem 0 .5rem;">👔 ชุดที่ยังไม่คืน</h4>
-        ${uni.length ? `<div class="sd-list-container">
+        <h4 class="duty-h">👔 ชุดที่ยังไม่คืน <span class="duty-n">${uni.length}</span></h4>
+        ${uni.length ? `<div class="duty-list">
             ${uni.map(r => `
-            <div class="sd-list-item">
-                <div class="sd-list-icon" style="background:#8b5cf6;color:#fff;">${r.icon || '👔'}</div>
-                <div class="sd-list-content">
-                    <div class="sd-list-title">ชุด #${r.kit_no} · ${escapeHtml(r.part_type || '')}</div>
-                    <div class="sd-list-desc">${escapeHtml(r.student_name || '-')}</div>
-                    <div class="sd-list-subtitle">
-                        ${escapeHtml(r.part_code || '')}${r.size ? ' · ไซส์ ' + escapeHtml(r.size) : ''}
-                        ${r.event_name ? ' · ' + escapeHtml(r.event_name) : ''}</div>
-                </div>
+            <div class="duty-row">
+                <span class="duty-ic" style="background:#8b5cf6;">${r.icon || '👔'}</span>
+                <span class="duty-main">
+                    <b>ชุด #${r.kit_no} · ${escapeHtml(r.part_type || '')}</b>
+                    <i>${escapeHtml(nameWithNick(r.student_name, r.student_nickname))}${
+                        r.event_name ? ' · ' + escapeHtml(r.event_name) : ''}</i>
+                </span>
+                <span class="duty-side">${escapeHtml(r.part_code || '')}${
+                    r.size ? '<br>ไซส์ ' + escapeHtml(r.size) : ''}</span>
             </div>`).join('')}
-        </div>` : '<p style="opacity:.6;font-size:.85rem;">✅ คืนครบแล้ว</p>'}` : ''}
+        </div>` : '<p class="duty-ok">✅ คืนครบแล้ว</p>'}` : ''}
 
-        <h4 style="font-size:.95rem;margin:1.2rem 0 .5rem;">📋 ใบตรวจที่ส่งไปแล้ว</h4>
-        ${reps.length ? `<div class="sd-list-container">
+        <h4 class="duty-h">📋 ใบตรวจที่ส่งไปแล้ว <span class="duty-n">${reps.length}</span></h4>
+        ${reps.length ? `<div class="duty-list">
             ${reps.map(r => `
-            <div class="sd-list-item">
-                <div class="sd-list-icon" style="background:${r.acknowledged ? '#10b981' : '#f59e0b'};color:#fff;">
-                    ${r.acknowledged ? '✅' : '⏳'}</div>
-                <div class="sd-list-content">
-                    <div class="sd-list-title">${escapeHtml(r.target_label || r.target_kind || '-')}</div>
-                    <div class="sd-list-desc">${escapeHtml(r.finding || '')}${
-                        r.note ? ' — ' + escapeHtml(r.note) : ''}</div>
-                    <div class="sd-list-subtitle">
-                        ${timeAgo(r.created_at)} · ${r.acknowledged ? 'ครูรับเรื่องแล้ว' : 'รอครูตรวจ'}</div>
-                </div>
+            <div class="duty-row">
+                <span class="duty-ic" style="background:${r.acknowledged ? '#10b981' : '#f59e0b'};">
+                    ${r.acknowledged ? '✅' : '⏳'}</span>
+                <span class="duty-main">
+                    <b>${escapeHtml(r.target_label || r.target_kind || '-')}${
+                        r.subject_name ? ' · ' + escapeHtml(r.subject_name) : ''}${
+                        r.event_name ? ' · ' + escapeHtml(r.event_name) : ''}</b>
+                    <i>${escapeHtml(r.finding || '')}${
+                        r.note ? ' — ' + escapeHtml(r.note) : ''}</i>
+                </span>
+                <span class="duty-side">${timeAgo(r.created_at)}<br>${
+                    r.acknowledged ? 'ครูรับแล้ว' : 'รอครูตรวจ'}</span>
             </div>`).join('')}
-        </div>` : '<p style="opacity:.6;font-size:.85rem;">ยังไม่เคยส่งใบตรวจ</p>'}`;
+        </div>` : '<p class="duty-ok">ยังไม่เคยส่งใบตรวจ</p>'}`;
 
     document.getElementById('duty-report-btn')?.addEventListener('click', submitStaffReport);
+}
+
+// ชื่อจริง + ชื่อเล่นในวงเล็บ — หัวหน้าจำชื่อเล่นได้ง่ายกว่า
+function nameWithNick(name, nick) {
+    const n = (name || '-').trim();
+    return nick ? `${n} (${nick})` : n;
 }
 
 function fmtWhen(ts) {
