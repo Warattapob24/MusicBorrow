@@ -176,20 +176,39 @@ DROP POLICY IF EXISTS "user_achievements_insert_system" ON public.user_achieveme
 -- SECURITY DEFINER view                  1     1      1      0
 
 
+
 -- =====================================================================
--- ยังเหลือ (ความเสี่ยงต่ำ / ต้องตัดสินใจก่อน)
+-- PART 5 — display_state (migration 20260813072846 security_enable_rls_display_state)
 -- =====================================================================
--- 1. 19 SECURITY DEFINER ที่ authenticated เรียกได้และไม่มี guard — แต่ "ไม่รับ user id"
---    ส่วนใหญ่เป็น read-only aggregate (get_kit_availability, get_instrument_kinds,
---    get_borrow_heatmap, get_event_summary, get_system_setting, ...) กับ claim_kit,
---    process_raid_result, uniform_return_part, get_kit_scan_details, notify_all_admins
---    → ไม่มี IDOR ตรง ๆ แต่ควรทยอยใส่ guard ตามบริบทของแต่ละตัว
--- 2. display_state ยัง RLS ปิด + anon CRUD เต็ม — เป็นตารางของ QSing (queue_number,
---    song_title, artist, karaoke_link) ไม่ใช่ของแอปนี้ ต้องเช็ค client ของ QSing
---    ก่อนว่าเขียนด้วย anon key หรือเปล่า แล้วค่อยเปิด RLS
--- 3. push_config เก็บ service_role key ตัวจริง (RLS on + 0 policies = deny-all ปลอดภัย)
---    ควรย้ายไป Supabase Vault
--- 4. get_admin_dashboard_stats มี overload ตายค้าง () ทำให้เรียกแบบ 0-arg กำกวม
---    (ของเดิม client ส่ง named arg จึงไม่กระทบ)
--- 5. 151 ฟังก์ชันไม่ได้ SET search_path — Supabase advisor เตือน แต่ต้องมีสิทธิ์ CREATE
---    บน schema ก่อนถึงจะโจมตีได้ ซึ่ง authenticated ไม่มี
+-- display_state เป็นตารางของแอป QSing (คาราโอเกะ) ที่ใช้ Supabase project เดียวกัน
+-- เป็นตารางสุดท้ายใน public ที่ relrowsecurity = false และ anon มี CRUD เต็ม
+--
+-- ตรวจซอร์ส QSing (New app/QSing/qsing-app/src) แล้วพบว่า:
+--   เขียน      -> เฉพาะ src/app/api/display/route.ts POST ซึ่งใช้ createServiceClient()
+--                 (service_role ข้าม RLS) หลัง auth check ของตัวเอง
+--                 ไม่มี .update/.insert/.delete จาก client ที่ไหนเลยใน src
+--   อ่านครั้งแรก -> GET ของ route เดียวกัน ก็ service_role
+--   อ่านสด      -> src/app/display/page.tsx และ src/app/sound/page.tsx subscribe
+--                 postgres_changes UPDATE ด้วย browser client
+--                 /display ไม่ได้อยู่ใน middleware matcher (มีแค่ /api/admin)
+--                 จอจึงเป็น anonymous และ Realtime ต้องการ anon SELECT
+--
+-- จึงเปิดให้อ่านได้ทุกคน แต่ไม่ให้ client เขียนเลย
+ALTER TABLE public.display_state ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "display_state_read_all" ON public.display_state
+  FOR SELECT TO anon, authenticated
+  USING (true);
+
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.display_state FROM anon, authenticated;
+
+-- ผลทดสอบ: anon SELECT OK (จอยังทำงาน) / anon UPDATE บล็อก / anon DELETE บล็อก
+--          ข้อมูลในตารางไม่ถูกแตะต้อง
+-- หลัง migration นี้: ไม่มีตารางใดใน schema public ที่ RLS ปิดอีกแล้ว
+
+
+-- =====================================================================
+-- งานต่อ
+-- =====================================================================
+-- รายการที่ยังไม่ได้ปิด เก็บไว้นอก repo ที่ SECURITY_REMAINING.local.md
+-- (repo นี้เป็น public จึงไม่ระบุรายละเอียดไว้ในไฟล์ที่ tracked)

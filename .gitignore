@@ -6,3 +6,6 @@ deploy.log
 deploy_output.txt
 styles.css.bak
 supabase/.temp/
+
+# รายละเอียดช่องโหว่ที่ยังไม่ได้ปิด — repo นี้เป็น public ห้าม commit
+*.local.md

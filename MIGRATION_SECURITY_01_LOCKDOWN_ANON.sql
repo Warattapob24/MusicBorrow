@@ -157,22 +157,10 @@ ORDER BY 1;
 
 
 -- =====================================================================
--- ยังไม่ได้แก้ (งานต่อ) — ดูรายงาน security review 2026-08-13
+-- งานต่อ
 -- =====================================================================
--- 1. 218 SECURITY DEFINER functions ที่ `authenticated` เรียกได้โดยไม่มี admin guard
---    เช่น trigger_yearly_reset, deactivate_user_account, admin_adjust_xp,
---    update_user_profile_by_admin (overload 11-arg/13-arg ไม่มี guard)
---    → ต้องใส่ IF NOT EXISTS (SELECT 1 FROM users WHERE id=auth.uid() AND role='admin')
---         THEN RAISE EXCEPTION 'ADMIN_ONLY'; END IF;
---    ตามแบบที่ MIGRATION_SOFT_BLOCK_AND_FORCE_RETURN.sql:57 ทำถูกอยู่แล้ว
--- 2. admin_users_with_activity ยังเปิดให้ authenticated ทุกคน (นักเรียนอ่าน PII เพื่อนได้)
---    → ต้องเพิ่ม admin SELECT policy บน public.users ก่อน แล้วค่อยเปลี่ยน view เป็น
---      security_invoker = true
--- 3. register_push_subscription ยังไม่มี auth.uid() guard
---    → FIX_PUSH_SUBSCRIPTION_UPSERT.sql:66 มีโค้ดแก้อยู่แล้วแต่ยังไม่เคยรัน
--- 4. user_achievements INSERT policy เป็น WITH CHECK (true)
--- 5. cleanup_stale_push_subscriptions() ไม่มี guard
--- 6. display_state (ตารางของ QSing) ยัง RLS ปิด + anon CRUD เต็ม
---    → ต้องเช็ค client ของ QSing ก่อนว่าเขียนแบบ anon หรือเปล่า
--- 7. push_config เก็บ service_role key ตัวจริง (ตอนนี้ deny-all อยู่ ปลอดภัย)
---    → ควรย้ายไป Supabase Vault
+-- ชุดที่ 2 (MIGRATION_SECURITY_02_ADMIN_GUARDS.sql) จัดการฝั่ง `authenticated`
+-- ชุดที่ 3 (MIGRATION_SECURITY_03_XSS_IDOR_AND_VIEW.sql) จัดการ XSS / IDOR / view
+--
+-- รายการที่ยังไม่ได้ปิด เก็บไว้นอก repo ที่ SECURITY_REMAINING.local.md
+-- (repo นี้เป็น public จึงไม่ระบุรายละเอียดไว้ในไฟล์ที่ tracked)

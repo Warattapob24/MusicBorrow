@@ -120,6 +120,7 @@ Backend + `api.js` พร้อมใช้ครบแล้ว แต่ยั
 | 10 | 20260813063856 | `security_pin_user_id_to_auth_uid` | pin uuid ผู้กระทำใน 11 RPC ฝั่งนักเรียน (ยอมให้แอดมิน/service_role ผ่าน) |
 | 11 | 20260813064320 | `security_fix_restore_get_user_role_grant` | 🐛 คืนสิทธิ์ `get_user_role()` — ชุดที่ 2 revoke ไปแล้วทำให้ 4 ตารางอ่านไม่ได้ |
 | 12 | 20260813064431 | `security_view_invoker_and_achievements_policy` | `admin_users_with_activity` → `security_invoker`, ลบ policy `user_achievements` ที่เป็น `WITH CHECK (true)` |
+| 13 | 20260813072846 | `security_enable_rls_display_state` | เปิด RLS `display_state` (ตารางของ QSing) — อ่านได้ทุกคนเพราะจอ subscribe realtime แบบ anonymous แต่ client เขียนไม่ได้เลย |
 
 **🐛 บั๊กที่เกิดระหว่างทางและแก้แล้ว — สำคัญ:**
 
@@ -150,13 +151,12 @@ Backend + `api.js` พร้อมใช้ครบแล้ว แต่ยั
 | `anon` เรียกฟังก์ชันได้ | 265 | 1 | 1 | **1** |
 | `authenticated` เรียกฟังก์ชันได้ | 265 | 265 | 198 | **199** |
 | SECURITY DEFINER ไม่มี guard | 131 | 131 | 30 | **19** |
-| ตารางที่ RLS ปิด | 4 | 1 | 1 | **1** |
+| ตารางที่ RLS ปิด | 4 | 1 | 1 | **0** |
 | view ที่ `anon` อ่านได้ | 1 | 0 | 0 | **0** |
 | SECURITY DEFINER view | 1 | 1 | 1 | **0** |
 
-**ยังเหลือ:** 19 ฟังก์ชันที่ไม่รับ user id (ส่วนใหญ่เป็น read-only aggregate ความเสี่ยงต่ำ) ·
-`display_state` (ตาราง QSing ต้องเช็ค client ก่อน) · `push_config` ควรย้ายไป Vault ·
-รายละเอียดท้าย `MIGRATION_SECURITY_03_XSS_IDOR_AND_VIEW.sql`
+**ยังเหลือ:** รายละเอียดเก็บไว้นอก repo ที่ `SECURITY_REMAINING.local.md`
+(repo นี้เป็น **public** — `.gitignore` มี `*.local.md` แล้ว ตรวจ `git status` ก่อน commit ทุกครั้ง)
 
 ## นอกฐานข้อมูล
 

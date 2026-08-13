@@ -135,36 +135,10 @@ GRANT EXECUTE ON FUNCTION public.register_push_subscription(uuid,text,text,text)
 
 
 -- =====================================================================
--- ยังเหลือ: 30 ฟังก์ชันฝั่งนักเรียน — ต้องแก้คนละแบบ (pin p_user_id = auth.uid())
--- ไม่ใช่ admin guard เพราะนักเรียนต้องเรียกได้จริง
+-- งานต่อ
 -- =====================================================================
--- 12 ตัวรับ user id จาก client → เป็น IDOR (ทำแทนเพื่อนได้):
---   borrow_instrument_atomic, return_instrument_and_log_minutes, get_my_borrowed_items,
---   uniform_checkout, join_raid_lobby, check_and_award_new_badges, reward_user_video_watch,
---   reward_video_watch_time, get_game_leaderboard, get_class_practice_ranking,
---   get_club_practice_ranking, check_student_id_taken
+-- ฝั่งนักเรียนที่รับ user id จาก client (IDOR) แก้แล้วในชุดที่ 3
+-- ดู MIGRATION_SECURITY_03_XSS_IDOR_AND_VIEW.sql
 --
--- 18 ตัวไม่รับ user id (ส่วนใหญ่เป็น read-only aggregate ความเสี่ยงต่ำกว่า):
---   claim_kit, process_raid_result, uniform_return_part, get_kit_scan_details,
---   get_available_kits, get_kit_availability, get_instrument_kinds, get_event_summary,
---   get_borrow_counts_by_type, get_borrow_heatmap, get_borrow_status_by_type_over_time,
---   get_boss_raid_stats, get_instrument_ranks_by_type, get_system_setting,
---   get_uniform_outstanding, get_uniform_require_size, get_uniform_self_select,
---   notify_all_admins
---
--- วิธีแก้ที่ควรใช้: เอา p_user_id ออกแล้วใช้ auth.uid() ภายใน
--- (ตาม pitfall #5 ต้อง DROP FUNCTION signature เก่าก่อน แล้วแก้ api.js ให้เลิกส่ง)
-
-
--- =====================================================================
--- งานอื่นที่ยังไม่ได้แก้
--- =====================================================================
--- 1. XSS 5 จุด (escapeHtml ใน onclick, Swal title, javascript: href) — นักเรียน → แอดมิน
--- 2. send-push edge function ไม่ตรวจตัวตนผู้เรียก + sw.js เปิด URL ภายนอกจาก payload
--- 3. admin_users_with_activity ยังเปิดให้ authenticated ทุกคน (ต้องเพิ่ม admin SELECT
---    policy บน users ก่อน แล้วเปลี่ยน view เป็น security_invoker)
--- 4. user_achievements INSERT policy = WITH CHECK (true)
--- 5. display_state (ตารางของ QSing) ยัง RLS ปิด + anon CRUD เต็ม — ต้องเช็ค client QSing ก่อน
--- 6. push_config เก็บ service_role key ตัวจริง (deny-all อยู่ ปลอดภัย) ควรย้ายไป Vault
--- 7. get_admin_dashboard_stats มี overload ตายค้าง () ทำให้เรียกแบบ 0-arg กำกวม
---    (ของเดิม ไม่ใช่ของใหม่ — client ส่ง named arg จึงไม่กระทบ)
+-- รายการที่ยังไม่ได้ปิด เก็บไว้นอก repo ที่ SECURITY_REMAINING.local.md
+-- (repo นี้เป็น public จึงไม่ระบุรายละเอียดไว้ในไฟล์ที่ tracked)
