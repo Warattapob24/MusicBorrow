@@ -13,7 +13,7 @@ import { authApi, notificationsExt, borrowExt, usersExt, repair,
          badgesExt, rankingsExt, bossesApi, raidApi, studentLoopsApi,
          uniformApi, eventsApi } from './api.js';
 import { currentUser, setCurrentUser, getCurrentUser } from './auth.js';
-import { escapeHtml, translateGroup, parseMediaUrl } from './utils.js';
+import { escapeHtml, escapeJsInAttr, safeUrl, translateGroup, parseMediaUrl } from './utils.js';
 import { buildPlayerCardHTML, triggerLevelUp, sharePlayerCard  } from './player-card.js';
 import { BadgeSystem } from './badge-system.js';
 import { renderBadgeGallery, setupBadgeGalleryEvents } from './badge-gallery.js';
@@ -3312,7 +3312,7 @@ function startTimer() {
 export async function handleReturnInstrument(instrumentId, instrumentName, button) {
     const cu = getCurrentUser();
     const { isConfirmed, isDenied } = await Swal.fire({
-        title: `คืน ${instrumentName}?`, 
+        title: `คืน ${escapeHtml(instrumentName)}?`,
         text: "เครื่องดนตรีอยู่ในสภาพดีหรือไม่?", 
         icon: 'question',
         showDenyButton: true, 
@@ -4894,7 +4894,7 @@ function _lfRenderCard(link, index) {
                 <div class="lf-tag-row">${tags.join('')}</div>
                 <h3 class="lf-title">${escapeHtml(link.title || '')}</h3>
                 ${link.caption ? `<p class="lf-caption">${escapeHtml(link.caption)}</p>` : ''}
-                <a class="lf-open-app" href="${escapeHtml(link.youtube_url)}" target="_blank" rel="noopener noreferrer" onclick="window.__lfMarkExternal && window.__lfMarkExternal()">🚀 เปิดในแอป</a>
+                <a class="lf-open-app" href="${escapeHtml(safeUrl(link.youtube_url))}" target="_blank" rel="noopener noreferrer" onclick="window.__lfMarkExternal && window.__lfMarkExternal()">🚀 เปิดในแอป</a>
             </div>
         </article>
     `;
@@ -6176,6 +6176,11 @@ export function setupMetronome() {
 // 9. Game Event Listener (รับค่ากลับมาจากเกม)
 // ─────────────────────────────────────────────────────────────────────────────
 window.addEventListener('message', async (event) => {
+    // 🔒 เกมอยู่ใน iframe โดเมนเดียวกันและ broadcast ด้วย '*' — ถ้าไม่เช็ค origin
+    // หน้าเว็บของใครก็ได้ที่ window.open() แอปนี้ไว้ จะ postMessage คะแนนปลอมเข้ามา
+    // แล้วเขียนลง DB ด้วย session ของเหยื่อเอง (ตรงนี้ทำแบบเดียวกับที่เช็ค YouTube อยู่แล้ว)
+    if (event.origin !== window.location.origin) return;
+
     // 1. รับคะแนนเมื่อเกมจบ
     if (event.data && event.data.type === 'GAME_OVER') {
         const cu = getCurrentUser();
@@ -6282,7 +6287,7 @@ window.__sdWatchVideo = async (url, title) => {
             <div style="margin-top: 1rem; padding: 1rem; background: var(--pico-form-element-background-color); border-radius: 8px; border: 1px dashed var(--pico-muted-border-color); text-align: left;">
                 <strong style="color:var(--pico-color);">📺 วิดีโอไม่เล่น / จอดำ?</strong>
                 <p style="font-size:0.85rem; color:var(--pico-muted-color); margin: 0.4rem 0;">เนื่องจากระบบความปลอดภัยของแอป (เช่น Facebook, TikTok) ให้คลิกปุ่มด้านล่างเพื่อ <b>เปิดดูในแอปหลัก</b> เมื่อดูจบแล้วค่อยกลับมากด "✅ เรียนรู้เสร็จสิ้น" ที่หน้านี้</p>
-                <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="sd-btn-outline" style="width:100%; padding:0.6rem; display:block; text-align:center; text-decoration:none; border-radius:8px;">🚀 ดูไม่ได้กดที่นี่</a>
+                <a href="${escapeHtml(safeUrl(url))}" target="_blank" rel="noopener noreferrer" class="sd-btn-outline" style="width:100%; padding:0.6rem; display:block; text-align:center; text-decoration:none; border-radius:8px;">🚀 ดูไม่ได้กดที่นี่</a>
             </div>
 
             <p style="font-size:0.85rem; color:var(--pico-primary); margin-top:1rem; font-weight:bold; text-align:center;">
@@ -6339,7 +6344,7 @@ window.__sdWatchVideo = async (url, title) => {
 // ✨ [Engineer Added]: ฟังก์ชันสำหรับนักเรียนส่งคำขอโจมตีบอส
 window.__sdChallengeBoss = async (bossId, bossTitle) => {
     const { value: url } = await Swal.fire({
-        title: `⚔️ ท้าทาย: ${bossTitle}`,
+        title: `⚔️ ท้าทาย: ${escapeHtml(bossTitle)}`,
         input: 'url',
         inputLabel: 'วางลิงก์ YouTube ที่อัดคลิปการสอบของคุณ',
         inputPlaceholder: 'https://youtu.be/...',

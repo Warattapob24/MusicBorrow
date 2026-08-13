@@ -5,7 +5,7 @@
  */
 
 import { adminDashboard as api, adminExt, authApi, bossesApi, raidApi, instrumentsExt, notifications, adminKnowledgeApi, scheduledNotificationsApi, adminNotifications, recoveryApi, studentLoopsApi, eventsApi, uniformApi, staffApi, sectionsApi, instrumentKindsApi } from './api.js';
-import { escapeHtml, translateGroup } from './utils.js';
+import { escapeHtml, escapeJsInAttr, safeUrl, translateGroup } from './utils.js';
 import { SUPABASE_URL } from './config.js';
 import { getCurrentUser } from './auth.js';
 
@@ -1557,7 +1557,7 @@ function registerWindowActions() {
                 <div style="background: var(--oad-surface); padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem; border: 1px dashed var(--oad-border);">
                     <label>📸 อัปโหลดรูปภาพใหม่ (ถ้าไม่เปลี่ยนให้เว้นไว้)</label>
                     <input type="file" id="ei-img-file" accept="image/*" style="margin-bottom: 0;">
-                    ${inst.image_url ? `<div style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="${escapeHtml(inst.image_url)}" target="_blank" style="color: var(--pico-primary);">🖼️ ดูรูปภาพปัจจุบันคลิกที่นี่</a></div>` : ''}
+                    ${inst.image_url ? `<div style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="${escapeHtml(safeUrl(inst.image_url))}" target="_blank" style="color: var(--pico-primary);">🖼️ ดูรูปภาพปัจจุบันคลิกที่นี่</a></div>` : ''}
                 </div>
 
                 <div><label>รายละเอียดเพิ่มเติม</label><textarea id="ei-desc" rows="2">${escapeHtml(inst.description||'')}</textarea></div>
@@ -1922,7 +1922,7 @@ function registerWindowActions() {
                         </div>
 
                         <button
-                            onclick="window.__oadRemoveUserBadge('${b.id}', '${userId}', '${escapeHtml(userName)}')"
+                            onclick="window.__oadRemoveUserBadge('${b.id}', '${userId}', '${escapeJsInAttr(userName)}')"
                             style="
                                 width:36px;
                                 height:36px;
@@ -1999,7 +1999,7 @@ function registerWindowActions() {
                         </select>
 
                         <button
-                            onclick="window.__oadAwardUserBadge('${userId}', '${escapeHtml(userName)}')"
+                            onclick="window.__oadAwardUserBadge('${userId}', '${escapeJsInAttr(userName)}')"
                             style="
                                 border:none;
                                 padding:.55rem .9rem;
@@ -2790,7 +2790,7 @@ function registerWindowActions() {
                     </table>
                 </div>`;
 
-            Swal.fire({ title: `ประวัติ: ${userName}`, width: '750px', html: historyHtml, showCloseButton: true, showConfirmButton: false });
+            Swal.fire({ title: `ประวัติ: ${escapeHtml(userName)}`, width: '750px', html: historyHtml, showCloseButton: true, showConfirmButton: false });
         } catch (err) { toast('ผิดพลาด: ' + err.message, 'error'); }
     };
 
@@ -3821,9 +3821,40 @@ async function renderRepairsTable() {
         </table>`;
 }
 
+// ชื่อผู้ใช้ต้องไม่ถูกฝังลงใน HTML attribute — ดึงจาก state ตอนกดแทน
+// (escapeHtml กัน JS string ที่อยู่ใน onclick ไม่ได้: parser ถอด entity ก่อน compile)
+function _userFullName(uid) {
+    const u = state.users?.find(x => x.id === uid);
+    if (!u) return '—';
+    return `${u.prefix || ''} ${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || '—';
+}
+
+function _bindUserTableActions(wrap) {
+    if (wrap.dataset.uactBound) return;
+    wrap.dataset.uactBound = '1';
+    wrap.addEventListener('click', (e) => {
+        const btn = e.target.closest('.oad-uact');
+        if (!btn || !wrap.contains(btn)) return;
+        const uid = btn.dataset.uid;
+        const name = _userFullName(uid);
+        switch (btn.dataset.uact) {
+            case 'kit':        window.__oadUserKit(uid, name); break;
+            case 'history':    window.__oadUserHistory(uid, name); break;
+            case 'badges':     window.__oadManageBadges(uid, name); break;
+            case 'exp':        window.__oadManageExp(uid, name); break;
+            case 'edit':       window.__oadEditUser(uid); break;
+            case 'unblock':    window.__oadUnblock(uid); break;
+            case 'block':      window.__oadBlock(uid, name); break;
+            case 'restore':    window.__oadToggleDeactivate(uid, false); break;
+            case 'deactivate': window.__oadToggleDeactivate(uid, true); break;
+        }
+    });
+}
+
 function renderUsersTable() {
     const wrap = document.getElementById('oad-user-table-wrap');
     if (!wrap) return;
+    _bindUserTableActions(wrap);
 
     const search = (document.getElementById('oad-user-search')?.value || '').toLowerCase();
     const group  = document.getElementById('oad-user-group-filter')?.value || 'all';
@@ -3958,23 +3989,23 @@ function renderUsersTable() {
 
                     <td><div class="actions" style="justify-content:center;">
                         ${r.student_group === 'club'
-                          ? `<button class="oad-btn oad-btn-ghost" title="จัดการชุดประจำตัว" onclick="window.__oadUserKit('${r.id}', '${escapeHtml(fullName)}')">👔</button>`
+                          ? `<button class="oad-btn oad-btn-ghost oad-uact" data-uact="kit" data-uid="${r.id}" title="จัดการชุดประจำตัว">👔</button>`
                           : ''}
-                        <button class="oad-btn oad-btn-ghost" title="ดูประวัติการยืม" onclick="window.__oadUserHistory('${r.id}', '${escapeHtml(fullName)}')">📜</button>
-                        
+                        <button class="oad-btn oad-btn-ghost oad-uact" data-uact="history" data-uid="${r.id}" title="ดูประวัติการยืม">📜</button>
+
                         ${isDeactivated ? `
-                            <button class="oad-btn oad-btn-green" title="กู้คืนบัญชี" onclick="window.__oadToggleDeactivate('${r.id}', false)">♻️ กู้คืนบัญชี</button>
+                            <button class="oad-btn oad-btn-green oad-uact" data-uact="restore" data-uid="${r.id}" title="กู้คืนบัญชี">♻️ กู้คืนบัญชี</button>
                         ` : `
-                            <button class="oad-btn oad-btn-ghost" title="จัดการเหรียญตรา" onclick="window.__oadManageBadges('${r.id}', '${escapeHtml(fullName)}')">🏅</button>
-                            <button class="oad-btn oad-btn-ghost" title="จัดการ EXP พิเศษ" onclick="window.__oadManageExp('${r.id}', '${escapeHtml(fullName)}')">⚡</button>
-                            <button class="oad-btn oad-btn-ghost" title="แก้ไขข้อมูล" onclick="window.__oadEditUser('${r.id}')">✏️</button>
-                            
+                            <button class="oad-btn oad-btn-ghost oad-uact" data-uact="badges" data-uid="${r.id}" title="จัดการเหรียญตรา">🏅</button>
+                            <button class="oad-btn oad-btn-ghost oad-uact" data-uact="exp" data-uid="${r.id}" title="จัดการ EXP พิเศษ">⚡</button>
+                            <button class="oad-btn oad-btn-ghost oad-uact" data-uact="edit" data-uid="${r.id}" title="แก้ไขข้อมูล">✏️</button>
+
                             ${r.is_blocked
-                                ? `<button class="oad-btn oad-btn-green" title="ปลดบล็อก" onclick="window.__oadUnblock('${r.id}')">🔓</button>`
-                                : `<button class="oad-btn oad-btn-amber" title="บล็อก" onclick="window.__oadBlock('${r.id}', '${escapeHtml(fullName)}')">🚫</button>`
+                                ? `<button class="oad-btn oad-btn-green oad-uact" data-uact="unblock" data-uid="${r.id}" title="ปลดบล็อก">🔓</button>`
+                                : `<button class="oad-btn oad-btn-amber oad-uact" data-uact="block" data-uid="${r.id}" title="บล็อก">🚫</button>`
                             }
-                            
-                            <button class="oad-btn oad-btn-red" title="ปิดบัญชีการใช้งาน" onclick="window.__oadToggleDeactivate('${r.id}', true)">📁</button>
+
+                            <button class="oad-btn oad-btn-red oad-uact" data-uact="deactivate" data-uid="${r.id}" title="ปิดบัญชีการใช้งาน">📁</button>
                         `}
                     </div></td>
                 </tr>`;
@@ -4094,9 +4125,9 @@ function renderInstrumentsTable() {
                     <td>${statusBadge(r.status)}</td>
                     <td><div class="actions">
                         <button class="oad-btn oad-btn-ghost" title="ดูประวัติการใช้งาน" onclick="window.__oadInstrumentHistory(${r.id})">📜</button>
-                        <button class="oad-btn oad-btn-ghost" onclick="window.__oadShowQR('${r.id}', '${escapeHtml(r.name)}')">⛶</button>
+                        <button class="oad-btn oad-btn-ghost" onclick="window.__oadShowQR('${r.id}', '${escapeJsInAttr(r.name)}')">⛶</button>
                         <button class="oad-btn oad-btn-ghost" onclick="window.__oadEditInstrument(${r.id})">✏️</button>
-                        <button class="oad-btn oad-btn-red" onclick="window.__oadDeleteInstrument(${r.id}, '${escapeHtml(r.name||'')}')">🗑️</button>
+                        <button class="oad-btn oad-btn-red" onclick="window.__oadDeleteInstrument(${r.id}, '${escapeJsInAttr(r.name||'')}')">🗑️</button>
                     </div></td>
                 </tr>`;
             }).join('')}
@@ -4161,7 +4192,7 @@ function renderKnowledgeTable() {
                 <tr ${!r.is_approved ? 'style="background: rgba(245, 158, 11, 0.05);"' : ''}>
                     <td>
                         <strong style="font-size:0.95rem;">${escapeHtml(r.title || '')}</strong><br>
-                        <a href="${escapeHtml(r.youtube_url || '')}" target="_blank" rel="noopener" style="font-size:0.8rem; color:var(--oad-accent); text-decoration:none;">🔗 เปิดดูคลิป</a>
+                        <a href="${escapeHtml(safeUrl(r.youtube_url))}" target="_blank" rel="noopener" style="font-size:0.8rem; color:var(--oad-accent); text-decoration:none;">🔗 เปิดดูคลิป</a>
                         ${r.caption ? `<div style="font-size:0.8rem; color:var(--oad-muted); margin-top:0.3rem; white-space:pre-wrap;">${escapeHtml(r.caption)}</div>` : ''}
                     </td>
                     <td style="font-size:0.85rem;">${submitterName}</td>
@@ -4283,7 +4314,7 @@ async function renderBossesTable() {
         if (!s || !s.total) return `<div style="font-size:0.72rem; color:var(--oad-muted); margin-top:2px;">ยังไม่มีสถิติ</div>`;
         return `<div style="font-size:0.72rem; color:var(--oad-muted); margin-top:2px;">
             🗡️ ${s.total} ครั้ง · ✅ ${s.passed} · ❌ ${s.failed}
-            <button onclick="window.__oadShowBossHistory('${b.id}', '${escapeHtml(b.title || '')}')"
+            <button onclick="window.__oadShowBossHistory('${b.id}', '${escapeJsInAttr(b.title || '')}')"
                 style="margin-left:0.5rem; font-size:0.7rem; padding:1px 7px; border-radius:99px;
                        background:rgba(99,102,241,0.2); border:1px solid rgba(99,102,241,0.4);
                        color:#a5b4fc; cursor:pointer;">📋 ดูรายละเอียด</button>
@@ -5262,7 +5293,7 @@ async function renderCharts() {
 
 // ✨ ฟังก์ชันแสดงรายละเอียดเมื่อคลิก Donut Chart
 async function showCategoryDetails(type) {
-    Swal.fire({ title: `กำลังโหลดข้อมูล ${type}...`, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: `กำลังโหลดข้อมูล ${escapeHtml(type)}...`, didOpen: () => Swal.showLoading() });
     
     try {
         const { data, error } = await api.getCategoryDetails(type);
@@ -5275,7 +5306,7 @@ async function showCategoryDetails(type) {
 
         // ดักกรณีไม่มีคนยืมเลย (Array ว่าง)
         if (!Array.isArray(data) || data.length === 0) {
-            Swal.fire({ title: `อันดับเครื่องดนตรี: ${type}`, html: '<div class="oad-empty">ยังไม่มีข้อมูลการยืมสำหรับประเภทนี้</div>', width: '500px' });
+            Swal.fire({ title: `อันดับเครื่องดนตรี: ${escapeHtml(type)}`, html: '<div class="oad-empty">ยังไม่มีข้อมูลการยืมสำหรับประเภทนี้</div>', width: '500px' });
             return;
         }
 
@@ -5285,7 +5316,7 @@ async function showCategoryDetails(type) {
         });
         html += `</tbody></table>`;
 
-        Swal.fire({ title: `อันดับเครื่องดนตรี: ${type}`, html: html, width: '500px' });
+        Swal.fire({ title: `อันดับเครื่องดนตรี: ${escapeHtml(type)}`, html: html, width: '500px' });
         
     } catch (err) {
         Swal.fire('ผิดพลาด', `การเชื่อมต่อขัดข้อง: ${err.message}`, 'error');
@@ -6232,7 +6263,7 @@ async function renderEventsTab() {
                     <td>${_EV_STATUS[e.status] || escapeHtml(e.status)}</td>
                     <td><div class="actions">
                         ${e.status === 'draft'
-                          ? `<button class="oad-btn oad-btn-approve" onclick="window.__oadPublishEvent(${e.id}, '${escapeHtml(e.name).replace(/'/g, "\'")}')">📢 ประกาศ</button>`
+                          ? `<button class="oad-btn oad-btn-approve oad-evact" data-evact="publish" data-evid="${e.id}" data-evname="${escapeHtml(e.name || '')}">📢 ประกาศ</button>`
                           : ''}
                         ${isClosed || e.status === 'draft' ? '' :
                           `<button class="oad-btn oad-btn-red" onclick="window.__oadCloseEvent(${e.id}, ${iPend + uPend})">🔴 ปิดงาน</button>`}
@@ -6242,6 +6273,18 @@ async function renderEventsTab() {
             }).join('')}
             </tbody>
         </table>`;
+
+    // ชื่องานอ่านจาก data-attribute (HTML context ปลอดภัย) แทนการฝังเป็น JS string ใน onclick
+    if (!wrap.dataset.evactBound) {
+        wrap.dataset.evactBound = '1';
+        wrap.addEventListener('click', (ev) => {
+            const btn = ev.target.closest('.oad-evact');
+            if (!btn || !wrap.contains(btn)) return;
+            if (btn.dataset.evact === 'publish') {
+                window.__oadPublishEvent(Number(btn.dataset.evid), btn.dataset.evname || '');
+            }
+        });
+    }
 }
 
 function _updateEventsBadge(n) {
@@ -6577,7 +6620,6 @@ async function _renderPartTypeTable() {
                        <th>สต๊อกรายไซส์ (มีกี่ตัว)</th><th>จำนวนชิ้น</th><th>บังคับติ๊ก</th><th>จัดการ</th></tr></thead>
             <tbody>
             ${_uni.partTypes.map(p => {
-                const nameEsc = escapeHtml(p.name_th).replace(/'/g, "\\'");
                 const opts = p.size_options || [];
                 return `<tr>
                 <td class="nowrap">${escapeHtml(p.set_name || '—')}</td>
@@ -6600,14 +6642,31 @@ async function _renderPartTypeTable() {
                     ? '<span class="oad-badge oad-badge-green">บังคับ</span>'
                     : '<span class="oad-badge oad-badge-gray">ปลดแล้ว</span>'}</td>
                 <td><div class="actions">
-                    <button class="oad-btn" onclick='window.__oadEditSizeStock(${p.id}, "${nameEsc}", ${JSON.stringify(p.size_stock || [])})'>📦 สต๊อก</button>
+                    <button class="oad-btn oad-pact" data-pact="stock" data-pid="${p.id}">📦 สต๊อก</button>
                     ${p.is_required
-                        ? `<button class="oad-btn oad-btn-red" onclick="window.__oadRetirePart(${p.id}, '${nameEsc}')">ปลดออก</button>`
+                        ? `<button class="oad-btn oad-btn-red oad-pact" data-pact="retire" data-pid="${p.id}">ปลดออก</button>`
                         : ''}
                 </div></td>
             </tr>`; }).join('')}
             </tbody>
         </table>`;
+
+    // ชื่ออุปกรณ์ดึงจาก _uni.partTypes ตอนกด แทนการฝังเป็น JS string ใน onclick
+    if (!wrap.dataset.pactBound) {
+        wrap.dataset.pactBound = '1';
+        wrap.addEventListener('click', (e) => {
+            const btn = e.target.closest('.oad-pact');
+            if (!btn || !wrap.contains(btn)) return;
+            const pid = Number(btn.dataset.pid);
+            const pt  = (_uni.partTypes || []).find(x => x.id === pid);
+            if (!pt) return;
+            if (btn.dataset.pact === 'stock') {
+                window.__oadEditSizeStock(pid, pt.name_th, pt.size_stock || []);
+            } else if (btn.dataset.pact === 'retire') {
+                window.__oadRetirePart(pid, pt.name_th);
+            }
+        });
+    }
 }
 
 // ── กำหนดเจ้าของชุด ────────────────────────────────────────────────────────
@@ -6754,7 +6813,7 @@ window.__oadKitSizes = async (kitId) => {
 window.__oadNewKits = async () => {
     const st = _uni.setTypes.find(s => s.id === _uni.setTypeId);
     const { value, isConfirmed } = await Swal.fire({
-        title: `➕ เพิ่มถุงชุด — ${st?.name_th || ''}`,
+        title: `➕ เพิ่มถุงชุด — ${escapeHtml(st?.name_th || '')}`,
         input: 'number', inputLabel: 'เพิ่มกี่ถุง?', inputValue: 20,
         inputAttributes: { min: 1, max: 200 },
         text: 'เลขถุงจะต่อจากเลขสูงสุดที่มีอยู่ และระบบจะสร้างชิ้นส่วนให้อัตโนมัติ',
@@ -6770,7 +6829,7 @@ window.__oadNewKits = async () => {
 
 window.__oadRetirePart = async (partTypeId, name) => {
     const { isConfirmed } = await Swal.fire({
-        title: `ปลด "${name}" ออกจากชุด?`,
+        title: `ปลด "${escapeHtml(name)}" ออกจากชุด?`,
         text: 'ประวัติการเบิกเดิมยังอยู่ครบ แต่จะไม่ต้องติ๊กชิ้นนี้อีกต่อไป',
         icon: 'warning', showCancelButton: true,
         confirmButtonText: 'ปลดออก', cancelButtonText: 'ยกเลิก'
@@ -7245,7 +7304,7 @@ async function _renderUniformReport() {
                     <td><span class="oad-badge ${d.condition === 'lost' ? 'oad-badge-red' : 'oad-badge-amber'}">${_COND_TH[d.condition] || d.condition}</span></td>
                     <td>#${d.kit_no}</td>
                     <td>${escapeHtml(d.owner_name || '—')}</td>
-                    <td><button class="oad-btn" onclick="window.__oadFixPart(${d.part_id}, '${escapeHtml(d.part_code)}')">แก้</button></td>
+                    <td><button class="oad-btn" onclick="window.__oadFixPart(${d.part_id}, '${escapeJsInAttr(d.part_code)}')">แก้</button></td>
                 </tr>`).join('')}
                 </tbody>
             </table>
@@ -7384,7 +7443,7 @@ window.__oadKitCondition = async (kitId) => {
 
 window.__oadFixPart = async (partId, code) => {
     const { value, isConfirmed } = await Swal.fire({
-        title: `แก้สภาพ ${code}`,
+        title: `แก้สภาพ ${escapeHtml(code)}`,
         input: 'select',
         inputOptions: { A: 'A — สภาพดี', B: 'B — มีร่องรอย', C: 'C — ชำรุดเล็กน้อย',
                         repair: 'ต้องซ่อม', lost: 'สูญหาย' },
@@ -7459,7 +7518,7 @@ window.__oadUserKit = async (userId, fullName) => {
         if (!free.length) return Swal.fire('ไม่มีชุดว่าง', 'ชุดถูกใช้หมดแล้ว', 'info');
 
         const { value, isConfirmed } = await Swal.fire({
-            title: `👔 กำหนดชุดให้ ${fullName}`,
+            title: `👔 กำหนดชุดให้ ${escapeHtml(fullName)}`,
             html: `<select id="uk-pick" class="swal2-input" style="width:100%;margin:0;">
                      ${free.map(k => `<option value="${k.kit_id}">
                         ${k.set_icon || ''} ชุด #${k.kit_no}
@@ -7876,7 +7935,7 @@ window.__oadEditSizeStock = async (partTypeId, name, rows) => {
     </tr>`;
 
     const { value, isConfirmed } = await Swal.fire({
-        title: `📦 สต๊อกไซส์ — ${name}`,
+        title: `📦 สต๊อกไซส์ — ${escapeHtml(name)}`,
         width: 460,
         html: `<div style="text-align:left;font-size:.87rem;">
                  <p style="margin:0 0 .6rem;opacity:.75;">
@@ -7972,7 +8031,7 @@ async function _loadGcalStatus() {
 // ── ประกาศกิจกรรมที่ร่างไว้ — นักเรียนเห็นและปฏิทินอัปเดตทันที
 window.__oadPublishEvent = async (eventId, name) => {
     const { isConfirmed } = await Swal.fire({
-        title: `ประกาศ "${name}"?`,
+        title: `ประกาศ "${escapeHtml(name)}"?`,
         text: 'นักเรียนจะเห็นทันที และกิจกรรมจะถูกส่งขึ้นปฏิทิน Google',
         icon: 'question', showCancelButton: true,
         confirmButtonText: '📢 ประกาศ', cancelButtonText: 'ยังก่อน'

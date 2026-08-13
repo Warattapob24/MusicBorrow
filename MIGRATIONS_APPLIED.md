@@ -59,3 +59,108 @@ Backend + `api.js` พร้อมใช้ครบแล้ว แต่ยั
 - คัลเลอร์การ์ดยังไม่มีเครื่องผูก เพราะใช้ธง/อุปกรณ์ซึ่งอยู่ในประเภท "อุปกรณ์"
 - RLS errors ที่ Supabase advisor รายงาน (`exp_logs`, `xp_event_rules`, `display_state`, `settings`)
   เป็นตารางเก่าที่มีอยู่ก่อน ไม่ได้เกิดจาก migration ชุดนี้
+  → **แก้แล้ว 3 จาก 4 ตัวเมื่อ 2026-08-13** ดูหัวข้อถัดไป (เหลือ `display_state` ซึ่งเป็นตารางของ QSing)
+
+---
+
+# Security lockdown (2026-08-13)
+
+มาจาก security review ทั้งระบบ รันผ่าน Supabase MCP `apply_migration` เช่นกัน
+ไฟล์ฉบับเต็มพร้อมคำอธิบาย: `MIGRATION_SECURITY_01_LOCKDOWN_ANON.sql`
+
+| ลำดับ | version | ชื่อ | ทำอะไร |
+|---|---|---|---|
+| 1 | 20260813020506 | `security_revoke_anon_rpc_execute` | ตัดสิทธิ์ `anon` เรียก RPC ทั้ง schema (265 → 1) โดย snapshot แล้ว grant คืนให้ `authenticated`/`service_role` เท่าเดิม |
+| 2 | 20260813020554 | `security_enable_rls_exp_logs_settings_xp_rules` | เปิด RLS + policy ให้ `exp_logs`, `xp_event_rules`, `settings` |
+| 3 | 20260813020653 | `security_default_privileges_no_anon_execute` | `ALTER DEFAULT PRIVILEGES` กันฟังก์ชันใหม่ถูก grant ให้ `anon` อัตโนมัติ |
+| 4 | 20260813022415 | `security_revoke_anon_admin_users_view` | ตัด `anon` ออกจาก SECURITY DEFINER view `admin_users_with_activity` |
+
+**ปัญหาที่แก้:** 264 จาก 265 functions ใน `public` เป็น `SECURITY DEFINER` ที่ไม่มีการตรวจสิทธิ์
+และ `anon` เรียกได้หมด → ใครถือ anon key จาก `config.js` (public โดยออกแบบ) ก็เรียก
+`trigger_yearly_reset`, `deactivate_user_account`, `admin_get_live_borrowing_status`
+ได้โดยไม่ต้องล็อกอิน · อีก 4 ตารางมี RLS ปิดพร้อม grant CRUD เต็มให้ `anon`
+
+**ผลหลังแก้ (ยืนยันด้วย PostgREST จริง):** RPC เดิมตอบ `401 permission denied`,
+`check_student_id_taken` (ฟอร์มสมัคร) ยัง `200`, Supabase advisor
+`anon_security_definer_function_executable` ลดจาก 218 → 1
+
+**ต่อจากนี้:** ฝั่ง `authenticated` แก้แล้วในชุดที่ 2 ด้านล่าง
+
+## ชุดที่ 2 — admin guards (`MIGRATION_SECURITY_02_ADMIN_GUARDS.sql`)
+
+| ลำดับ | version | ชื่อ | ทำอะไร |
+|---|---|---|---|
+| 5 | 20260813023459 | `security_guard_register_push_subscription` | ใส่ `auth.uid()` guard กัน push hijack (หยิบเฉพาะ guard จาก `FIX_PUSH_SUBSCRIPTION_UPSERT.sql` ส่วนที่เหลือของไฟล์นั้นไม่ตรง production แล้ว) |
+| 6 | 20260813023811 | `security_revoke_authenticated_internal_functions` | ตัด `authenticated` ออกจาก 61 ฟังก์ชันภายใน (cron / trigger helper / edge-function callee / โค้ดตาย) |
+| 7 | 20260813024314 | `security_guard_admin_rpcs_stage2` | ครอบ guard ให้ RPC แอดมิน 37 overloads ด้วยวิธี rename เป็น `__inner` + wrapper ชื่อเดิม |
+| 8 | 20260813024801 | `security_fix_wrapper_guard_and_anon_grants` | 🐛 แก้บั๊ก 2 ตัวจาก migration ที่ 7 (ดูด้านล่าง) |
+
+**🐛 บั๊กที่เกิดระหว่างทางและแก้แล้ว — อย่าทำซ้ำ:**
+
+| # | อาการ | สาเหตุ |
+|---|---|---|
+| 1 | wrapper 37 ตัวที่เพิ่งสร้าง กลับมาให้ `anon` เรียกได้ | `CREATE FUNCTION` ได้ default privileges ของ Supabase คืนมา · `ALTER DEFAULT PRIVILEGES` ผูกกับ role ที่รัน CREATE ต้องระบุ `FOR ROLE` ให้ตรง · **ต้อง REVOKE ซ้ำหลังสร้างฟังก์ชันใหม่เสมอ** |
+| 2 | guard รุ่นแรกไม่กัน `anon` เลย | เขียนว่า `auth.uid() IS NULL → ผ่าน` เพื่อให้ cron ผ่าน แต่ anon JWT ก็มี `sub` เป็น NULL → เปลี่ยนไปเช็ค `request.jwt.claims->>'role'` แทน |
+
+**ตัวเลขรวม:**
+
+| | ก่อน | หลังชุดที่ 1 | หลังชุดที่ 2 |
+|---|---|---|---|
+| `anon` เรียกได้ | 265 | 1 | **1** |
+| `authenticated` เรียกได้ | 265 | 265 | **198** |
+| SECURITY DEFINER ที่ไม่มี guard | 131 | 131 | **30** |
+
+**ต่อจากนี้:** IDOR ฝั่งนักเรียนแก้แล้วในชุดที่ 3 ด้านล่าง
+
+## ชุดที่ 3 — XSS / IDOR / view (`MIGRATION_SECURITY_03_XSS_IDOR_AND_VIEW.sql`)
+
+| ลำดับ | version | ชื่อ | ทำอะไร |
+|---|---|---|---|
+| 9 | 20260813063711 | `security_url_scheme_constraints` | CHECK บังคับ `^https?://` ที่ `knowledge_links.youtube_url` และ `boss_requests.video_url` (กัน `javascript:`) |
+| 10 | 20260813063856 | `security_pin_user_id_to_auth_uid` | pin uuid ผู้กระทำใน 11 RPC ฝั่งนักเรียน (ยอมให้แอดมิน/service_role ผ่าน) |
+| 11 | 20260813064320 | `security_fix_restore_get_user_role_grant` | 🐛 คืนสิทธิ์ `get_user_role()` — ชุดที่ 2 revoke ไปแล้วทำให้ 4 ตารางอ่านไม่ได้ |
+| 12 | 20260813064431 | `security_view_invoker_and_achievements_policy` | `admin_users_with_activity` → `security_invoker`, ลบ policy `user_achievements` ที่เป็น `WITH CHECK (true)` |
+
+**🐛 บั๊กที่เกิดระหว่างทางและแก้แล้ว — สำคัญ:**
+
+`get_user_role()` ถูก revoke จาก `authenticated` ในชุดที่ 2 เพราะตรวจแล้วว่า "ไม่มีไฟล์ client เรียก"
+ซึ่ง**ไม่พอ** — ฟังก์ชันนี้ถูกอ้างใน **RLS policy** ของ `badges`, `borrow_logs`, `instruments`,
+`knowledge_links` และ policy expression ประเมินด้วยสิทธิ์ของ role ที่ query
+ผลคือนักเรียนที่ล็อกอิน `SELECT` 4 ตารางนี้ไม่ได้เลย (`permission denied for function get_user_role`)
+
+> **ก่อน REVOKE ฟังก์ชันใด ๆ ต้องเช็ค `pg_policies` ด้วย ไม่ใช่แค่ source ของแอป**
+> query ที่ใช้ตรวจอยู่ในหัวข้อ PART 3 ของ `MIGRATION_SECURITY_03_XSS_IDOR_AND_VIEW.sql`
+
+## การแก้ฝั่งแอป (deploy แล้ว)
+
+- `utils.js` — เพิ่ม `escapeJsInAttr()` (escape JS ก่อน HTML) และ `safeUrl()` (เฉพาะ http/https)
+- `admin-dashboard.js` / `ui.js` — ตาราง users, events, part types และ autocomplete "ยืมแทนนักเรียน"
+  เลิกฝังชื่อใน `onclick` เปลี่ยนเป็น `data-*` + event delegation · อีก 6 จุดใช้ `escapeJsInAttr()`
+- Swal `title` 10 จุดใส่ `escapeHtml` (v11 `title` เป็น innerHTML sink ไม่ใช่ text sink)
+- `<a href>` ที่รับข้อมูลผู้ใช้ใส่ `safeUrl()`
+- `student-dashboard.js` — `window` message listener เช็ค `event.origin` (SW ใช้ listener แยกใน `main.js:388`)
+- `sw.js` — บังคับ same-origin ก่อน `clients.openWindow()`
+- `supabase/functions/send-push/index.ts` (v13) — ตรวจ Authorization, CORS เฉพาะโดเมนแอป,
+  จำกัด `url`/`icon` ใน payload, ตอบรูปแบบเดียวกันเมื่อไม่มี subscription
+
+**ตัวเลขรวม:**
+
+| | ก่อน | ชุด 1 | ชุด 2 | ชุด 3 |
+|---|---|---|---|---|
+| `anon` เรียกฟังก์ชันได้ | 265 | 1 | 1 | **1** |
+| `authenticated` เรียกฟังก์ชันได้ | 265 | 265 | 198 | **199** |
+| SECURITY DEFINER ไม่มี guard | 131 | 131 | 30 | **19** |
+| ตารางที่ RLS ปิด | 4 | 1 | 1 | **1** |
+| view ที่ `anon` อ่านได้ | 1 | 0 | 0 | **0** |
+| SECURITY DEFINER view | 1 | 1 | 1 | **0** |
+
+**ยังเหลือ:** 19 ฟังก์ชันที่ไม่รับ user id (ส่วนใหญ่เป็น read-only aggregate ความเสี่ยงต่ำ) ·
+`display_state` (ตาราง QSing ต้องเช็ค client ก่อน) · `push_config` ควรย้ายไป Vault ·
+รายละเอียดท้าย `MIGRATION_SECURITY_03_XSS_IDOR_AND_VIEW.sql`
+
+## นอกฐานข้อมูล
+
+- `.vercelignore` — เดิม `vercel.json` ตั้ง `outputDirectory: "."` ทำให้ทั้งรีโปถูกเสิร์ฟ
+  `/supabase_rls.sql` และ `/supabase/functions/send-push/index.ts` เคยตอบ 200 พร้อม source เต็ม
+  ตอนนี้ 404 แล้ว (deploy `dpl_7MCVp3t5DDaaDtiMvzkAaQZNn3ub`)
+  ⚠️ `.vercelignore` ตัดไฟล์ตั้งแต่ตอน **upload** ห้ามใส่อะไรที่ buildCommand ต้องใช้

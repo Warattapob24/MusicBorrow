@@ -253,7 +253,18 @@ self.addEventListener('notificationclick', event => {
     // ✅ กด "คืนเลย" → เปิดแอปที่หน้ารายการค้างพร้อมสั่งคืนทันที
     const base = event.notification.data?.url || '/';
     const target = event.action === 'return-now' ? '/?return=my&auto=1' : base;
-    const urlToOpen = new URL(target, self.location.origin).href;
+
+    // 🔒 data.url มาจาก push payload ซึ่งเซิร์ฟเวอร์เป็นคนกำหนด — ถ้ามันเป็น URL แบบเต็ม
+    // new URL(target, origin) จะคืนโดเมนนั้นตรง ๆ (base ใช้กับ relative เท่านั้น)
+    // จึงต้องบังคับ same-origin ก่อนเปิด ไม่งั้นแจ้งเตือนที่ดูเหมือนมาจากแอปโรงเรียน
+    // จะพาผู้ใช้ไปหน้าฟิชชิงได้
+    let urlToOpen;
+    try {
+        const u = new URL(target, self.location.origin);
+        urlToOpen = (u.origin === self.location.origin) ? u.href : new URL('/', self.location.origin).href;
+    } catch {
+        urlToOpen = new URL('/', self.location.origin).href;
+    }
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {

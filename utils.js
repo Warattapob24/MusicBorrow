@@ -21,6 +21,40 @@ export function escapeHtml(text) {
 }
 
 /**
+ * Escape a value that will sit inside a JS string literal which is itself inside an
+ * HTML attribute — e.g. onclick="fn('<HERE>')".
+ *
+ * escapeHtml alone is NOT enough there: the HTML parser decodes &#039; back to a real
+ * quote BEFORE the attribute is compiled as JavaScript, so the escaping is undone exactly
+ * where it was needed and the value breaks out of the string literal.
+ *
+ * Correct order is JS-escape first, then HTML-escape, so that after the browser's HTML
+ * decode what remains is a valid, inert JS string literal.
+ *
+ * Prefer data-* attributes + event delegation for new code; this exists for the inline
+ * handlers that are still around.
+ */
+export function escapeJsInAttr(text) {
+    if (text === null || text === undefined) return '';
+    const jsEscaped = JSON.stringify(String(text)).slice(1, -1).replace(/'/g, "\\'");
+    return escapeHtml(jsEscaped);
+}
+
+/**
+ * Return url only when it is a safe, navigable http(s) URL; otherwise ''.
+ * escapeHtml cannot help here — `javascript:alert(1)` contains no escapable character,
+ * and a javascript: URI in an href executes in the current document even with
+ * target="_blank" and rel="noopener".
+ */
+export function safeUrl(url) {
+    if (!url) return '';
+    try {
+        const u = new URL(String(url).trim(), window.location.origin);
+        return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '';
+    } catch { return ''; }
+}
+
+/**
  * Translate a student-group key to Thai.
  */
 export function translateGroup(groupKey) {

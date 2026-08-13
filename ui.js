@@ -10,7 +10,7 @@ import {
     eventsApi, fillInstrumentSelect
 } from './api.js';
 import { supabase, ICONS, VAPID_PUBLIC_KEY } from './config.js';
-import { escapeHtml, translateGroup, parseMediaUrl, fmtEventTimes } from './utils.js';
+import { escapeHtml, escapeJsInAttr, safeUrl, translateGroup, parseMediaUrl, fmtEventTimes } from './utils.js';
 import { parseKitCode, processKitScan } from './uniform-kit.js';
 import { initAdminDashboard, destroyAdminDashboard } from './admin-dashboard.js';
 import { initStudentDashboard, destroyStudentDashboard } from './student-dashboard.js';
@@ -1627,7 +1627,7 @@ export async function loadAndDisplayMedia(instrumentType) {
             
             return `
             <article style="padding:0; margin:0; overflow: hidden; border-radius: 1rem; transition: transform 0.2s, box-shadow 0.2s;">
-                <a href="${escapeHtml(mediaInfo.originalUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; height:100%;">
+                <a href="${escapeHtml(safeUrl(mediaInfo.originalUrl))}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; height:100%;">
                     <div style="position: relative;">
                         <img src="${mediaInfo.thumbnailUrl}" alt="${titleText}" style="aspect-ratio:16/9; width:100%; object-fit:cover; background-color: var(--input-bg);">
                         <div style="position: absolute; bottom: 0.5rem; right: 0.5rem;">${platformBadge}</div>
@@ -2469,8 +2469,10 @@ window.filterAdminBorrowSuggestions = function(query) {
             const displayName = `${studentIdPart}${prefixPart} ${namePart}${classPart}`.trim().replace(/\s+/g, ' ');
             const valueForInput = `${studentIdPart}${prefixPart} ${namePart}`.trim().replace(/\s+/g, ' ');
 
+            // ชื่อนักเรียนต้องไม่ถูกฝังเป็น JS string ใน onclick — HTML parser ถอด entity
+            // ก่อน compile handler ทำให้ escapeHtml กัน quote breakout ตรงนี้ไม่ได้
             html += `
-                <div onclick="window.selectAdminBorrowUser('${escapeHtml(u.id)}', '${escapeHtml(valueForInput)}')" 
+                <div data-uid="${escapeHtml(u.id)}" data-uvalue="${escapeHtml(valueForInput)}"
                      style="padding: 0.5rem 0.75rem; cursor: pointer; border-bottom: 1px solid var(--input-border, #e2e8f0); color: var(--text-main, #1e293b); font-size: 0.9em; text-align: left; transition: background-color 0.15s ease;"
                      onmouseover="this.style.backgroundColor='var(--pico-primary-hover-background, #3b82f6)'; this.style.color='white';"
                      onmouseout="this.style.backgroundColor=''; this.style.color='';"
@@ -2480,6 +2482,14 @@ window.filterAdminBorrowSuggestions = function(query) {
             `;
         });
         suggestionsDiv.innerHTML = html;
+        if (!suggestionsDiv.dataset.pickBound) {
+            suggestionsDiv.dataset.pickBound = '1';
+            suggestionsDiv.addEventListener('click', (e) => {
+                const item = e.target.closest('.suggestion-item');
+                if (!item || !suggestionsDiv.contains(item)) return;
+                window.selectAdminBorrowUser(item.dataset.uid, item.dataset.uvalue || '');
+            });
+        }
     }
     suggestionsDiv.style.display = 'block';
     suggestionsDiv.scrollTop = 0;

@@ -1,0 +1,32 @@
+# Vercel serves the repo root as static assets (vercel.json -> "outputDirectory": ".").
+# Without this file, https://music-borrow.vercel.app/supabase_rls.sql and
+# /supabase/functions/send-push/index.ts both returned 200 with their full source.
+#
+# CAUTION: .vercelignore excludes files from the UPLOAD, not just from the served output.
+# Never list anything the buildCommand needs — student-groups/{src,index.html,package.json}
+# and the root package.json must stay uploaded or the Vite build fails.
+
+# --- Database: RLS policies, migrations, audit scripts ---
+*.sql
+
+# --- Server-side source (Deno edge functions, Supabase CLI state) ---
+# Deployed separately with the Supabase CLI; never needed by the web build.
+supabase/
+
+# --- Internal docs and notes ---
+*.md
+
+# --- Build/deploy logs and scratch files ---
+deploy.log
+deploy_output.txt
+temp_script.js
+patch_ui.py
+*.bak
+styles (1).css
+
+# --- Tooling / agent config ---
+.agents/
+.claude/
+
+# --- Demo/presentation material ---
+demo/
