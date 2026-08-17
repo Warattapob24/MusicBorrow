@@ -9,7 +9,7 @@
 //   7. [NEW] Enhanced 'notificationclick' to focus existing tabs instead of always opening new ones
 
 // ⚠️ เปลี่ยนค่านี้เมื่อไหร่ ต้องแก้ EXPECTED ในสคริปต์กู้ระบบของ index.html ให้ตรงกันด้วย
-const CACHE_NAME = 'music-borrow-v6.4.1'; // self-healing boot for stale service workers
+const CACHE_NAME = 'music-borrow-v6.4.3'; // self-healing boot for stale service workers
 
 const PRECACHE_URLS = [
     '/',
