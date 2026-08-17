@@ -1,0 +1,254 @@
+-- =====================================================================
+-- MIGRATION: Fix Invalid Bigint Syntax for Staff Roles Scope Value
+-- File: MIGRATION_FIX_STAFF_ROLES_BIGINT.sql
+-- Description: Handles scope_value as text (e.g., 'ทรัมเป็ต') safely
+--              without throwing 'invalid input syntax for type bigint'.
+-- Schema columns:
+--   users: (id, prefix, first_name, last_name, nickname, student_group, main_instrument, role)
+--   staff_roles: (id, user_id, scope_type, scope_value, granted_by, granted_at, is_active)
+-- =====================================================================
+
+-- 1. admin_grant_staff
+DROP FUNCTION IF EXISTS public.admin_grant_staff(uuid, text, text) CASCADE;
+DROP FUNCTION IF EXISTS public.admin_grant_staff(uuid, text) CASCADE;
+
+CREATE OR REPLACE FUNCTION public.admin_grant_staff(
+    p_user_id uuid,
+    p_scope_type text,
+    p_scope_value text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_label text;
+BEGIN
+    -- Security guard check using existing users.role column
+    IF current_setting('request.jwt.claims', true)::jsonb->>'role' NOT IN ('admin', 'service_role')
+       AND NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin') THEN
+        RAISE EXCEPTION 'permission denied for admin_grant_staff' USING ERRCODE = '42501';
+    END IF;
+
+    -- Validate target student
+    IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_user_id) THEN
+        RETURN jsonb_build_object('success', false, 'message', 'ไม่พบนักเรียนนี้ในระบบ');
+    END IF;
+
+    -- Validate scope_type
+    IF p_scope_type NOT IN ('band', 'section', 'instrument', 'event', 'uniform') THEN
+        RETURN jsonb_build_object('success', false, 'message', 'ประเภทขอบเขตไม่ถูกต้อง');
+    END IF;
+
+    -- Determine scope label and sanitize scope_value
+    IF p_scope_type = 'band' THEN
+        v_label := 'ทั้งวง';
+        p_scope_value := NULL;
+    ELSIF p_scope_type = 'uniform' THEN
+        v_label := 'ชุดวงโยธวาทิต';
+        p_scope_value := NULL;
+    ELSIF p_scope_type = 'section' THEN
+        IF p_scope_value IS NULL OR trim(p_scope_value) = '' THEN
+            RETURN jsonb_build_object('success', false, 'message', 'กรุณาระบุกลุ่มเครื่อง');
+        END IF;
+        SELECT name_th INTO v_label FROM public.sections WHERE code = p_scope_value;
+        IF v_label IS NULL THEN v_label := p_scope_value; END IF;
+    ELSIF p_scope_type = 'event' THEN
+        IF p_scope_value IS NULL OR trim(p_scope_value) = '' THEN
+            RETURN jsonb_build_object('success', false, 'message', 'กรุณาระบุงาน');
+        END IF;
+        IF p_scope_value ~ '^\d+$' THEN
+            SELECT name INTO v_label FROM public.events WHERE id = p_scope_value::bigint;
+        END IF;
+        IF v_label IS NULL THEN v_label := 'งาน #' || p_scope_value; END IF;
+    ELSIF p_scope_type = 'instrument' THEN
+        IF p_scope_value IS NULL OR trim(p_scope_value) = '' THEN
+            RETURN jsonb_build_object('success', false, 'message', 'กรุณาระบุเครื่องดนตรี');
+        END IF;
+        v_label := p_scope_value;
+        IF p_scope_value ~ '^\d+$' THEN
+            SELECT COALESCE(name, type, p_scope_value) INTO v_label FROM public.instruments WHERE id = p_scope_value::bigint;
+        END IF;
+    END IF;
+
+    -- Upsert staff role
+    -- Remove conflicting active roles for same user & scope
+    DELETE FROM public.staff_roles 
+    WHERE user_id = p_user_id 
+      AND scope_type = p_scope_type 
+      AND (scope_value = p_scope_value OR (scope_value IS NULL AND p_scope_value IS NULL));
+
+    INSERT INTO public.staff_roles (user_id, scope_type, scope_value, granted_by, is_active, granted_at)
+    VALUES (p_user_id, p_scope_type, p_scope_value, auth.uid(), true, NOW());
+
+    RETURN jsonb_build_object('success', true, 'message', 'แต่งตั้งสำเร็จ (' || v_label || ')');
+END;
+$$;
+
+
+-- 2. admin_staff_list
+DROP FUNCTION IF EXISTS public.admin_staff_list() CASCADE;
+
+CREATE OR REPLACE FUNCTION public.admin_staff_list()
+RETURNS TABLE (
+    role_id bigint,
+    user_id uuid,
+    full_name text,
+    nickname text,
+    student_group text,
+    main_instrument text,
+    scope_type text,
+    scope_value text,
+    scope_label text,
+    granted_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    IF current_setting('request.jwt.claims', true)::jsonb->>'role' NOT IN ('admin', 'service_role')
+       AND NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin') THEN
+        RAISE EXCEPTION 'permission denied for admin_staff_list' USING ERRCODE = '42501';
+    END IF;
+
+    RETURN QUERY
+    SELECT 
+        sr.id AS role_id,
+        sr.user_id,
+        TRIM(COALESCE(u.prefix, '') || ' ' || COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS full_name,
+        u.nickname,
+        u.student_group,
+        u.main_instrument,
+        sr.scope_type,
+        sr.scope_value,
+        CASE 
+            WHEN sr.scope_type = 'band' THEN 'ทั้งวง'
+            WHEN sr.scope_type = 'uniform' THEN 'ชุดวงโยธวาทิต'
+            WHEN sr.scope_type = 'section' THEN COALESCE((SELECT s.name_th FROM public.sections s WHERE s.code = sr.scope_value), sr.scope_value)
+            WHEN sr.scope_type = 'event' AND sr.scope_value ~ '^\d+$' THEN COALESCE((SELECT e.name FROM public.events e WHERE e.id = sr.scope_value::bigint), 'งาน #' || sr.scope_value)
+            WHEN sr.scope_type = 'instrument' THEN 
+                CASE 
+                    WHEN sr.scope_value ~ '^\d+$' THEN COALESCE((SELECT i.name FROM public.instruments i WHERE i.id = sr.scope_value::bigint), sr.scope_value)
+                    ELSE sr.scope_value
+                END
+            ELSE COALESCE(sr.scope_value, '')
+        END AS scope_label,
+        sr.granted_at
+    FROM public.staff_roles sr
+    JOIN public.users u ON u.id = sr.user_id
+    WHERE sr.is_active = true
+    ORDER BY sr.id DESC;
+END;
+$$;
+
+
+-- 3. get_my_staff_scopes
+DROP FUNCTION IF EXISTS public.get_my_staff_scopes() CASCADE;
+
+CREATE OR REPLACE FUNCTION public.get_my_staff_scopes()
+RETURNS TABLE (
+    t text,
+    v text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        sr.scope_type AS t,
+        CASE 
+            WHEN sr.scope_type = 'band' THEN 'ทั้งวง'
+            WHEN sr.scope_type = 'uniform' THEN 'ชุดวงโยธวาทิต'
+            WHEN sr.scope_type = 'section' THEN COALESCE((SELECT s.name_th FROM public.sections s WHERE s.code = sr.scope_value), sr.scope_value)
+            WHEN sr.scope_type = 'event' AND sr.scope_value ~ '^\d+$' THEN COALESCE((SELECT e.name FROM public.events e WHERE e.id = sr.scope_value::bigint), 'งาน #' || sr.scope_value)
+            WHEN sr.scope_type = 'instrument' THEN 
+                CASE 
+                    WHEN sr.scope_value ~ '^\d+$' THEN COALESCE((SELECT i.name FROM public.instruments i WHERE i.id = sr.scope_value::bigint), sr.scope_value)
+                    ELSE sr.scope_value
+                END
+            ELSE COALESCE(sr.scope_value, '')
+        END AS v
+    FROM public.staff_roles sr
+    WHERE sr.user_id = auth.uid()
+      AND sr.is_active = true;
+END;
+$$;
+
+
+-- 4. staff_get_outstanding
+DROP FUNCTION IF EXISTS public.staff_get_outstanding(bigint) CASCADE;
+DROP FUNCTION IF EXISTS public.staff_get_outstanding() CASCADE;
+
+CREATE OR REPLACE FUNCTION public.staff_get_outstanding(p_event_id bigint DEFAULT NULL)
+RETURNS TABLE (
+    log_id bigint,
+    instrument_id bigint,
+    instrument_name text,
+    instrument_kind text,
+    section_name text,
+    student_id uuid,
+    student_name text,
+    student_nickname text,
+    borrowed_at timestamptz,
+    expected_return_at timestamptz,
+    is_overdue boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_user_id uuid := auth.uid();
+    v_is_band boolean := false;
+BEGIN
+    -- Check if user is band leader or admin using users.role = 'admin'
+    IF EXISTS (SELECT 1 FROM public.staff_roles WHERE user_id = v_user_id AND scope_type = 'band' AND is_active = true)
+       OR current_setting('request.jwt.claims', true)::jsonb->>'role' IN ('admin', 'service_role')
+       OR EXISTS (SELECT 1 FROM public.users WHERE id = v_user_id AND role = 'admin') THEN
+        v_is_band := true;
+    END IF;
+
+    RETURN QUERY
+    SELECT 
+        bl.id AS log_id,
+        bl.instrument_id,
+        i.name AS instrument_name,
+        i.type AS instrument_kind,
+        s.name_th AS section_name,
+        u.id AS student_id,
+        TRIM(COALESCE(u.prefix, '') || ' ' || COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS student_name,
+        u.nickname AS student_nickname,
+        bl.borrow_timestamp AS borrowed_at,
+        bl.expected_return_at,
+        (bl.expected_return_at IS NOT NULL AND bl.expected_return_at < NOW()) AS is_overdue
+    FROM public.borrow_logs bl
+    JOIN public.instruments i ON i.id = bl.instrument_id
+    LEFT JOIN public.sections s ON s.id = i.section_id
+    JOIN public.users u ON u.id = bl.user_id
+    WHERE bl.return_timestamp IS NULL
+      AND (p_event_id IS NULL OR bl.event_id = p_event_id)
+      AND (
+          v_is_band = true
+          OR EXISTS (
+              SELECT 1 FROM public.staff_roles sr
+              WHERE sr.user_id = v_user_id AND sr.is_active = true
+                AND (
+                    (sr.scope_type = 'section' AND s.code = sr.scope_value)
+                    OR (sr.scope_type = 'event' AND sr.scope_value ~ '^\d+$' AND bl.event_id = sr.scope_value::bigint)
+                    OR (sr.scope_type = 'instrument' AND (
+                        i.type = sr.scope_value 
+                        OR i.name = sr.scope_value
+                        OR (sr.scope_value ~ '^\d+$' AND bl.instrument_id = sr.scope_value::bigint)
+                    ))
+                )
+          )
+      )
+    ORDER BY bl.borrow_timestamp DESC;
+END;
+$$;
+
+-- Grants
+GRANT EXECUTE ON FUNCTION public.admin_grant_staff(uuid, text, text) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_staff_list() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_my_staff_scopes() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.staff_get_outstanding(bigint) TO authenticated, service_role;

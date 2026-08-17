@@ -164,3 +164,18 @@ Backend + `api.js` พร้อมใช้ครบแล้ว แต่ยั
   `/supabase_rls.sql` และ `/supabase/functions/send-push/index.ts` เคยตอบ 200 พร้อม source เต็ม
   ตอนนี้ 404 แล้ว (deploy `dpl_7MCVp3t5DDaaDtiMvzkAaQZNn3ub`)
   ⚠️ `.vercelignore` ตัดไฟล์ตั้งแต่ตอน **upload** ห้ามใส่อะไรที่ buildCommand ต้องใช้
+
+---
+
+# Bug Fix: Staff Roles Bigint Syntax (2026-08-17)
+
+ไฟล์: `MIGRATION_FIX_STAFF_ROLES_BIGINT.sql`
+
+**ปัญหาที่แก้:** การแต่งตั้ง "หัวหน้าเครื่อง" (เช่น ทรัมเป็ต) ส่งค่า `scope_value` เป็นข้อความ `"ทรัมเป็ต"` แต่ RPC ฝั่ง Postgres เดิมมีการพยายาม cast `scope_value` เป็น `bigint` (เข้าใจว่าเป็น `instruments.id`) ส่งผลให้เกิด error `invalid input syntax for type bigint: "ทรัมเป็ต"`
+
+**การปรับปรุง RPC 4 ตัว:**
+1. `admin_grant_staff`: ใช้ regex `~ '^\d+$'` ตรวจสอบก่อน cast เป็น `bigint` เพื่อรองรับทั้งชื่อประเภทเครื่อง (เช่น `"ทรัมเป็ต"`) และ ID ของเครื่อง
+2. `admin_staff_list`: แสดง `scope_label` ปลอดภัยไม่พังเมื่อเจอข้อความ
+3. `get_my_staff_scopes`: คืนค่าขอบเขตหน้าที่โดยไม่เกิด bigint casting error
+4. `staff_get_outstanding`: ดึงรายการยืมค้างให้หัวหน้าเครื่อง โดยรองรับการแมตช์ด้วยชื่อประเภทเครื่อง (`i.type = sr.scope_value`), ชื่อเครื่อง, หรือ ID
+

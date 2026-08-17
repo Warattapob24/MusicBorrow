@@ -7610,10 +7610,50 @@ const _SCOPE_LABEL = {
     uniform:    { icon: '👔', name: 'ฝ่ายเสื้อผ้า',       hint: 'ดูแลชุด' }
 };
 
+let _staffViewMode = 'tree';
+
+const _SECTION_MAP_DEFS = [
+    {
+        id: 'brass',
+        name: 'กลุ่มเครื่องลมทองเหลือง',
+        icon: '🎺',
+        instruments: ['ทรัมเป็ต', 'เมโลโฟน', 'ทรอมโบน', 'บาริโทน', 'ตูบา', 'ยูโฟเนียม', 'ฮอร์น', 'เฟรนช์ฮอร์น', 'trumpet', 'mellophone', 'trombone', 'baritone', 'tuba', 'euphonium', 'horn']
+    },
+    {
+        id: 'woodwind',
+        name: 'กลุ่มเครื่องลมไม้',
+        icon: '🎷',
+        instruments: ['ฟลูต', 'พิคโคโล', 'คลาริเน็ต', 'แซกโซโฟน', 'อัลโตแซกโซโฟน', 'เทเนอร์แซกโซโฟน', 'บาริโทนแซกโซโฟน', 'โอโบ', 'บาสซูน', 'flute', 'piccolo', 'clarinet', 'saxophone', 'alto saxophone', 'tenor saxophone', 'baritone saxophone', 'oboe', 'bassoon']
+    },
+    {
+        id: 'percussion',
+        name: 'กลุ่มเครื่องกระทบ',
+        icon: '🥁',
+        instruments: ['สแนร์', 'กลองใหญ่', 'เทเนอร์', 'มัลติทอม', 'มาริมบา', 'ไซโลโฟน', 'ฉาบ', 'เครื่องกระทบ', 'snare', 'bass drum', 'marimba', 'xylophone', 'percussion']
+    },
+    {
+        id: 'guard',
+        name: 'คัลเลอร์การ์ด & อื่น ๆ',
+        icon: '🚩',
+        instruments: ['คัลเลอร์การ์ด', 'ธง', 'ไวโอลิน', 'พิณ', 'อุปกรณ์', 'guard', 'violin']
+    }
+];
+
+function _getSectionForInstrument(instName) {
+    if (!instName) return 'guard';
+    const lower = String(instName).trim().toLowerCase();
+    for (const sec of _SECTION_MAP_DEFS) {
+        if (sec.instruments.some(i => lower.includes(i.toLowerCase()) || i.toLowerCase().includes(lower))) {
+            return sec.id;
+        }
+    }
+    return 'guard';
+}
+
 async function _renderStaffRoles() {
     const wrap = document.getElementById('oad-staff-wrap');
     if (!wrap) return;
-    wrap.innerHTML = '<div class="oad-skel" style="height:60px;"></div>';
+    wrap.innerHTML = '<div class="oad-skel" style="height:80px;"></div>';
 
     const { data, error } = await staffApi.listAll();
     if (error) { wrap.innerHTML = `<div class="oad-empty">${escapeHtml(error.message)}</div>`; return; }
@@ -7624,28 +7664,194 @@ async function _renderStaffRoles() {
         return;
     }
 
-    wrap.innerHTML = `
-        <table class="oad-table">
-            <thead><tr><th>ชื่อ</th><th>กลุ่ม</th><th>เครื่องดนตรี</th>
-                       <th>ตำแหน่ง</th><th>ขอบเขต</th><th>จัดการ</th></tr></thead>
-            <tbody>
-            ${rows.map(r => {
-                const sc = _SCOPE_LABEL[r.scope_type] || { icon: '•', name: r.scope_type };
-                return `<tr>
-                    <td><strong>${escapeHtml(r.full_name || '—')}</strong>
-                        ${r.nickname ? `<span style="opacity:.6;"> (${escapeHtml(r.nickname)})</span>` : ''}</td>
-                    <td class="nowrap">${r.student_group === 'club'
-                        ? '<span class="oad-badge oad-badge-green">ชุมนุม</span>'
-                        : '<span class="oad-badge oad-badge-gray">ทั่วไป</span>'}</td>
-                    <td class="nowrap">${escapeHtml(r.main_instrument || '—')}</td>
-                    <td class="nowrap">${sc.icon} ${escapeHtml(sc.name)}</td>
-                    <td style="font-size:.85rem;opacity:.8;">${escapeHtml(r.scope_label || '')}</td>
-                    <td><button class="oad-btn oad-btn-red" onclick="window.__oadRevokeStaff(${r.role_id})">ถอดถอน</button></td>
-                </tr>`;
+    const viewBarHtml = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; gap:0.5rem; flex-wrap:wrap;">
+            <div style="display:flex; background:rgba(255,255,255,0.06); padding:4px; border-radius:10px; border:1px solid var(--oad-border); gap:4px;">
+                <button class="oad-btn ${!_staffViewMode || _staffViewMode === 'tree' ? 'oad-btn-primary' : ''}" 
+                        style="${!_staffViewMode || _staffViewMode === 'tree' ? '' : 'background:transparent;color:var(--oad-muted);'}"
+                        onclick="window.__oadSwitchStaffView('tree')">🌳 ผังสายงานบังคับบัญชา</button>
+                <button class="oad-btn ${_staffViewMode === 'table' ? 'oad-btn-primary' : ''}" 
+                        style="${_staffViewMode === 'table' ? '' : 'background:transparent;color:var(--oad-muted);'}"
+                        onclick="window.__oadSwitchStaffView('table')">📋 รายการตาราง</button>
+            </div>
+            <div style="font-size:0.82rem; color:var(--oad-muted);">
+                แต่งตั้งแล้ว <strong style="color:var(--oad-accent); font-size:1rem;">${rows.length}</strong> ตำแหน่ง
+            </div>
+        </div>`;
+
+    if (_staffViewMode === 'table') {
+        wrap.innerHTML = viewBarHtml + `
+            <table class="oad-table">
+                <thead><tr><th>ชื่อ</th><th>กลุ่ม</th><th>เครื่องดนตรี</th>
+                           <th>ตำแหน่ง</th><th>ขอบเขต</th><th>จัดการ</th></tr></thead>
+                <tbody>
+                ${rows.map(r => {
+                    const sc = _SCOPE_LABEL[r.scope_type] || { icon: '•', name: r.scope_type };
+                    return `<tr>
+                        <td><strong>${escapeHtml(r.full_name || '—')}</strong>
+                            ${r.nickname ? `<span style="opacity:.6;"> (${escapeHtml(r.nickname)})</span>` : ''}</td>
+                        <td class="nowrap">${r.student_group === 'club'
+                            ? '<span class="oad-badge oad-badge-green">ชุมนุม</span>'
+                            : '<span class="oad-badge oad-badge-gray">ทั่วไป</span>'}</td>
+                        <td class="nowrap">${escapeHtml(r.main_instrument || '—')}</td>
+                        <td class="nowrap">${sc.icon} ${escapeHtml(sc.name)}</td>
+                        <td style="font-size:.85rem;opacity:.8;">${escapeHtml(r.scope_label || '')}</td>
+                        <td><button class="oad-btn oad-btn-red" onclick="window.__oadRevokeStaff(${r.role_id})">ถอดถอน</button></td>
+                    </tr>`;
+                }).join('')}
+                </tbody>
+            </table>`;
+        return;
+    }
+
+    // Hierarchy View (tree)
+    const bandLeader = rows.find(r => r.scope_type === 'band');
+    const uniformStaff = rows.filter(r => r.scope_type === 'uniform');
+    const eventStaff = rows.filter(r => r.scope_type === 'event');
+
+    const sectionHeads = {};
+    rows.filter(r => r.scope_type === 'section').forEach(r => {
+        sectionHeads[r.scope_value] = r;
+    });
+
+    const instHeadsBySection = { brass: [], woodwind: [], percussion: [], guard: [] };
+    rows.filter(r => r.scope_type === 'instrument').forEach(r => {
+        const secId = _getSectionForInstrument(r.scope_value || r.main_instrument);
+        if (!instHeadsBySection[secId]) instHeadsBySection[secId] = [];
+        instHeadsBySection[secId].push(r);
+    });
+
+    const topCommanderHtml = `
+        <div style="width:100%; display:flex; flex-direction:column; align-items:center; margin-bottom:1.5rem;">
+            <div style="width:100%; max-width:540px; background:linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(30, 41, 59, 0.95) 100%); border:2px solid rgba(245, 158, 11, 0.5); border-radius:16px; padding:1.2rem 1.5rem; text-align:center; position:relative; box-shadow:0 8px 24px rgba(0,0,0,0.3);">
+                <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(245, 158, 11, 0.2); color:#fbbf24; font-size:0.78rem; font-weight:800; padding:4px 14px; border-radius:99px; border:1px solid rgba(245, 158, 11, 0.3); margin-bottom:0.6rem;">
+                    🎖️ หัวหน้าวง (Band Leader)
+                </div>
+                ${bandLeader ? `
+                    <div style="font-size:1.25rem; font-weight:800; color:#fff;">
+                        ${escapeHtml(bandLeader.full_name)}
+                        ${bandLeader.nickname ? `<span style="opacity:0.75; font-size:1rem;"> (${escapeHtml(bandLeader.nickname)})</span>` : ''}
+                    </div>
+                    <div style="font-size:0.85rem; color:rgba(255,255,255,0.75); margin-top:0.3rem; display:flex; justify-content:center; align-items:center; gap:0.8rem; flex-wrap:wrap;">
+                        <span>🎵 เครื่องดนตรีประจำตัว: <strong>${escapeHtml(bandLeader.main_instrument || '—')}</strong></span>
+                        <span class="oad-badge oad-badge-green">${bandLeader.student_group === 'club' ? 'สมาชิกชุมนุม' : 'นักเรียนทั่วไป'}</span>
+                        <button class="oad-btn oad-btn-red" style="padding:0.25rem 0.65rem; font-size:0.78rem; margin-left:0.5rem;" onclick="window.__oadRevokeStaff(${bandLeader.role_id})">ถอดถอน</button>
+                    </div>
+                ` : `
+                    <div style="font-size:0.95rem; color:var(--oad-muted); margin:0.4rem 0;">
+                        ยังไม่ได้แต่งตั้งหัวหน้าวง
+                    </div>
+                    <button class="oad-btn oad-btn-approve" style="font-size:0.82rem; padding:0.3rem 0.8rem;" onclick="window.__oadAddStaff()">+ แต่งตั้งหัวหน้าวง</button>
+                `}
+            </div>
+            <div style="width:2px; height:24px; background:linear-gradient(180deg, rgba(245, 158, 11, 0.6) 0%, rgba(99, 102, 241, 0.4) 100%);"></div>
+        </div>`;
+
+    const sectionGridsHtml = `
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(270px, 1fr)); gap:1.2rem; width:100%;">
+            ${_SECTION_MAP_DEFS.map(sec => {
+                const secHead = sectionHeads[sec.id];
+                const instHeads = instHeadsBySection[sec.id] || [];
+                return `
+                    <div style="background:var(--oad-surface); border:1px solid var(--oad-border); border-radius:14px; padding:1.1rem; display:flex; flex-direction:column; gap:0.9rem; box-shadow:0 4px 12px rgba(0,0,0,0.12);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:0.6rem; border-bottom:1px solid var(--oad-border);">
+                            <span style="font-weight:800; font-size:0.98rem; display:flex; align-items:center; gap:0.4rem; color:var(--oad-text);">
+                                ${sec.icon} ${sec.name}
+                            </span>
+                            <span class="oad-badge oad-badge-purple">${instHeads.length + (secHead ? 1 : 0)} ตำแหน่ง</span>
+                        </div>
+
+                        <!-- หัวหน้ากลุ่มเครื่อง (Section Head) -->
+                        <div style="background:rgba(99, 102, 241, 0.08); border:1px dashed rgba(99, 102, 241, 0.3); border-radius:10px; padding:0.7rem 0.85rem;">
+                            <div style="font-size:0.72rem; font-weight:700; color:var(--oad-accent2); margin-bottom:0.3rem;">
+                                👑 หัวหน้ากลุ่มเครื่อง
+                            </div>
+                            ${secHead ? `
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div>
+                                        <strong style="font-size:0.9rem;">${escapeHtml(secHead.full_name)}</strong>
+                                        ${secHead.nickname ? `<span style="opacity:0.65; font-size:0.8rem;"> (${escapeHtml(secHead.nickname)})</span>` : ''}
+                                    </div>
+                                    <button class="oad-btn oad-btn-red" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="window.__oadRevokeStaff(${secHead.role_id})">ถอดถอน</button>
+                                </div>
+                            ` : `
+                                <div style="font-size:0.8rem; opacity:0.6; font-style:italic;">ยังไม่มีหัวหน้ากลุ่ม</div>
+                            `}
+                        </div>
+
+                        <!-- หัวหน้าเครื่องดนตรีประจำกลุ่ม (Instrument Heads) -->
+                        <div>
+                            <div style="font-size:0.75rem; font-weight:700; color:var(--oad-muted); margin-bottom:0.5rem; display:flex; justify-content:space-between;">
+                                <span>🎵 หัวหน้าเครื่องดนตรี</span>
+                                <span>${instHeads.length} รายการ</span>
+                            </div>
+                            ${instHeads.length ? `
+                                <div style="display:flex; flex-direction:column; gap:0.45rem;">
+                                    ${instHeads.map(h => `
+                                        <div style="background:var(--oad-surface2); border:1px solid rgba(255,255,255,0.05); border-radius:8px; padding:0.55rem 0.75rem; display:flex; justify-content:space-between; align-items:center;">
+                                            <div>
+                                                <div style="font-weight:700; font-size:0.85rem; color:var(--oad-text); display:flex; align-items:center; gap:0.3rem;">
+                                                    🎵 ${escapeHtml(h.scope_label || h.scope_value || 'เครื่องดนตรี')}
+                                                </div>
+                                                <div style="font-size:0.78rem; opacity:0.8; margin-top:0.1rem;">
+                                                    ${escapeHtml(h.full_name)}${h.nickname ? ` (${escapeHtml(h.nickname)})` : ''}
+                                                </div>
+                                            </div>
+                                            <button class="oad-btn oad-btn-red" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="window.__oadRevokeStaff(${h.role_id})">ถอดถอน</button>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : `
+                                <div style="font-size:0.8rem; color:var(--oad-muted); text-align:center; padding:0.8rem 0; background:rgba(0,0,0,0.1); border-radius:8px;">
+                                    ยังไม่มีหัวหน้าเครื่องในกลุ่มนี้
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `;
             }).join('')}
-            </tbody>
-        </table>`;
+        </div>`;
+
+    const specialRolesHtml = (uniformStaff.length || eventStaff.length) ? `
+        <div style="width:100%; margin-top:1.2rem; background:var(--oad-surface); border:1px solid var(--oad-border); border-radius:14px; padding:1.1rem;">
+            <div style="font-weight:800; font-size:0.95rem; margin-bottom:0.8rem; color:var(--oad-text); display:flex; align-items:center; gap:0.5rem;">
+                👔 ฝ่ายสนับสนุน & หัวหน้างานเฉพาะกิจ
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:0.8rem;">
+                ${uniformStaff.map(u => `
+                    <div style="background:rgba(139, 92, 246, 0.1); border:1px solid rgba(139, 92, 246, 0.3); border-radius:10px; padding:0.7rem; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-size:0.78rem; font-weight:700; color:#a78bfa;">👔 ฝ่ายเสื้อผ้า</div>
+                            <div style="font-weight:700; font-size:0.88rem; margin-top:0.1rem;">${escapeHtml(u.full_name)}</div>
+                        </div>
+                        <button class="oad-btn oad-btn-red" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="window.__oadRevokeStaff(${u.role_id})">ถอดถอน</button>
+                    </div>
+                `).join('')}
+                ${eventStaff.map(e => `
+                    <div style="background:rgba(236, 72, 153, 0.1); border:1px solid rgba(236, 72, 153, 0.3); border-radius:10px; padding:0.7rem; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-size:0.78rem; font-weight:700; color:#f472b6;">🎭 หัวหน้างาน: ${escapeHtml(e.scope_label)}</div>
+                            <div style="font-weight:700; font-size:0.88rem; margin-top:0.1rem;">${escapeHtml(e.full_name)}</div>
+                        </div>
+                        <button class="oad-btn oad-btn-red" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="window.__oadRevokeStaff(${e.role_id})">ถอดถอน</button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    ` : '';
+
+    wrap.innerHTML = viewBarHtml + `
+        <div style="width:100%; display:flex; flex-direction:column; align-items:center;">
+            ${topCommanderHtml}
+            ${sectionGridsHtml}
+            ${specialRolesHtml}
+        </div>`;
 }
+
+window.__oadSwitchStaffView = (mode) => {
+    _staffViewMode = mode;
+    _renderStaffRoles();
+};
 
 async function _renderStaffReports() {
     const wrap  = document.getElementById('oad-staffrep-wrap');
