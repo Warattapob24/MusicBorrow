@@ -7695,16 +7695,16 @@ async function _renderStaffRoles() {
     }
 
     const viewBarHtml = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; gap:0.5rem; flex-wrap:wrap;">
-            <div style="display:flex; background:rgba(255,255,255,0.06); padding:3px; border-radius:8px; border:1px solid var(--oad-border); gap:3px;">
-                <button class="oad-btn ${!_staffViewMode || _staffViewMode === 'tree' ? 'oad-btn-primary' : ''}" 
-                        style="padding:0.25rem 0.65rem; font-size:0.78rem; ${_staffViewMode === 'table' ? 'background:transparent;color:var(--oad-muted);' : ''}"
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; gap:0.5rem; flex-wrap:wrap;">
+            <div style="display:flex; background:rgba(255,255,255,0.06); padding:2px; border-radius:6px; border:1px solid var(--oad-border); gap:2px;">
+                <button type="button" class="oad-btn ${!_staffViewMode || _staffViewMode === 'tree' ? 'oad-btn-primary' : ''}" 
+                        style="width:auto !important; margin:0 !important; padding:0.2rem 0.55rem; font-size:0.75rem; ${_staffViewMode === 'table' ? 'background:transparent;color:var(--oad-muted);' : ''}"
                         onclick="window.__oadSwitchStaffView('tree')">🌳 ผังสายงานบังคับบัญชา</button>
-                <button class="oad-btn ${_staffViewMode === 'table' ? 'oad-btn-primary' : ''}" 
-                        style="padding:0.25rem 0.65rem; font-size:0.78rem; ${_staffViewMode === 'table' ? '' : 'background:transparent;color:var(--oad-muted);'}"
+                <button type="button" class="oad-btn ${_staffViewMode === 'table' ? 'oad-btn-primary' : ''}" 
+                        style="width:auto !important; margin:0 !important; padding:0.2rem 0.55rem; font-size:0.75rem; ${_staffViewMode === 'table' ? '' : 'background:transparent;color:var(--oad-muted);'}"
                         onclick="window.__oadSwitchStaffView('table')">📋 รายการตาราง</button>
             </div>
-            <div style="font-size:0.78rem; color:var(--oad-muted);">
+            <div style="font-size:0.75rem; color:var(--oad-muted);">
                 แต่งตั้งแล้ว <strong style="color:var(--oad-accent);">${rows.length}</strong> ตำแหน่ง
             </div>
         </div>`;
@@ -7726,7 +7726,7 @@ async function _renderStaffRoles() {
                         <td class="nowrap">${escapeHtml(r.main_instrument || '—')}</td>
                         <td class="nowrap">${sc.icon} ${escapeHtml(sc.name)}</td>
                         <td style="font-size:.85rem;opacity:.8;">${escapeHtml(r.scope_label || '')}</td>
-                        <td><button class="oad-btn oad-btn-red" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="window.__oadRevokeStaff(${r.role_id})">ถอดถอน</button></td>
+                        <td><button type="button" style="width:auto !important; margin:0 !important; padding:2px 8px !important; font-size:0.7rem !important; background:rgba(239,68,68,0.2) !important; color:#f87171 !important; border:1px solid rgba(239,68,68,0.4) !important; border-radius:6px !important; cursor:pointer;" onclick="window.__oadRevokeStaff(${r.role_id})">ถอดถอน</button></td>
                     </tr>`;
                 }).join('')}
                 </tbody>
@@ -7734,7 +7734,7 @@ async function _renderStaffRoles() {
         return;
     }
 
-    // Hierarchy View (tree) - Compact & Sleek
+    // Hierarchy View (tree) - Super Compact & Non-overlapping
     const bandLeader = rows.find(r => r.scope_type === 'band');
     const uniformStaff = rows.filter(r => r.scope_type === 'uniform');
     const eventStaff = rows.filter(r => r.scope_type === 'event');
@@ -7752,87 +7752,85 @@ async function _renderStaffRoles() {
     });
 
     const topCommanderHtml = `
-        <div style="width:100%; display:flex; flex-direction:column; align-items:center; margin-bottom:1rem;">
-            <div style="width:100%; max-width:440px; background:linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(30, 41, 59, 0.95) 100%); border:1.5px solid rgba(245, 158, 11, 0.5); border-radius:12px; padding:0.75rem 1.1rem; text-align:center; position:relative; box-shadow:0 4px 14px rgba(0,0,0,0.25);">
-                <div style="display:inline-flex; align-items:center; gap:4px; background:rgba(245, 158, 11, 0.2); color:#fbbf24; font-size:0.72rem; font-weight:800; padding:2px 10px; border-radius:99px; border:1px solid rgba(245, 158, 11, 0.3); margin-bottom:0.3rem;">
+        <div style="width:100%; display:flex; flex-direction:column; align-items:center; margin-bottom:0.6rem;">
+            <div style="width:100%; max-width:340px; background:linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(30, 41, 59, 0.95) 100%); border:1.5px solid rgba(245, 158, 11, 0.4); border-radius:8px; padding:0.45rem 0.75rem; text-align:center; box-shadow:0 3px 8px rgba(0,0,0,0.2);">
+                <div style="display:inline-flex; align-items:center; gap:3px; background:rgba(245, 158, 11, 0.2); color:#fbbf24; font-size:0.68rem; font-weight:800; padding:1px 6px; border-radius:99px; border:1px solid rgba(245, 158, 11, 0.3); margin-bottom:0.15rem;">
                     🎖️ หัวหน้าวง (Band Leader)
                 </div>
                 ${bandLeader ? `
-                    <div style="font-size:1.05rem; font-weight:800; color:#fff;">
+                    <div style="font-size:0.9rem; font-weight:800; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         ${escapeHtml(bandLeader.full_name)}
-                        ${bandLeader.nickname ? `<span style="opacity:0.75; font-size:0.9rem;"> (${escapeHtml(bandLeader.nickname)})</span>` : ''}
+                        ${bandLeader.nickname ? `<span style="opacity:0.75; font-size:0.78rem;"> (${escapeHtml(bandLeader.nickname)})</span>` : ''}
                     </div>
-                    <div style="font-size:0.78rem; color:rgba(255,255,255,0.75); margin-top:0.2rem; display:flex; justify-content:center; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-                        <span>🎵 เครื่องดนตรี: <strong>${escapeHtml(bandLeader.main_instrument || '—')}</strong></span>
-                        <span class="oad-badge oad-badge-green" style="padding:0.1rem 0.4rem; font-size:0.7rem;">${bandLeader.student_group === 'club' ? 'ชุมนุม' : 'ทั่วไป'}</span>
-                        <button class="oad-btn oad-btn-red" style="padding:0.15rem 0.5rem; font-size:0.72rem;" onclick="window.__oadRevokeStaff(${bandLeader.role_id})">ถอดถอน</button>
+                    <div style="font-size:0.72rem; color:rgba(255,255,255,0.75); margin-top:0.1rem; display:flex; justify-content:center; align-items:center; gap:0.4rem; flex-wrap:nowrap;">
+                        <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🎵 ${escapeHtml(bandLeader.main_instrument || '—')}</span>
+                        <span class="oad-badge oad-badge-green" style="padding:0.05rem 0.3rem; font-size:0.65rem; flex-shrink:0;">${bandLeader.student_group === 'club' ? 'ชุมนุม' : 'ทั่วไป'}</span>
+                        <button type="button" style="width:auto !important; min-width:unset !important; margin:0 !important; padding:1px 6px !important; font-size:0.68rem !important; background:rgba(239,68,68,0.2) !important; color:#f87171 !important; border:1px solid rgba(239,68,68,0.4) !important; border-radius:4px !important; cursor:pointer; flex-shrink:0;" onclick="window.__oadRevokeStaff(${bandLeader.role_id})">ถอดถอน</button>
                     </div>
                 ` : `
-                    <div style="font-size:0.85rem; color:var(--oad-muted); margin:0.2rem 0;">
-                        ยังไม่ได้แต่งตั้งหัวหน้าวง
-                    </div>
-                    <button class="oad-btn oad-btn-approve" style="font-size:0.78rem; padding:0.2rem 0.65rem;" onclick="window.__oadAddStaff()">+ แต่งตั้งหัวหน้าวง</button>
+                    <div style="font-size:0.75rem; color:var(--oad-muted); margin:0.1rem 0;">ยังไม่ได้แต่งตั้งหัวหน้าวง</div>
+                    <button type="button" style="width:auto !important; margin:0 !important; font-size:0.72rem !important; padding:0.15rem 0.5rem !important; background:#059669 !important; color:#fff !important; border:none !important; border-radius:4px !important; cursor:pointer;" onclick="window.__oadAddStaff()">+ แต่งตั้งหัวหน้าวง</button>
                 `}
             </div>
-            <div style="width:2px; height:18px; background:linear-gradient(180deg, rgba(245, 158, 11, 0.6) 0%, rgba(99, 102, 241, 0.4) 100%);"></div>
+            <div style="width:2px; height:12px; background:linear-gradient(180deg, rgba(245, 158, 11, 0.6) 0%, rgba(99, 102, 241, 0.4) 100%);"></div>
         </div>`;
 
     const sectionGridsHtml = `
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:0.85rem; width:100%;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:0.6rem; width:100%;">
             ${_SECTION_MAP_DEFS.map(sec => {
                 const secHead = sectionHeads[sec.id];
                 const instHeads = instHeadsBySection[sec.id] || [];
                 return `
-                    <div style="background:var(--oad-surface); border:1px solid var(--oad-border); border-radius:10px; padding:0.85rem; display:flex; flex-direction:column; gap:0.65rem; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:0.45rem; border-bottom:1px solid var(--oad-border);">
-                            <span style="font-weight:800; font-size:0.88rem; display:flex; align-items:center; gap:0.35rem; color:var(--oad-text);">
+                    <div style="background:var(--oad-surface); border:1px solid var(--oad-border); border-radius:8px; padding:0.65rem; display:flex; flex-direction:column; gap:0.5rem; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:0.35rem; border-bottom:1px solid var(--oad-border);">
+                            <span style="font-weight:800; font-size:0.82rem; display:flex; align-items:center; gap:0.3rem; color:var(--oad-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${sec.icon} ${sec.name}
                             </span>
-                            <span class="oad-badge oad-badge-purple" style="font-size:0.7rem; padding:0.1rem 0.4rem;">${instHeads.length + (secHead ? 1 : 0)} ตำแหน่ง</span>
+                            <span class="oad-badge oad-badge-purple" style="font-size:0.68rem; padding:0.05rem 0.35rem; flex-shrink:0;">${instHeads.length + (secHead ? 1 : 0)} ตำแหน่ง</span>
                         </div>
 
                         <!-- หัวหน้ากลุ่มเครื่อง (Section Head) -->
-                        <div style="background:rgba(99, 102, 241, 0.08); border:1px dashed rgba(99, 102, 241, 0.3); border-radius:8px; padding:0.45rem 0.65rem;">
-                            <div style="font-size:0.7rem; font-weight:700; color:var(--oad-accent2); margin-bottom:0.15rem;">
+                        <div style="background:rgba(99, 102, 241, 0.08); border:1px dashed rgba(99, 102, 241, 0.3); border-radius:6px; padding:0.35rem 0.55rem;">
+                            <div style="font-size:0.68rem; font-weight:700; color:var(--oad-accent2); margin-bottom:0.1rem;">
                                 👑 หัวหน้ากลุ่มเครื่อง
                             </div>
                             ${secHead ? `
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div>
-                                        <strong style="font-size:0.82rem;">${escapeHtml(secHead.full_name)}</strong>
-                                        ${secHead.nickname ? `<span style="opacity:0.65; font-size:0.75rem;"> (${escapeHtml(secHead.nickname)})</span>` : ''}
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.3rem;">
+                                    <div style="flex:1; min-width:0; font-size:0.76rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                        <strong style="color:var(--oad-text);">${escapeHtml(secHead.full_name)}</strong>
+                                        ${secHead.nickname ? `<span style="opacity:0.65; font-size:0.7rem;"> (${escapeHtml(secHead.nickname)})</span>` : ''}
                                     </div>
-                                    <button class="oad-btn oad-btn-red" style="padding:0.15rem 0.45rem; font-size:0.72rem;" onclick="window.__oadRevokeStaff(${secHead.role_id})">ถอดถอน</button>
+                                    <button type="button" style="width:auto !important; min-width:unset !important; margin:0 !important; padding:1px 6px !important; font-size:0.68rem !important; background:rgba(239,68,68,0.2) !important; color:#f87171 !important; border:1px solid rgba(239,68,68,0.4) !important; border-radius:4px !important; cursor:pointer; flex-shrink:0;" onclick="window.__oadRevokeStaff(${secHead.role_id})">ถอดถอน</button>
                                 </div>
                             ` : `
-                                <div style="font-size:0.75rem; opacity:0.6; font-style:italic;">ยังไม่มีหัวหน้ากลุ่ม</div>
+                                <div style="font-size:0.72rem; opacity:0.6; font-style:italic;">ยังไม่มีหัวหน้ากลุ่ม</div>
                             `}
                         </div>
 
                         <!-- หัวหน้าเครื่องดนตรีประจำกลุ่ม (Instrument Heads) -->
                         <div>
-                            <div style="font-size:0.72rem; font-weight:700; color:var(--oad-muted); margin-bottom:0.35rem; display:flex; justify-content:space-between;">
+                            <div style="font-size:0.7rem; font-weight:700; color:var(--oad-muted); margin-bottom:0.25rem; display:flex; justify-content:space-between;">
                                 <span>🎵 หัวหน้าเครื่องดนตรี</span>
                                 <span>${instHeads.length} รายการ</span>
                             </div>
                             ${instHeads.length ? `
-                                <div style="display:flex; flex-direction:column; gap:0.35rem;">
+                                <div style="display:flex; flex-direction:column; gap:0.3rem;">
                                     ${instHeads.map(h => `
-                                        <div style="background:var(--oad-surface2); border:1px solid rgba(255,255,255,0.04); border-radius:6px; padding:0.4rem 0.6rem; display:flex; justify-content:space-between; align-items:center;">
-                                            <div style="min-width:0; flex:1; margin-right:0.4rem;">
-                                                <div style="font-weight:700; font-size:0.8rem; color:var(--oad-text); display:flex; align-items:center; gap:0.25rem;">
+                                        <div style="background:var(--oad-surface2); border:1px solid rgba(255,255,255,0.04); border-radius:5px; padding:0.35rem 0.5rem; display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
+                                            <div style="flex:1 1 auto; min-width:0; overflow:hidden;">
+                                                <div style="font-weight:700; font-size:0.78rem; color:var(--oad-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:0.2rem;">
                                                     🎵 ${escapeHtml(h.scope_label || h.scope_value || 'เครื่องดนตรี')}
                                                 </div>
-                                                <div style="font-size:0.74rem; opacity:0.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                                <div style="font-size:0.72rem; color:var(--oad-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;">
                                                     ${escapeHtml(h.full_name)}${h.nickname ? ` (${escapeHtml(h.nickname)})` : ''}
                                                 </div>
                                             </div>
-                                            <button class="oad-btn oad-btn-red" style="padding:0.15rem 0.45rem; font-size:0.72rem; flex-shrink:0;" onclick="window.__oadRevokeStaff(${h.role_id})">ถอดถอน</button>
+                                            <button type="button" style="width:auto !important; min-width:unset !important; margin:0 !important; padding:1px 6px !important; font-size:0.68rem !important; background:rgba(239,68,68,0.2) !important; color:#f87171 !important; border:1px solid rgba(239,68,68,0.4) !important; border-radius:4px !important; cursor:pointer; flex-shrink:0; white-space:nowrap;" onclick="window.__oadRevokeStaff(${h.role_id})">ถอดถอน</button>
                                         </div>
                                     `).join('')}
                                 </div>
                             ` : `
-                                <div style="font-size:0.75rem; color:var(--oad-muted); text-align:center; padding:0.5rem 0; background:rgba(0,0,0,0.1); border-radius:6px;">
+                                <div style="font-size:0.72rem; color:var(--oad-muted); text-align:center; padding:0.4rem 0; background:rgba(0,0,0,0.1); border-radius:5px;">
                                     ยังไม่มีหัวหน้าเครื่องในกลุ่มนี้
                                 </div>
                             `}
@@ -7843,27 +7841,27 @@ async function _renderStaffRoles() {
         </div>`;
 
     const specialRolesHtml = (uniformStaff.length || eventStaff.length) ? `
-        <div style="width:100%; margin-top:0.85rem; background:var(--oad-surface); border:1px solid var(--oad-border); border-radius:10px; padding:0.85rem;">
-            <div style="font-weight:800; font-size:0.88rem; margin-bottom:0.6rem; color:var(--oad-text); display:flex; align-items:center; gap:0.4rem;">
+        <div style="width:100%; margin-top:0.6rem; background:var(--oad-surface); border:1px solid var(--oad-border); border-radius:8px; padding:0.65rem;">
+            <div style="font-weight:800; font-size:0.82rem; margin-bottom:0.4rem; color:var(--oad-text); display:flex; align-items:center; gap:0.35rem;">
                 👔 ฝ่ายสนับสนุน & หัวหน้างานเฉพาะกิจ
             </div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:0.6rem;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.45rem;">
                 ${uniformStaff.map(u => `
-                    <div style="background:rgba(139, 92, 246, 0.1); border:1px solid rgba(139, 92, 246, 0.25); border-radius:8px; padding:0.5rem 0.7rem; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <div style="font-size:0.72rem; font-weight:700; color:#a78bfa;">👔 ฝ่ายเสื้อผ้า</div>
-                            <div style="font-weight:700; font-size:0.82rem;">${escapeHtml(u.full_name)}</div>
+                    <div style="background:rgba(139, 92, 246, 0.1); border:1px solid rgba(139, 92, 246, 0.25); border-radius:6px; padding:0.35rem 0.55rem; display:flex; justify-content:space-between; align-items:center; gap:0.3rem;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:0.68rem; font-weight:700; color:#a78bfa;">👔 ฝ่ายเสื้อผ้า</div>
+                            <div style="font-weight:700; font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(u.full_name)}</div>
                         </div>
-                        <button class="oad-btn oad-btn-red" style="padding:0.15rem 0.45rem; font-size:0.72rem;" onclick="window.__oadRevokeStaff(${u.role_id})">ถอดถอน</button>
+                        <button type="button" style="width:auto !important; min-width:unset !important; margin:0 !important; padding:1px 6px !important; font-size:0.68rem !important; background:rgba(239,68,68,0.2) !important; color:#f87171 !important; border:1px solid rgba(239,68,68,0.4) !important; border-radius:4px !important; cursor:pointer; flex-shrink:0;" onclick="window.__oadRevokeStaff(${u.role_id})">ถอดถอน</button>
                     </div>
                 `).join('')}
                 ${eventStaff.map(e => `
-                    <div style="background:rgba(236, 72, 153, 0.1); border:1px solid rgba(236, 72, 153, 0.25); border-radius:8px; padding:0.5rem 0.7rem; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <div style="font-size:0.72rem; font-weight:700; color:#f472b6;">🎭 หัวหน้างาน: ${escapeHtml(e.scope_label)}</div>
-                            <div style="font-weight:700; font-size:0.82rem;">${escapeHtml(e.full_name)}</div>
+                    <div style="background:rgba(236, 72, 153, 0.1); border:1px solid rgba(236, 72, 153, 0.25); border-radius:6px; padding:0.35rem 0.55rem; display:flex; justify-content:space-between; align-items:center; gap:0.3rem;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:0.68rem; font-weight:700; color:#f472b6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🎭 ${escapeHtml(e.scope_label)}</div>
+                            <div style="font-weight:700; font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(e.full_name)}</div>
                         </div>
-                        <button class="oad-btn oad-btn-red" style="padding:0.15rem 0.45rem; font-size:0.72rem;" onclick="window.__oadRevokeStaff(${e.role_id})">ถอดถอน</button>
+                        <button type="button" style="width:auto !important; min-width:unset !important; margin:0 !important; padding:1px 6px !important; font-size:0.68rem !important; background:rgba(239,68,68,0.2) !important; color:#f87171 !important; border:1px solid rgba(239,68,68,0.4) !important; border-radius:4px !important; cursor:pointer; flex-shrink:0;" onclick="window.__oadRevokeStaff(${e.role_id})">ถอดถอน</button>
                     </div>
                 `).join('')}
             </div>
