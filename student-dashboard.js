@@ -4080,16 +4080,16 @@ export async function initStudentDashboard(mountEl, user) {
 
     await setView('home', user);
     setupRealtime(user);
-    revealStaffTab();
+    revealStaffTab(user);
 }
 
-// 👑 เปิดแท็บ "งานที่ได้รับมอบหมาย" เฉพาะคนที่ครูแต่งตั้งไว้จริง
+// 👑 เปิดแท็บ "งานที่ได้รับมอบหมาย" เฉพาะคนที่ครูแต่งตั้งไว้จริง (หรือครูผู้ดูแล)
 let _myScopes = null;
-async function revealStaffTab() {
+async function revealStaffTab(user) {
     const { data, error } = await staffApi.myScopes();
     if (error) return;
     _myScopes = data || [];
-    if (!_myScopes.length) return;
+    if (!_myScopes.length && user?.role !== 'admin') return;
     document.querySelector('#sd-top-nav .sd-tab[data-view="duty"]')?.classList.remove('hidden');
 }
 

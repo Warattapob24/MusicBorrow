@@ -1,11 +1,6 @@
 -- =====================================================================
--- MIGRATION: Fix Invalid Bigint Syntax for Staff Roles Scope Value
+-- MIGRATION: Fix Staff Roles Scope Value, Thai Spelling & Duty RPCs
 -- File: MIGRATION_FIX_STAFF_ROLES_BIGINT.sql
--- Description: Handles scope_value as text (e.g., 'ทรัมเป็ต') safely
---              without throwing 'invalid input syntax for type bigint'.
--- Schema columns:
---   users: (id, prefix, first_name, last_name, nickname, student_group, main_instrument, role)
---   staff_roles: (id, user_id, scope_type, scope_value, granted_by, granted_at, is_active)
 -- =====================================================================
 
 -- 1. admin_grant_staff
@@ -51,7 +46,7 @@ BEGIN
         IF p_scope_value IS NULL OR trim(p_scope_value) = '' THEN
             RETURN jsonb_build_object('success', false, 'message', 'กรุณาระบุกลุ่มเครื่อง');
         END IF;
-        SELECT name_th INTO v_label FROM public.sections WHERE code = p_scope_value;
+        SELECT name_th INTO v_label FROM public.sections WHERE code = p_scope_value OR name_th = p_scope_value;
         IF v_label IS NULL THEN v_label := p_scope_value; END IF;
     ELSIF p_scope_type = 'event' THEN
         IF p_scope_value IS NULL OR trim(p_scope_value) = '' THEN
@@ -72,7 +67,6 @@ BEGIN
     END IF;
 
     -- Upsert staff role
-    -- Remove conflicting active roles for same user & scope
     DELETE FROM public.staff_roles 
     WHERE user_id = p_user_id 
       AND scope_type = p_scope_type 
@@ -124,7 +118,7 @@ BEGIN
         CASE 
             WHEN sr.scope_type = 'band' THEN 'ทั้งวง'
             WHEN sr.scope_type = 'uniform' THEN 'ชุดวงโยธวาทิต'
-            WHEN sr.scope_type = 'section' THEN COALESCE((SELECT s.name_th FROM public.sections s WHERE s.code = sr.scope_value), sr.scope_value)
+            WHEN sr.scope_type = 'section' THEN COALESCE((SELECT s.name_th FROM public.sections s WHERE s.code = sr.scope_value OR s.name_th = sr.scope_value), sr.scope_value)
             WHEN sr.scope_type = 'event' AND sr.scope_value ~ '^\d+$' THEN COALESCE((SELECT e.name FROM public.events e WHERE e.id = sr.scope_value::bigint), 'งาน #' || sr.scope_value)
             WHEN sr.scope_type = 'instrument' THEN 
                 CASE 
@@ -160,7 +154,7 @@ BEGIN
         CASE 
             WHEN sr.scope_type = 'band' THEN 'ทั้งวง'
             WHEN sr.scope_type = 'uniform' THEN 'ชุดวงโยธวาทิต'
-            WHEN sr.scope_type = 'section' THEN COALESCE((SELECT s.name_th FROM public.sections s WHERE s.code = sr.scope_value), sr.scope_value)
+            WHEN sr.scope_type = 'section' THEN COALESCE((SELECT s.name_th FROM public.sections s WHERE s.code = sr.scope_value OR s.name_th = sr.scope_value), sr.scope_value)
             WHEN sr.scope_type = 'event' AND sr.scope_value ~ '^\d+$' THEN COALESCE((SELECT e.name FROM public.events e WHERE e.id = sr.scope_value::bigint), 'งาน #' || sr.scope_value)
             WHEN sr.scope_type = 'instrument' THEN 
                 CASE 
@@ -201,7 +195,7 @@ DECLARE
     v_user_id uuid := auth.uid();
     v_is_band boolean := false;
 BEGIN
-    -- Check if user is band leader or admin using users.role = 'admin'
+    -- Check if user is band leader or admin
     IF EXISTS (SELECT 1 FROM public.staff_roles WHERE user_id = v_user_id AND scope_type = 'band' AND is_active = true)
        OR current_setting('request.jwt.claims', true)::jsonb->>'role' IN ('admin', 'service_role')
        OR EXISTS (SELECT 1 FROM public.users WHERE id = v_user_id AND role = 'admin') THEN
@@ -233,11 +227,26 @@ BEGIN
               SELECT 1 FROM public.staff_roles sr
               WHERE sr.user_id = v_user_id AND sr.is_active = true
                 AND (
-                    (sr.scope_type = 'section' AND s.code = sr.scope_value)
+                    -- Section match
+                    (sr.scope_type = 'section' AND (
+                        s.code = sr.scope_value 
+                        OR s.name_th = sr.scope_value
+                        OR (sr.scope_value = 'brass' AND (s.code = 'brass' OR s.name_th ILIKE '%ทองเหลือง%'))
+                        OR (sr.scope_value = 'woodwind' AND (s.code = 'woodwind' OR s.name_th ILIKE '%ไม้%'))
+                        OR (sr.scope_value = 'percussion' AND (s.code = 'percussion' OR s.name_th ILIKE '%กระทบ%'))
+                        OR (sr.scope_value = 'guard' AND (s.code = 'guard' OR s.name_th ILIKE '%การ์ด%'))
+                    ))
+                    -- Event match
                     OR (sr.scope_type = 'event' AND sr.scope_value ~ '^\d+$' AND bl.event_id = sr.scope_value::bigint)
+                    -- Instrument match (name/type & Thai spelling normalization)
                     OR (sr.scope_type = 'instrument' AND (
                         i.type = sr.scope_value 
                         OR i.name = sr.scope_value
+                        OR i.name ILIKE '%' || sr.scope_value || '%'
+                        OR i.type ILIKE '%' || sr.scope_value || '%'
+                        OR sr.scope_value ILIKE '%' || i.type || '%'
+                        OR replace(i.type, 'แซก', 'แซ็ก') = replace(sr.scope_value, 'แซก', 'แซ็ก')
+                        OR replace(i.name, 'แซก', 'แซ็ก') ILIKE '%' || replace(sr.scope_value, 'แซก', 'แซ็ก') || '%'
                         OR (sr.scope_value ~ '^\d+$' AND bl.instrument_id = sr.scope_value::bigint)
                     ))
                 )
@@ -247,8 +256,67 @@ BEGIN
 END;
 $$;
 
+
+-- 5. staff_get_uniform_outstanding
+DROP FUNCTION IF EXISTS public.staff_get_uniform_outstanding(bigint) CASCADE;
+DROP FUNCTION IF EXISTS public.staff_get_uniform_outstanding() CASCADE;
+
+CREATE OR REPLACE FUNCTION public.staff_get_uniform_outstanding(p_event_id bigint DEFAULT NULL)
+RETURNS TABLE (
+    id bigint,
+    kit_no text,
+    part_type text,
+    part_code text,
+    size text,
+    student_name text,
+    student_nickname text,
+    event_name text,
+    icon text,
+    issued_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_user_id uuid := auth.uid();
+    v_has_access boolean := false;
+BEGIN
+    IF EXISTS (SELECT 1 FROM public.staff_roles WHERE user_id = v_user_id AND scope_type IN ('band', 'uniform') AND is_active = true)
+       OR current_setting('request.jwt.claims', true)::jsonb->>'role' IN ('admin', 'service_role')
+       OR EXISTS (SELECT 1 FROM public.users WHERE id = v_user_id AND role = 'admin') THEN
+        v_has_access := true;
+    END IF;
+
+    IF NOT v_has_access THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT 
+        uk.id,
+        uk.kit_no,
+        up.part_type,
+        up.part_code,
+        up.size,
+        TRIM(COALESCE(u.prefix, '') || ' ' || COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS student_name,
+        u.nickname AS student_nickname,
+        e.name AS event_name,
+        '👔'::text AS icon,
+        uk.issued_at
+    FROM public.uniform_kits uk
+    JOIN public.uniform_parts up ON up.id = uk.part_id
+    JOIN public.users u ON u.id = uk.user_id
+    LEFT JOIN public.events e ON e.id = uk.event_id
+    WHERE uk.returned_at IS NULL
+      AND (p_event_id IS NULL OR uk.event_id = p_event_id)
+    ORDER BY uk.issued_at DESC;
+END;
+$$;
+
+
 -- Grants
 GRANT EXECUTE ON FUNCTION public.admin_grant_staff(uuid, text, text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_staff_list() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_my_staff_scopes() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.staff_get_outstanding(bigint) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.staff_get_uniform_outstanding(bigint) TO authenticated, service_role;
